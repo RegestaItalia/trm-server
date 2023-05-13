@@ -847,6 +847,23 @@
      </DOCUMENTATION>
     </item>
     <item>
+     <FUNCNAME>ZTRM_GET_SYSTEM_CVERS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get system software components</SHORT_TEXT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>ET_CVERS</PARAMETER>
+       <DBSTRUCT>CVERS</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>ET_CVERS</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>ZTRM_GET_TRANSPORT_LAYER</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get transport layer</SHORT_TEXT>
