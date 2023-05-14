@@ -1,4 +1,4 @@
-FUNCTION ZTRM_DELETE_MANIFEST_LOCK.
+FUNCTION ztrm_delete_manifest_lock.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -10,9 +10,9 @@ FUNCTION ZTRM_DELETE_MANIFEST_LOCK.
   DATA lv_arg TYPE eqegraarg.
 
   IF iv_manifest_type EQ 1.
-    lv_arg = 'SKTDZAPM*'.
+    lv_arg = 'SKTDZTRM*'.
   ELSEIF iv_manifest_type EQ 2.
-    lv_arg = 'ZAPM*'.
+    lv_arg = 'ZTRM*'.
   ELSE.
     RAISE unsupported_type.
   ENDIF.
