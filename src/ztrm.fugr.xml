@@ -864,6 +864,58 @@
      </DOCUMENTATION>
     </item>
     <item>
+     <FUNCNAME>ZTRM_GET_TADIR_ENTRY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get object tadir entry</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>IV_PGMID</PARAMETER>
+       <DBFIELD>TADIR-PGMID</DBFIELD>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_OBJECT</PARAMETER>
+       <DBFIELD>TADIR-OBJECT</DBFIELD>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_OBJ_NAME</PARAMETER>
+       <DBFIELD>TADIR-OBJ_NAME</DBFIELD>
+      </RSIMP>
+     </IMPORT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>ES_TADIR</PARAMETER>
+       <TYP>TADIR</TYP>
+      </RSEXP>
+     </EXPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>OBJECT_NOT_FOUND</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>IV_PGMID</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_OBJECT</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_OBJ_NAME</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>ES_TADIR</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>OBJECT_NOT_FOUND</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>ZTRM_GET_TRANSPORT_LAYER</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get transport layer</SHORT_TEXT>
