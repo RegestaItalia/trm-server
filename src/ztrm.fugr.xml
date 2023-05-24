@@ -385,10 +385,6 @@
        <TYP>ZTRM_PACKAGE_NAME</TYP>
       </RSIMP>
       <RSIMP>
-       <PARAMETER>IV_VERSION</PARAMETER>
-       <TYP>ZTRM_PACKAGE_VERSION</TYP>
-      </RSIMP>
-      <RSIMP>
        <PARAMETER>IV_REGISTRY</PARAMETER>
        <TYP>ZTRM_PACKAGE_REGISTRY</TYP>
       </RSIMP>
@@ -406,10 +402,6 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_NAME</PARAMETER>
-       <KIND>P</KIND>
-      </RSFDO>
-      <RSFDO>
-       <PARAMETER>IV_VERSION</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
@@ -1226,6 +1218,31 @@
       <RSFDO>
        <PARAMETER>OBJECT_LANG_ERROR</PARAMETER>
        <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>ZTRM_RENAME_TRANSPORT_REQUEST</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Rename transport request</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>IV_TRKORR</PARAMETER>
+       <TYP>TRKORR</TYP>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_AS4TEXT</PARAMETER>
+       <TYP>AS4TEXT</TYP>
+      </RSIMP>
+     </IMPORT>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>IV_TRKORR</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_AS4TEXT</PARAMETER>
+       <KIND>P</KIND>
       </RSFDO>
      </DOCUMENTATION>
     </item>
