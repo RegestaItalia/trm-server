@@ -68,6 +68,7 @@ FUNCTION ztrm_get_source_code.
           is_local_settings = <fs_local_settings>
           iv_package        = iv_package
           io_dot_abapgit    = <fs_dot_abapgit>
+          iv_show_log       = abap_false
         RECEIVING
           rv_xstr           = ev_zip.
     CATCH cx_root.
