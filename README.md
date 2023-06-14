@@ -1,29 +1,40 @@
 # trm-server
-TRM Server-Side is essential for operations between TRM and SAP System.
+![GitHub](https://img.shields.io/github/license/RegestaItalia/trm-server)
+![Custom badge](https://img.shields.io/endpoint?url=https://trmregistry.regestaitalia.it/public/shieldio/version?package=trm-server)
+![Custom badge](https://img.shields.io/endpoint?url=https://trmregistry.regestaitalia.it/public/shieldio/downloads?package=trm-server)
+
+TRM Server is the essential component for operations between TRM and your development SAP® system.
 
 Find more about TRM [here](https://github.com/RegestaItalia/trm-cli).
 
-## Status
-TRM is under development.
-
-Issues and pull requests are currently limited to developers during this stage.
-
 ## Install
+### First setup
 Download the source code of the main branch from [here](https://github.com/RegestaItalia/trm-server/archive/refs/heads/main.zip).
 
-Once downloaded, if not done already, [install abapGit](https://docs.abapgit.org/guide-install.html#install-standalone-version) (standalone version is enough).
+![image](https://github.com/RegestaItalia/trm-server/assets/87023474/bc654cff-25cf-4f9e-9b95-eb52465cff7a)
+
+Once downloaded, [install abapGit](https://docs.abapgit.org/guide-install.html#install-standalone-version) (standalone version is enough).
 
 Execute transaction SE38 and run the abapGit program.
 
-Once abapGit is running, you can follow [these steps](https://docs.abapgit.org/guide-offline-install.html).
+With abapGit report running, you can follow [these steps](https://docs.abapgit.org/guide-offline-install.html).
 
-You can name the package however you want (for example $TRM).
+![image](https://github.com/RegestaItalia/trm-server/assets/87023474/63c7c7c9-e13c-4bad-8f6b-4410a445fc1f)
 
-It is recommended to name is with the prefix $, because the package is not meant to be transported but should only stay on the development system.
+Create a new offline repository.
 
-## Update
-With TRM CLI installed, update with the following command
+![image](https://github.com/RegestaItalia/trm-server/assets/87023474/fdd3440a-b512-48d2-9b6c-cb36eb6c4c76)
+
+You can name the package whatever you prefer, although it's good practice to name it **$TRM**: this package is not meant to be transported.
+
+![image](https://github.com/RegestaItalia/trm-server/assets/87023474/995b7d18-4c14-4471-905d-1f57484d96f4)
+
+### Update
+With [trm-cli](https://github.com/RegestaItalia/trm-cli) installed, update with the following command:
 ```
 trm update trm-server
 ```
-If prompted, choose the public registry.
+
+## FAQ
+For any question regarding trm-server, you can open an issue.
+Before opening an issue, check if it's trm-server related: all other issues should be opened in their respective GitHub repos.
