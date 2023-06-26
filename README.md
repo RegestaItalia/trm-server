@@ -5,7 +5,7 @@
 
 TRM Server is the essential component for operations between TRM and your development SAP® system.
 
-Find more about TRM [here](https://github.com/RegestaItalia/trm-cli).
+Find more about TRM [here](https://github.com/RegestaItalia/trm-client).
 
 ## Install
 ### First setup
@@ -30,7 +30,7 @@ You can name the package whatever you prefer, although it's good practice to nam
 ![image](https://github.com/RegestaItalia/trm-server/assets/87023474/995b7d18-4c14-4471-905d-1f57484d96f4)
 
 ### Update
-With [trm-cli](https://github.com/RegestaItalia/trm-cli) installed, update with the following command:
+With [trm-cli](https://github.com/RegestaItalia/trm-client) installed, update with the following command:
 ```
 trm update trm-server
 ```
