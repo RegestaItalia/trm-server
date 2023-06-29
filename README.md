@@ -1,7 +1,7 @@
 # trm-server
-![GitHub](https://img.shields.io/github/license/RegestaItalia/trm-server)
-![Custom badge](https://img.shields.io/endpoint?url=https://trmregistry.regestaitalia.it/public/shieldio/version?package=trm-server)
-![Custom badge](https://img.shields.io/endpoint?url=https://trmregistry.regestaitalia.it/public/shieldio/downloads?package=trm-server)
+![Custom badge](https://img.shields.io/endpoint?url=https://www.trmregistry.com/public/shieldio/license?package=trm-server)
+![Custom badge](https://img.shields.io/endpoint?url=https://www.trmregistry.com/public/shieldio/version?package=trm-server)
+![Custom badge](https://img.shields.io/endpoint?url=https://www.trmregistry.com/public/shieldio/downloads?package=trm-server)
 
 TRM Server is the essential component for operations between TRM and your development SAP® system.
 
