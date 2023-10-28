@@ -1,0 +1,21 @@
+name: Align after PR
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  alignAfterPr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Regesta Actions
+        uses: actions/checkout@v2
+        with:
+          repository: RegestaItalia/actions
+          token: ${{ secrets.CI_GITHUB_TOKEN }}
+          path: actions/regesta
+      - name: Align after PR
+        uses: ./actions/regesta/alignAfterPr
+        with:
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          repoName: ${{ github.event.repository.name }}
+          mainBranch: ${{ github.ref_name }}
