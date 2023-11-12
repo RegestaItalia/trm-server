@@ -91,6 +91,10 @@ The transport request will be created as a workbench transport (K).
 
         Transport request description.
 
+    - IV_TARGET - `TR_TARGET`
+
+        Transport system target.
+
 - Exporting
     - EV_TRKORR - `TRKORR`
 
