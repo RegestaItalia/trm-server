@@ -459,6 +459,10 @@
        <PARAMETER>IV_TEXT</PARAMETER>
        <TYP>AS4TEXT</TYP>
       </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_TARGET</PARAMETER>
+       <TYP>TR_TARGET</TYP>
+      </RSIMP>
      </IMPORT>
      <EXPORT>
       <RSEXP>
@@ -480,6 +484,10 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_TEXT</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_TARGET</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
