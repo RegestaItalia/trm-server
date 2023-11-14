@@ -3,21 +3,21 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <DD04V>
-    <ROLLNAME>ZTRM_PACKAGE_REGISTRY</ROLLNAME>
+    <ROLLNAME>ZTRM_PACKAGE_INTEGRITY</ROLLNAME>
     <DDLANGUAGE>E</DDLANGUAGE>
     <HEADLEN>55</HEADLEN>
     <SCRLEN1>10</SCRLEN1>
     <SCRLEN2>20</SCRLEN2>
     <SCRLEN3>40</SCRLEN3>
-    <DDTEXT>TRM Package registry URL</DDTEXT>
-    <REPTEXT>Registry</REPTEXT>
-    <SCRTEXT_S>Reg</SCRTEXT_S>
-    <SCRTEXT_M>Registry</SCRTEXT_M>
-    <SCRTEXT_L>Registry</SCRTEXT_L>
+    <DDTEXT>TRM Package Integrity</DDTEXT>
+    <REPTEXT>Integrity</REPTEXT>
+    <SCRTEXT_S>Int</SCRTEXT_S>
+    <SCRTEXT_M>Integrity</SCRTEXT_M>
+    <SCRTEXT_L>Integrity</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
     <DATATYPE>CHAR</DATATYPE>
-    <LENG>000100</LENG>
-    <OUTPUTLEN>000100</OUTPUTLEN>
+    <LENG>000128</LENG>
+    <OUTPUTLEN>000128</OUTPUTLEN>
    </DD04V>
   </asx:values>
  </asx:abap>
