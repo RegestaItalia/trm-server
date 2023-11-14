@@ -321,6 +321,20 @@ This parameter can also be seen in transaction `AL11`.
 
         Binary file to write.
 
+## TRM Package
+
+TRM Package related functions.
+
+### Update integrity
+
+Integrity is used to verify package content.
+
+- Function module `ZTRM_SET_INTEGRITY`
+- Importing
+    - IS_INTEGRITY - **required** - `ZTRM_INTEGRITY`
+
+        Package integrity.
+
 ## Interfaces
 
 Interfaces are used to modify objects.
