@@ -16,6 +16,6 @@ jobs:
       - name: Align after PR
         uses: ./actions/regesta/alignAfterPr
         with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          githubToken: ${{ secrets.CI_GITHUB_TOKEN }}
           repoName: ${{ github.event.repository.name }}
           mainBranch: ${{ github.ref_name }}

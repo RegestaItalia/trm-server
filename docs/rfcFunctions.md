@@ -91,6 +91,10 @@ The transport request will be created as a workbench transport (K).
 
         Transport request description.
 
+    - IV_TARGET - `TR_TARGET`
+
+        Transport system target.
+
 - Exporting
     - EV_TRKORR - `TRKORR`
 
@@ -320,6 +324,20 @@ This parameter can also be seen in transaction `AL11`.
     - IV_FILE - **required** - `XSTRING`
 
         Binary file to write.
+
+## TRM Package
+
+TRM Package related functions.
+
+### Update integrity
+
+Integrity is used to verify package content.
+
+- Function module `ZTRM_SET_INTEGRITY`
+- Importing
+    - IS_INTEGRITY - **required** - `ZTRM_INTEGRITY`
+
+        Package integrity.
 
 ## Interfaces
 

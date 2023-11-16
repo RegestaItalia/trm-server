@@ -3,6 +3,7 @@ FUNCTION ZTRM_CREATE_IMPORT_TR.
 *"*"Local Interface:
 *"  IMPORTING
 *"     VALUE(IV_TEXT) TYPE  AS4TEXT
+*"     VALUE(IV_TARGET) TYPE  TR_TARGET
 *"  EXPORTING
 *"     VALUE(EV_TRKORR) TYPE  TRKORR
 *"  EXCEPTIONS
@@ -22,6 +23,7 @@ FUNCTION ZTRM_CREATE_IMPORT_TR.
     EXPORTING
       iv_text           = iv_text
       iv_type           = 'K'
+      iv_target         = iv_target
     IMPORTING
       es_request_header = ls_header
     EXCEPTIONS

@@ -17,7 +17,7 @@ TRM Server is the essential component for operations between TRM Client and your
 
 Typically, trm-server is used by a TRM Client.
 
-When a TRM Client (like [trm-client](https://github.com/RegestaItalia/trm-client)) has to execute any of the functions of trm-server, it makes use od the [SAP NW RFC SDK](https://support.sap.com/en/product/connectors/nwrfcsdk.html).
+When a TRM Client (like [trm-client](https://github.com/RegestaItalia/trm-client)) has to execute any of the functions of trm-server, it makes use of the [SAP NW RFC SDK](https://support.sap.com/en/product/connectors/nwrfcsdk.html).
 
 The SDK connects to the development system, where this package exists, and executes the function.
 

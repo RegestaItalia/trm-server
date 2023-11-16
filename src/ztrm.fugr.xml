@@ -459,6 +459,10 @@
        <PARAMETER>IV_TEXT</PARAMETER>
        <TYP>AS4TEXT</TYP>
       </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_TARGET</PARAMETER>
+       <TYP>TR_TARGET</TYP>
+      </RSIMP>
      </IMPORT>
      <EXPORT>
       <RSEXP>
@@ -480,6 +484,10 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_TEXT</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_TARGET</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
@@ -1654,6 +1662,32 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IT_INSTALLDEVC</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>ZTRM_SET_INTEGRITY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Set TRM package integrity</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>IS_INTEGRITY</PARAMETER>
+       <TYP>ZTRM_INTEGRITY</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>IS_INTEGRITY</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
