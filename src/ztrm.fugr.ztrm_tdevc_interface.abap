@@ -35,7 +35,6 @@ FUNCTION ZTRM_TDEVC_INTERFACE.
 *    IF sy-subrc <> 0.
 *      RAISE factory_error.
 *    ENDIF.
-    "Issue #6
     PERFORM modify_package_data
             USING    ls_modify_sign
                      'X'
@@ -52,8 +51,8 @@ FUNCTION ZTRM_TDEVC_INTERFACE.
         OTHERS                = 1 ).
     lo_package->set_changeable(
     EXPORTING
-      i_changeable              = abap_true
-      i_suppress_dialog         = abap_true
+      i_changeable              = 'X'
+      i_suppress_dialog         = 'D'
     EXCEPTIONS
       object_already_changeable = 1
       object_already_unlocked   = 2
@@ -71,8 +70,8 @@ FUNCTION ZTRM_TDEVC_INTERFACE.
     ENDIF.
     lo_package->save(
       EXPORTING
-        i_suppress_dialog      = abap_true
-        i_suppress_corr_insert = abap_true
+        i_suppress_dialog      = 'X'
+        i_suppress_corr_insert = 'X'
       EXCEPTIONS
         OTHERS                = 1 ).
     IF sy-subrc <> 0.
@@ -80,8 +79,8 @@ FUNCTION ZTRM_TDEVC_INTERFACE.
     ENDIF.
     lo_package->set_changeable(
       EXPORTING
-        i_changeable              = abap_false
-        i_suppress_dialog         = abap_true
+        i_changeable              = 'X'
+        i_suppress_dialog         = 'D'
       EXCEPTIONS
         object_already_changeable = 1
         object_already_unlocked   = 2
@@ -136,6 +135,7 @@ FORM modify_package_data
   CALL METHOD lo_package->set_changeable
     EXPORTING
       i_changeable                = 'X'
+      i_suppress_dialog           = 'D'
     EXCEPTIONS
       object_locked_by_other_user = 1
       permission_failure          = 2
@@ -258,6 +258,7 @@ FORM modify_package_data
   CALL METHOD lo_package->set_changeable
     EXPORTING
       i_changeable                = ' '
+      i_suppress_dialog           = 'D'
     EXCEPTIONS
       object_locked_by_other_user = 1
       permission_failure          = 2
