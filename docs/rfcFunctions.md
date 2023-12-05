@@ -36,6 +36,19 @@ This package will expose RFC enabled function modules used by the TRM client.
 
         Objects to add to the transport.
 
+### Add language translations to transport request
+
+- Function module `ZTRM_ADD_LANG_TR`
+- Importing
+    - IV_TRKORR - **required** - `TRKORR`
+        
+        Transport request number where the translations should be added.
+
+- Tables
+    - IT_DEVCLASS - `LXE_TT_PACKG_LINE`
+
+        Range of devclass.
+
 ### Source TRM Transport
 
 To indicate a transport was generated from the current system, a table is maintained.
@@ -107,6 +120,22 @@ The transport request will be created as a workbench transport (K).
     - IV_TRKORR - **required** - `TRKORR`
 
         Transport request to delete.
+        
+### Include transport request objects from source to target
+
+- Function module `ZTRM_TR_COPY`
+- Importing
+    - IV_FROM - **required** - `TRKORR`
+
+        Source transport request.
+
+    - IV_TO - **required** - `TRKORR`
+
+        Target transport request.
+
+    - IV_DOC - `TRPARFLAG`
+
+        Include documentation.
 
 ### Dequeue transport request
 
