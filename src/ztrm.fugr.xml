@@ -1519,6 +1519,9 @@
       <RSEXC>
        <EXCEPTION>READ_QUEUE_FAILED</EXCEPTION>
       </RSEXC>
+      <RSEXC>
+       <EXCEPTION>TMS_ALERT</EXCEPTION>
+      </RSEXC>
      </EXCEPTION>
      <DOCUMENTATION>
       <RSFDO>
@@ -1535,6 +1538,10 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>READ_QUEUE_FAILED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TMS_ALERT</PARAMETER>
        <KIND>X</KIND>
       </RSFDO>
      </DOCUMENTATION>
