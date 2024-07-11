@@ -1,4 +1,4 @@
-FUNCTION ZTRM_CREATE_IMPORT_TR.
+FUNCTION ztrm_create_import_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -11,12 +11,7 @@ FUNCTION ZTRM_CREATE_IMPORT_TR.
 *"      INSERT_FAILED
 *"      ENQUEUE_FAILED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA ls_header TYPE trwbo_request_header.
   CALL FUNCTION 'TR_INSERT_REQUEST_WITH_TASKS'

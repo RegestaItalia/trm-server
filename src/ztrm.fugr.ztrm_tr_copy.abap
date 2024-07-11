@@ -1,4 +1,4 @@
-FUNCTION ZTRM_TR_COPY.
+FUNCTION ztrm_tr_copy.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -19,12 +19,7 @@ FUNCTION ZTRM_TR_COPY.
 *"      WRONG_CATEGORY
 *"      OBJECT_NOT_PATCHABLE
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TR_COPY_COMM'
     EXPORTING

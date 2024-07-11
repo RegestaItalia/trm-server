@@ -1,4 +1,4 @@
-FUNCTION ZTRM_CREATE_PACKAGE.
+FUNCTION ztrm_create_package.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -38,12 +38,7 @@ FUNCTION ZTRM_CREATE_PACKAGE.
 *"      OBJECT_NOT_EXISTING
 *"----------------------------------------------------------------------
 
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
 
   DATA lo_package TYPE REF TO if_package.

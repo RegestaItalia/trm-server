@@ -1,4 +1,4 @@
-FUNCTION ZTRM_SET_TRANSPORT_DOC.
+FUNCTION ztrm_set_transport_doc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -9,12 +9,7 @@ FUNCTION ZTRM_SET_TRANSPORT_DOC.
 *"      TRM_RFC_UNAUTHORIZED
 *"      ERROR
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TRINT_DOCU_INTERFACE'
     EXPORTING

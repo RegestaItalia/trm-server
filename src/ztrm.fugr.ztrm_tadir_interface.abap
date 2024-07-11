@@ -1,4 +1,4 @@
-FUNCTION ZTRM_TADIR_INTERFACE.
+FUNCTION ztrm_tadir_interface.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -36,12 +36,7 @@ FUNCTION ZTRM_TADIR_INTERFACE.
 *"      CHANGE_OF_CLASS_NOT_ALLOWED
 *"      NO_CHANGE_FROM_SAP_TO_TMP
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TR_TADIR_INTERFACE'
     EXPORTING

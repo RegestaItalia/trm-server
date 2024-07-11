@@ -1,4 +1,4 @@
-FUNCTION ZTRM_DEQUEUE_TR.
+FUNCTION ztrm_dequeue_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -6,12 +6,7 @@ FUNCTION ZTRM_DEQUEUE_TR.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'DEQUEUE_E_TRKORR'
     EXPORTING

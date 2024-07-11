@@ -1,4 +1,4 @@
-FUNCTION ZTRM_SET_INTEGRITY.
+FUNCTION ztrm_set_integrity.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -6,12 +6,7 @@ FUNCTION ZTRM_SET_INTEGRITY.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   MODIFY ztrm_integrity FROM is_integrity.
   COMMIT WORK AND WAIT.

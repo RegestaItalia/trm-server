@@ -1,4 +1,4 @@
-FUNCTION ZTRM_ADD_OBJS_TR.
+FUNCTION ztrm_add_objs_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -18,12 +18,7 @@ FUNCTION ZTRM_ADD_OBJS_TR.
 *"      CANCELLED_BY_USER
 *"      RECURSIVE_CALL
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TRINT_REQUEST_CHOICE'
     EXPORTING

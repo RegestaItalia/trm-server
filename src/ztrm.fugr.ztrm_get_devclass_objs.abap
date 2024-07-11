@@ -1,4 +1,4 @@
-FUNCTION ZTRM_GET_DEVCLASS_OBJS.
+FUNCTION ztrm_get_devclass_objs.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -10,12 +10,7 @@ FUNCTION ZTRM_GET_DEVCLASS_OBJS.
 *"      CANCELLED_BY_USER
 *"      INVALID_INPUT
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TRINT_SELECT_OBJECTS'
     EXPORTING

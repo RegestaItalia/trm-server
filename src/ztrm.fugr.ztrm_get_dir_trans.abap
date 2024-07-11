@@ -1,4 +1,4 @@
-FUNCTION ZTRM_GET_DIR_TRANS.
+FUNCTION ztrm_get_dir_trans.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -7,12 +7,7 @@ FUNCTION ZTRM_GET_DIR_TRANS.
 *"      TRM_RFC_UNAUTHORIZED
 *"      NOT_FOUND
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA lv_param_name TYPE pfeparname.
   lv_param_name = 'DIR_TRANS'.

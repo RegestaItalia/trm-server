@@ -1,4 +1,4 @@
-FUNCTION ZTRM_RELEASE_TR.
+FUNCTION ztrm_release_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -26,12 +26,7 @@ FUNCTION ZTRM_RELEASE_TR.
 *"      ERROR_IN_EXPORT_METHODS
 *"      OBJECT_LANG_ERROR
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA lv_without_lock TYPE flag.
   IF iv_lock EQ 'X'.

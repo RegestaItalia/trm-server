@@ -1,4 +1,4 @@
-FUNCTION ZTRM_ADD_SRC_TRKORR.
+FUNCTION ztrm_add_src_trkorr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -7,12 +7,7 @@ FUNCTION ZTRM_ADD_SRC_TRKORR.
 *"      TRM_RFC_UNAUTHORIZED
 *"      INSERT_ERROR
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA ls_data TYPE ztrm_src_trkorr.
   ls_data-trkorr = iv_trkorr.

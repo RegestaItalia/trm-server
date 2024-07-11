@@ -1,4 +1,4 @@
-FUNCTION ZTRM_DELETE_TRANSPORT.
+FUNCTION ztrm_delete_transport.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -22,12 +22,7 @@ FUNCTION ZTRM_DELETE_TRANSPORT.
 *"      PROJECT_STILL_REFERENCED
 *"      SUCCESSORS_ALREADY_RELEASED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TR_DELETE_COMM'
     EXPORTING

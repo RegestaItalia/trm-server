@@ -1,4 +1,4 @@
-FUNCTION ZTRM_CHECK_AUTH.
+FUNCTION ztrm_check_auth.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXCEPTIONS

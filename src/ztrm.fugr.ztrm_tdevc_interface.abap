@@ -1,4 +1,4 @@
-FUNCTION ZTRM_TDEVC_INTERFACE.
+FUNCTION ztrm_tdevc_interface.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -9,12 +9,7 @@ FUNCTION ZTRM_TDEVC_INTERFACE.
 *"      TRM_RFC_UNAUTHORIZED
 *"      FACTORY_ERROR
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   IF iv_rm_parentcl EQ 'X'.
     "SAP Note 636704

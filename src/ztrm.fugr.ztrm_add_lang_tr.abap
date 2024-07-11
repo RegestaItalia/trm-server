@@ -1,4 +1,4 @@
-FUNCTION ZTRM_ADD_LANG_TR.
+FUNCTION ztrm_add_lang_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -25,12 +25,7 @@ FUNCTION ZTRM_ADD_LANG_TR.
         lt_date    TYPE lxe_tt_date,
         lt_comp    TYPE lxe_tt_comp.
 
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   IF it_devclass[] IS INITIAL.
     RAISE empty_devclass.

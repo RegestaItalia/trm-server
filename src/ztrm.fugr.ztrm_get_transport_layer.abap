@@ -1,4 +1,4 @@
-FUNCTION ZTRM_GET_TRANSPORT_LAYER.
+FUNCTION ztrm_get_transport_layer.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -9,12 +9,7 @@ FUNCTION ZTRM_GET_TRANSPORT_LAYER.
 *"      INVALID_INPUT
 *"      CTS_INITIALIZATION_FAILURE
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TR_GET_TRANSPORT_TARGET'
     EXPORTING

@@ -1,4 +1,4 @@
-FUNCTION ZTRM_IMPORT_TR.
+FUNCTION ztrm_import_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -10,12 +10,7 @@ FUNCTION ZTRM_IMPORT_TR.
 *"      TABLE_OF_REQUESTS_IS_EMPTY
 *"      ERROR_MESSAGE
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
     EXPORTING

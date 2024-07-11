@@ -13,12 +13,7 @@ FUNCTION ztrm_read_tms_queue.
   DATA: ls_bufcnt TYPE tmsbufcnt,
         ls_alog  TYPE tmsalog.
 
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   " 03072024 avoid display alert
   sy-batch = 'X'.

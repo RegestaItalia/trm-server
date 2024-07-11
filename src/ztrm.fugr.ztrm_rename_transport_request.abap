@@ -1,4 +1,4 @@
-FUNCTION ZTRM_RENAME_TRANSPORT_REQUEST.
+FUNCTION ztrm_rename_transport_request.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -8,12 +8,7 @@ FUNCTION ZTRM_RENAME_TRANSPORT_REQUEST.
 *"      TRM_RFC_UNAUTHORIZED
 *"      UPDATE_FAILED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
 
   CALL FUNCTION 'ENQUEUE_E_TRKORR'

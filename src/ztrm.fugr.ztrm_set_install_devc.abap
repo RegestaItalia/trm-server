@@ -1,4 +1,4 @@
-FUNCTION ZTRM_SET_INSTALL_DEVC.
+FUNCTION ztrm_set_install_devc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  TABLES
@@ -6,12 +6,7 @@ FUNCTION ZTRM_SET_INSTALL_DEVC.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA ls_installdevc LIKE LINE OF it_installdevc.
   LOOP AT it_installdevc INTO ls_installdevc.

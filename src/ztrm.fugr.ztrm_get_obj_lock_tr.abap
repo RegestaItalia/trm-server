@@ -1,4 +1,4 @@
-FUNCTION ZTRM_GET_OBJ_LOCK_TR.
+FUNCTION ztrm_get_obj_lock_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -10,12 +10,7 @@ FUNCTION ZTRM_GET_OBJ_LOCK_TR.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
   DATA ls_e070 TYPE e070.
   SELECT SINGLE e070~trkorr e070~strkorr
