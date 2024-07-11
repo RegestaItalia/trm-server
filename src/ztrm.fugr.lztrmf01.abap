@@ -16,6 +16,12 @@ FORM handle_exception.
   CASE lo_exc->reason( ).
     WHEN zcx_trm_exception=>c_reason-invalid_input.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING invalid_input.
+    WHEN zcx_trm_exception=>c_reason-enqueue_error.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING enqueue_error.
+    WHEN zcx_trm_exception=>c_reason-dequeue_error.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING dequeue_error.
+    WHEN zcx_trm_exception=>c_reason-dyn_call_param_not_found.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING dyn_call_param_not_found.
     WHEN OTHERS.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING generic.
   ENDCASE.

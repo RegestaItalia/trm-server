@@ -7,8 +7,11 @@ CLASS zcx_trm_exception DEFINITION
 
     CONSTANTS:
       BEGIN OF c_reason,
-        generic       TYPE string VALUE 'GENERIC',
-        invalid_input TYPE string VALUE 'INVALID_INPUT',
+        generic                  TYPE string VALUE 'GENERIC',
+        invalid_input            TYPE string VALUE 'INVALID_INPUT',
+        enqueue_error            TYPE string VALUE 'ENQUEUE_ERROR',
+        dequeue_error            TYPE string VALUE 'DEQUEUE_ERROR',
+        dyn_call_param_not_found TYPE string VALUE 'DYN_CALL_PARAM_NOT_FOUND',
       END OF c_reason .
 
     METHODS constructor

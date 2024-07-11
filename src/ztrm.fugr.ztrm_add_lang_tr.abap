@@ -13,7 +13,7 @@ FUNCTION ztrm_add_lang_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>add_translations_to_transport(
+      zcl_trm_transport=>add_translations(
         EXPORTING
           iv_trkorr   = iv_trkorr
           it_devclass = it_devclass[]
