@@ -8,29 +8,21 @@ FUNCTION ztrm_forward_tr.
 *"     VALUE(IV_IMPORT_AGAIN) TYPE  FLAG DEFAULT 'X'
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      READ_CONFIG_FAILED
-*"      TABLE_OF_REQUESTS_IS_EMPTY
-*"      ERROR_MESSAGE
+*"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
-  CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
-    EXPORTING
-      iv_request                 = iv_trkorr
-      iv_target                  = iv_target
-      iv_source                  = iv_source
-      iv_import_again            = iv_import_again
-    EXCEPTIONS
-      read_config_failed         = 1
-      table_of_requests_is_empty = 2
-      error_message              = 3.
-
-  IF sy-subrc EQ 1.
-    RAISE read_config_failed.
-  ELSEIF sy-subrc EQ 2.
-    RAISE table_of_requests_is_empty.
-  ELSEIF sy-subrc EQ 3.
-    RAISE error_message.
-  ENDIF.
+  TRY.
+      zcl_trm_transport=>forward(
+        EXPORTING
+          iv_trkorr       = iv_trkorr
+          iv_target       = iv_target
+          iv_source       = iv_source
+          iv_import_again = iv_import_again
+      ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

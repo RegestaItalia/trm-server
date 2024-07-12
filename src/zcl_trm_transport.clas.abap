@@ -5,7 +5,8 @@ CLASS zcl_trm_transport DEFINITION
 
   PUBLIC SECTION.
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
-           tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY.
+           tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
+           tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
 
     CLASS-METHODS add_translations
       IMPORTING iv_trkorr   TYPE trkorr
@@ -33,6 +34,54 @@ CLASS zcl_trm_transport DEFINITION
 
     CLASS-METHODS delete
       IMPORTING iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS enqueue
+      IMPORTING iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS dequeue
+      IMPORTING iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS forward
+      IMPORTING iv_trkorr       TYPE trkorr
+                iv_target       TYPE tmssysnam
+                iv_source       TYPE tmssysnam
+                iv_import_again TYPE flag
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS find_object_lock
+      IMPORTING iv_pgmid    TYPE pgmid
+                iv_object   TYPE trobjtype
+                iv_obj_name TYPE trobj_name
+      EXPORTING ev_trkorr   TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS import
+      IMPORTING iv_system TYPE tmssysnam
+                iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS read_queue
+      IMPORTING iv_target   TYPE tmssysnam
+      EXPORTING et_requests TYPE tmsiqreqs
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS release
+      IMPORTING iv_trkorr   TYPE trkorr
+                iv_lock     TYPE flag
+      EXPORTING et_messages TYPE ctsgerrmsgs
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS rename
+      IMPORTING iv_trkorr  TYPE trkorr
+                iv_as4text TYPE as4text
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS set_documentation
+      IMPORTING iv_trkorr TYPE trkorr
+                it_doc    TYPE tyt_tline
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
@@ -208,6 +257,223 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         wi_trkorr = iv_trkorr
       EXCEPTIONS
         OTHERS    = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD enqueue.
+    CALL FUNCTION 'ENQUEUE_E_TRKORR'
+      EXPORTING
+        trkorr = iv_trkorr
+      EXCEPTIONS
+        OTHERS = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-enqueue_error ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD dequeue.
+    CALL FUNCTION 'DEQUEUE_E_TRKORR'
+      EXPORTING
+        trkorr = iv_trkorr
+      EXCEPTIONS
+        OTHERS = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-dequeue_error ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD forward.
+    CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
+      EXPORTING
+        iv_request      = iv_trkorr
+        iv_target       = iv_target
+        iv_source       = iv_source
+        iv_import_again = iv_import_again
+      EXCEPTIONS
+        OTHERS          = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD find_object_lock.
+    DATA ls_e070 TYPE e070.
+    SELECT SINGLE e070~trkorr e070~strkorr
+    FROM e071
+    INNER JOIN e070 ON e070~trkorr = e071~trkorr
+    INTO CORRESPONDING FIELDS OF ls_e070
+    WHERE e071~pgmid EQ iv_pgmid AND e071~object EQ iv_object AND e071~obj_name EQ iv_obj_name
+          AND ( e070~trfunction EQ 'K' OR e070~trfunction EQ 'S' OR e070~trfunction EQ 'R' )
+          AND e070~trstatus EQ 'D'.
+
+    IF ls_e070-strkorr IS NOT INITIAL.
+      ev_trkorr = ls_e070-strkorr.
+    ELSE.
+      ev_trkorr = ls_e070-trkorr.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD import.
+    CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
+      EXPORTING
+        iv_system             = iv_system
+        iv_request            = iv_trkorr
+        iv_ctc_active         = ' '
+        iv_overtake           = 'X'
+        iv_import_again       = 'X'
+        iv_ignore_originality = 'X'
+        iv_ignore_repairs     = 'X'
+        iv_ignore_transtype   = 'X'
+        iv_ignore_tabletype   = 'X'
+        iv_ignore_predec      = 'X'
+        iv_ignore_cvers       = 'X'
+        iv_test_import        = ' '
+        iv_subset             = 'X'
+        iv_offline            = 'X'
+        iv_monitor            = 'X'
+        iv_verbose            = ' '
+      EXCEPTIONS
+        OTHERS                = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD read_queue.
+    DATA: ls_bufcnt TYPE tmsbufcnt,
+          ls_alog   TYPE tmsalog,
+          lv_dummy  TYPE string.
+    " 03072024 avoid display alert
+    sy-batch = 'X'.
+
+    CALL FUNCTION 'TMS_UIQ_IQD_READ_QUEUE'
+      EXPORTING
+        iv_system      = iv_target
+        iv_collect     = 'X'
+        iv_read_shadow = 'X'
+      IMPORTING
+        et_requests    = et_requests
+        es_bufcnt      = ls_bufcnt
+      EXCEPTIONS
+        OTHERS         = 1.
+
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+
+    IF ls_bufcnt-alertid IS NOT INITIAL.
+      CALL FUNCTION 'TMS_ALT_ANALYSE_ALERT'
+        EXPORTING
+          iv_alert_id   = ls_bufcnt-alertid
+          iv_no_display = 'X'
+        IMPORTING
+          es_alog       = ls_alog
+        EXCEPTIONS
+          OTHERS        = 1.
+      IF ls_alog-msgty EQ 'E' OR ls_alog-msgty EQ 'A' OR sy-subrc <> 0.
+        MESSAGE ID ls_alog-msgid
+        TYPE ls_alog-msgty
+        NUMBER ls_alog-msgno
+        INTO lv_dummy
+        WITH ls_alog-msgv1 ls_alog-msgv2 ls_alog-msgv3 ls_alog-msgv4.
+        zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-tms_alert ).
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD release.
+    DATA lv_without_lock TYPE flag.
+    IF iv_lock EQ 'X'.
+      lv_without_lock = ' '.
+    ELSE.
+      lv_without_lock = 'X'.
+    ENDIF.
+
+    CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+      EXPORTING
+        iv_trkorr                = iv_trkorr
+        iv_dialog                = ' '
+        iv_success_message       = ' '
+        iv_display_export_log    = ' '
+        iv_without_objects_check = 'X'
+        iv_without_locking       = lv_without_lock
+      EXCEPTIONS
+        OTHERS                   = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD rename.
+    enqueue( iv_trkorr ).
+    "LSTR6F02 - e070_update
+    DATA: ls_e070  TYPE e070,
+          ls_e070c TYPE e070c,
+          ls_e07t  TYPE e07t.
+    DATA: lv_msgtext1 LIKE sy-msgv3,
+          lv_msgtext2 LIKE sy-msgv3,
+          lv_msgtext3 LIKE sy-msgv3.
+
+    SELECT SINGLE * INTO ls_e070
+           FROM e070
+           WHERE trkorr = iv_trkorr.
+    SELECT SINGLE * INTO ls_e070c "read additional fields - note 2231381
+           FROM e070c
+           WHERE trkorr = iv_trkorr.
+
+    ls_e07t-trkorr = iv_trkorr.
+    ls_e07t-langu = sy-langu.
+    ls_e07t-as4text = iv_as4text.
+
+    CALL FUNCTION 'TRINT_UPDATE_COMM_HEADER'
+      EXPORTING
+        wi_e070      = ls_e070
+        wi_e07t      = ls_e07t
+        wi_save_user = ' '
+        wi_sel_e070  = 'X'
+        wi_sel_e07t  = 'X'
+        wi_user      = sy-uname
+        wi_e070c     = ls_e070c
+        wi_sel_e070c = 'X'
+      IMPORTING
+        we_e070      = ls_e070
+        we_e070c     = ls_e070c
+      EXCEPTIONS
+        OTHERS       = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+
+    dequeue( iv_trkorr ).
+
+    lv_msgtext1 = ls_e070-trkorr.
+    lv_msgtext2 = sy-uname.
+    lv_msgtext3 = ' '.
+
+    CALL FUNCTION 'TRINT_APPEND_COMM_SYSLOG_ENTRY'
+      EXPORTING
+        wi_msgid      = 'TR'
+        wi_msgno      = '018'
+        wi_msgv2      = lv_msgtext1
+        wi_msgv3      = lv_msgtext2
+        wi_msgv4      = lv_msgtext3
+        wi_new_order  = ' '
+        wi_trfunction = ls_e070-trfunction
+        wi_trkorr     = ls_e070-trkorr.
+  ENDMETHOD.
+
+  METHOD set_documentation.
+    CALL FUNCTION 'TRINT_DOCU_INTERFACE'
+      EXPORTING
+        iv_object           = iv_trkorr
+        iv_action           = 'M'
+        iv_modify_appending = ''
+      TABLES
+        tt_line             = it_doc
+      EXCEPTIONS
+        OTHERS              = 1.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.

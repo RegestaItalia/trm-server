@@ -9,6 +9,11 @@ CLASS zcl_trm_package DEFINITION
       IMPORTING is_data TYPE scompkdtln
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS get_objects
+      IMPORTING iv_devclass TYPE devclass
+      EXPORTING et_tadir    TYPE scts_tadir
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -65,6 +70,20 @@ CLASS zcl_trm_package IMPLEMENTATION.
       CATCH cx_sy_dyn_call_param_not_found.
         zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-dyn_call_param_not_found ).
     ENDTRY.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_objects.
+    CALL FUNCTION 'TRINT_SELECT_OBJECTS'
+      EXPORTING
+        iv_devclass      = iv_devclass
+        iv_via_selscreen = ' '
+      IMPORTING
+        et_objects_tadir = et_tadir
+      EXCEPTIONS
+        OTHERS           = 1.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.

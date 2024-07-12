@@ -7,25 +7,20 @@ FUNCTION ztrm_get_devclass_objs.
 *"     VALUE(ET_TADIR) TYPE  SCTS_TADIR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      CANCELLED_BY_USER
 *"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
-  CALL FUNCTION 'TRINT_SELECT_OBJECTS'
-    EXPORTING
-      iv_devclass       = iv_devclass
-      iv_via_selscreen  = ' '
-    IMPORTING
-      et_objects_tadir  = et_tadir
-    EXCEPTIONS
-      cancelled_by_user = 1
-      invalid_input     = 2.
-
-  IF sy-subrc EQ 1.
-    RAISE cancelled_by_user.
-  ELSEIF sy-subrc EQ 2.
-    RAISE invalid_input.
-  ENDIF.
+  TRY.
+      zcl_trm_package=>get_objects(
+        EXPORTING
+          iv_devclass = iv_devclass
+        IMPORTING
+          et_tadir    = et_tadir
+      ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

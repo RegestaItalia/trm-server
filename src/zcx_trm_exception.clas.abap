@@ -12,6 +12,8 @@ CLASS zcx_trm_exception DEFINITION
         enqueue_error            TYPE string VALUE 'ENQUEUE_ERROR',
         dequeue_error            TYPE string VALUE 'DEQUEUE_ERROR',
         dyn_call_param_not_found TYPE string VALUE 'DYN_CALL_PARAM_NOT_FOUND',
+        not_found                TYPE string VALUE 'NOT_FOUND',
+        tms_alert                TYPE string VALUE 'TMS_ALERT',
       END OF c_reason .
 
     METHODS constructor

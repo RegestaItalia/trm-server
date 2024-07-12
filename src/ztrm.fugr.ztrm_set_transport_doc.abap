@@ -7,21 +7,21 @@ FUNCTION ztrm_set_transport_doc.
 *"      IT_DOC STRUCTURE  TLINE
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      ERROR
+*"      INVALID_INPUT
+*"      ENQUEUE_ERROR
+*"      DEQUEUE_ERROR
+*"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
-  CALL FUNCTION 'TRINT_DOCU_INTERFACE'
-    EXPORTING
-      iv_object           = iv_trkorr
-      iv_action           = 'M'
-      iv_modify_appending = ''
-    TABLES
-      tt_line             = it_doc.
-
-  IF sy-subrc <> 0.
-    RAISE error.
-  ENDIF.
-
+  TRY.
+      zcl_trm_transport=>set_documentation(
+        EXPORTING
+          iv_trkorr = iv_trkorr
+          it_doc    = it_doc[]
+      ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

@@ -5,14 +5,18 @@ FUNCTION ztrm_list_object_types.
 *"      ET_OBJECT_TEXT STRUCTURE  KO100
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
-  CLEAR et_object_text.
-  CALL FUNCTION 'TR_OBJECT_TABLE'
-    TABLES
-      wt_object_text = et_object_text.
-
-
+  TRY.
+      zcl_trm_utility=>get_supported_object_types(
+        IMPORTING
+          et_object_text = et_object_text[]
+      ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

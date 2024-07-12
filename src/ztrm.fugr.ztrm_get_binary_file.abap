@@ -7,12 +7,20 @@ FUNCTION ztrm_get_binary_file.
 *"     VALUE(EV_FILE) TYPE  XSTRING
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
-  OPEN DATASET iv_file_path FOR INPUT IN BINARY MODE.
-  READ DATASET iv_file_path INTO ev_file.
-  CLOSE DATASET iv_file_path.
-
+  TRY.
+      zcl_trm_utility=>get_binary_file(
+        EXPORTING
+          iv_file_path = iv_file_path
+        IMPORTING
+          ev_file      = ev_file
+      ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.
