@@ -8,59 +8,27 @@ CLASS zcl_trm_transport DEFINITION
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
 
-    CLASS-METHODS add_translations
-      IMPORTING iv_trkorr   TYPE trkorr
-                it_devclass TYPE tyt_lxe_packg
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS add_objects
-      IMPORTING iv_lock   TYPE flag
-                iv_trkorr TYPE trkorr
-                it_e071   TYPE tyt_e071
-      EXPORTING et_log    TYPE sprot_u_tab
+    METHODS constructor
+      IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS create_workbench
       IMPORTING iv_text   TYPE as4text
                 iv_target TYPE tr_target
-      EXPORTING ev_trkorr TYPE trkorr
+      RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS create_transport_of_copies
       IMPORTING iv_text   TYPE as4text
                 iv_target TYPE tr_target
-      EXPORTING ev_trkorr TYPE trkorr
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS delete
-      IMPORTING iv_trkorr TYPE trkorr
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS enqueue
-      IMPORTING iv_trkorr TYPE trkorr
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS dequeue
-      IMPORTING iv_trkorr TYPE trkorr
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS forward
-      IMPORTING iv_trkorr       TYPE trkorr
-                iv_target       TYPE tmssysnam
-                iv_source       TYPE tmssysnam
-                iv_import_again TYPE flag
+      RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS find_object_lock
       IMPORTING iv_pgmid    TYPE pgmid
                 iv_object   TYPE trobjtype
                 iv_obj_name TYPE trobj_name
-      EXPORTING ev_trkorr   TYPE trkorr
-      RAISING   zcx_trm_exception.
-
-    CLASS-METHODS import
-      IMPORTING iv_system TYPE tmssysnam
-                iv_trkorr TYPE trkorr
+      RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS read_queue
@@ -68,20 +36,49 @@ CLASS zcl_trm_transport DEFINITION
       EXPORTING et_requests TYPE tmsiqreqs
       RAISING   zcx_trm_exception.
 
-    CLASS-METHODS release
-      IMPORTING iv_trkorr   TYPE trkorr
-                iv_lock     TYPE flag
+    METHODS get_trkorr
+      RETURNING VALUE(rv_trkorr) TYPE trkorr.
+
+    METHODS add_translations
+      IMPORTING it_devclass TYPE tyt_lxe_packg
+      RAISING   zcx_trm_exception.
+
+    METHODS add_objects
+      IMPORTING iv_lock   TYPE flag
+                it_e071   TYPE tyt_e071
+      EXPORTING et_log    TYPE sprot_u_tab
+      RAISING   zcx_trm_exception.
+
+    METHODS delete
+      RAISING   zcx_trm_exception.
+
+    METHODS enqueue
+      RAISING   zcx_trm_exception.
+
+    METHODS dequeue
+      RAISING   zcx_trm_exception.
+
+    METHODS forward
+      IMPORTING iv_target       TYPE tmssysnam
+                iv_source       TYPE tmssysnam
+                iv_import_again TYPE flag
+      RAISING   zcx_trm_exception.
+
+    METHODS import
+      IMPORTING iv_system TYPE tmssysnam
+      RAISING   zcx_trm_exception.
+
+    METHODS release
+      IMPORTING iv_lock     TYPE flag
       EXPORTING et_messages TYPE ctsgerrmsgs
       RAISING   zcx_trm_exception.
 
-    CLASS-METHODS rename
-      IMPORTING iv_trkorr  TYPE trkorr
-                iv_as4text TYPE as4text
+    METHODS rename
+      IMPORTING iv_as4text TYPE as4text
       RAISING   zcx_trm_exception.
 
-    CLASS-METHODS set_documentation
-      IMPORTING iv_trkorr TYPE trkorr
-                it_doc    TYPE tyt_tline
+    METHODS set_documentation
+      IMPORTING it_doc    TYPE tyt_tline
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
@@ -90,13 +87,23 @@ CLASS zcl_trm_transport DEFINITION
       IMPORTING iv_text   TYPE as4text
                 iv_target TYPE tr_target
                 iv_type   TYPE trfunction
-      EXPORTING ev_trkorr TYPE trkorr
+      RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
+
+    DATA: gv_trkorr TYPE trkorr.
 ENDCLASS.
 
 
 
 CLASS zcl_trm_transport IMPLEMENTATION.
+
+  METHOD constructor.
+    gv_trkorr = iv_trkorr.
+  ENDMETHOD.
+
+  METHOD get_trkorr.
+    rv_trkorr = gv_trkorr.
+  ENDMETHOD.
 
   METHOD add_translations.
     DATA: lt_langs   TYPE TABLE OF lxeisolang,
@@ -160,7 +167,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       CALL METHOD lo_explang->export_objects
         EXPORTING
           tr_auto                      = ''
-          tr_request                   = iv_trkorr
+          tr_request                   = gv_trkorr
           force                        = ''
           forcekey                     = ''
           object_transport             = ''
@@ -186,17 +193,19 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_objects.
+    DATA lt_e071 LIKE it_e071.
+    MOVE it_e071[] TO lt_e071[].
     CALL FUNCTION 'TRINT_REQUEST_CHOICE'
       EXPORTING
         iv_suppress_dialog   = 'X'
         iv_request_types     = 'FTCOK'
         iv_lock_objects      = iv_lock
         iv_with_error_log    = 'X'
-        iv_request           = iv_trkorr
+        iv_request           = gv_trkorr
       IMPORTING
         et_log               = et_log
       TABLES
-        it_e071              = it_e071
+        it_e071              = lt_e071
       EXCEPTIONS
         invalid_request      = 1
         invalid_request_type = 2
@@ -213,22 +222,22 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   METHOD create_workbench.
     create(
       EXPORTING
-        iv_text   = iv_text
-        iv_target = iv_target
-        iv_type   = 'K'
-      IMPORTING
-        ev_trkorr = ev_trkorr
+        iv_text      = iv_text
+        iv_target    = iv_target
+        iv_type      = 'K'
+      RECEIVING
+        ro_transport = ro_transport
     ).
   ENDMETHOD.
 
   METHOD create_transport_of_copies.
     create(
       EXPORTING
-        iv_text   = iv_text
-        iv_target = iv_target
-        iv_type   = 'T'
-      IMPORTING
-        ev_trkorr = ev_trkorr
+        iv_text      = iv_text
+        iv_target    = iv_target
+        iv_type      = 'T'
+      RECEIVING
+        ro_transport = ro_transport
     ).
   ENDMETHOD.
 
@@ -247,14 +256,14 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
-    ev_trkorr = ls_header-trkorr.
+    CREATE OBJECT ro_transport EXPORTING iv_trkorr = ls_header-trkorr.
   ENDMETHOD.
 
   METHOD delete.
     CALL FUNCTION 'TR_DELETE_COMM'
       EXPORTING
         wi_dialog = ' '
-        wi_trkorr = iv_trkorr
+        wi_trkorr = gv_trkorr
       EXCEPTIONS
         OTHERS    = 1.
     IF sy-subrc <> 0.
@@ -265,7 +274,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   METHOD enqueue.
     CALL FUNCTION 'ENQUEUE_E_TRKORR'
       EXPORTING
-        trkorr = iv_trkorr
+        trkorr = gv_trkorr
       EXCEPTIONS
         OTHERS = 1.
     IF sy-subrc <> 0.
@@ -276,7 +285,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   METHOD dequeue.
     CALL FUNCTION 'DEQUEUE_E_TRKORR'
       EXPORTING
-        trkorr = iv_trkorr
+        trkorr = gv_trkorr
       EXCEPTIONS
         OTHERS = 1.
     IF sy-subrc <> 0.
@@ -287,7 +296,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   METHOD forward.
     CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
       EXPORTING
-        iv_request      = iv_trkorr
+        iv_request      = gv_trkorr
         iv_target       = iv_target
         iv_source       = iv_source
         iv_import_again = iv_import_again
@@ -299,7 +308,8 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD find_object_lock.
-    DATA ls_e070 TYPE e070.
+    DATA: ls_e070 TYPE e070,
+          lv_trkorr TYPE trkorr.
     SELECT SINGLE e070~trkorr e070~strkorr
     FROM e071
     INNER JOIN e070 ON e070~trkorr = e071~trkorr
@@ -309,9 +319,13 @@ CLASS zcl_trm_transport IMPLEMENTATION.
           AND e070~trstatus EQ 'D'.
 
     IF ls_e070-strkorr IS NOT INITIAL.
-      ev_trkorr = ls_e070-strkorr.
+      lv_trkorr = ls_e070-strkorr.
     ELSE.
-      ev_trkorr = ls_e070-trkorr.
+      lv_trkorr = ls_e070-trkorr.
+    ENDIF.
+
+    IF lv_trkorr IS NOT INITIAL.
+      CREATE OBJECT ro_transport EXPORTING iv_trkorr = lv_trkorr.
     ENDIF.
   ENDMETHOD.
 
@@ -319,7 +333,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
       EXPORTING
         iv_system             = iv_system
-        iv_request            = iv_trkorr
+        iv_request            = gv_trkorr
         iv_ctc_active         = ' '
         iv_overtake           = 'X'
         iv_import_again       = 'X'
@@ -393,7 +407,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
 
     CALL FUNCTION 'TRINT_RELEASE_REQUEST'
       EXPORTING
-        iv_trkorr                = iv_trkorr
+        iv_trkorr                = gv_trkorr
         iv_dialog                = ' '
         iv_success_message       = ' '
         iv_display_export_log    = ' '
@@ -407,7 +421,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD rename.
-    enqueue( iv_trkorr ).
+    enqueue( ).
     "LSTR6F02 - e070_update
     DATA: ls_e070  TYPE e070,
           ls_e070c TYPE e070c,
@@ -418,12 +432,12 @@ CLASS zcl_trm_transport IMPLEMENTATION.
 
     SELECT SINGLE * INTO ls_e070
            FROM e070
-           WHERE trkorr = iv_trkorr.
+           WHERE trkorr = gv_trkorr.
     SELECT SINGLE * INTO ls_e070c "read additional fields - note 2231381
            FROM e070c
-           WHERE trkorr = iv_trkorr.
+           WHERE trkorr = gv_trkorr.
 
-    ls_e07t-trkorr = iv_trkorr.
+    ls_e07t-trkorr = gv_trkorr.
     ls_e07t-langu = sy-langu.
     ls_e07t-as4text = iv_as4text.
 
@@ -446,7 +460,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
-    dequeue( iv_trkorr ).
+    dequeue( ).
 
     lv_msgtext1 = ls_e070-trkorr.
     lv_msgtext2 = sy-uname.
@@ -465,13 +479,15 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_documentation.
+    DATA lt_doc LIKE it_doc.
+    MOVE it_doc[] TO lt_doc[].
     CALL FUNCTION 'TRINT_DOCU_INTERFACE'
       EXPORTING
-        iv_object           = iv_trkorr
+        iv_object           = gv_trkorr
         iv_action           = 'M'
         iv_modify_appending = ''
       TABLES
-        tt_line             = it_doc
+        tt_line             = lt_doc
       EXCEPTIONS
         OTHERS              = 1.
     IF sy-subrc <> 0.

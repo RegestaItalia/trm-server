@@ -5,22 +5,30 @@ CLASS zcl_trm_package DEFINITION
 
   PUBLIC SECTION.
 
+    METHODS constructor
+      IMPORTING iv_devclass TYPE devclass.
+
     CLASS-METHODS create
       IMPORTING is_data TYPE scompkdtln
+      RETURNING VALUE(ro_package) TYPE REF TO zcl_trm_package
       RAISING   zcx_trm_exception.
 
-    CLASS-METHODS get_objects
-      IMPORTING iv_devclass TYPE devclass
+    METHODS get_objects
       EXPORTING et_tadir    TYPE scts_tadir
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    DATA: gv_devclass TYPE devclass.
 ENDCLASS.
 
 
 
 CLASS zcl_trm_package IMPLEMENTATION.
+
+  METHOD constructor.
+    gv_devclass = iv_devclass.
+  ENDMETHOD.
 
   METHOD create.
     DATA ls_data LIKE is_data.
@@ -73,12 +81,14 @@ CLASS zcl_trm_package IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+
+    CREATE OBJECT ro_package EXPORTING iv_devclass = ls_data-devclass.
   ENDMETHOD.
 
   METHOD get_objects.
     CALL FUNCTION 'TRINT_SELECT_OBJECTS'
       EXPORTING
-        iv_devclass      = iv_devclass
+        iv_devclass      = gv_devclass
         iv_via_selscreen = ' '
       IMPORTING
         et_objects_tadir = et_tadir

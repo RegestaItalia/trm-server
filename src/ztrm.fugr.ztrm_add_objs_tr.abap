@@ -16,15 +16,16 @@ FUNCTION ztrm_add_objs_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>add_objects(
-        EXPORTING
-          iv_lock   = iv_lock
-          iv_trkorr = iv_trkorr
-          it_e071   = it_e071[]
-        IMPORTING
-          et_log    = et_log
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->add_objects(
+      EXPORTING
+        iv_lock   = iv_lock
+        it_e071   = it_e071[]
+      IMPORTING
+        et_log    = et_log
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
+
 ENDFUNCTION.

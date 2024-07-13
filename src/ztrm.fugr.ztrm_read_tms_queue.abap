@@ -14,14 +14,14 @@ FUNCTION ztrm_read_tms_queue.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>read_queue(
-        EXPORTING
-          iv_target   = iv_target
-        IMPORTING
-          et_requests = et_requests
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_transport=>read_queue(
+      EXPORTING
+        iv_target   = iv_target
+      IMPORTING
+        et_requests = et_requests
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

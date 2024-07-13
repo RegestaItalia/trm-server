@@ -13,12 +13,13 @@ FUNCTION ztrm_add_lang_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>add_translations(
-        EXPORTING
-          iv_trkorr   = iv_trkorr
-          it_devclass = it_devclass[]
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->add_translations(
+      EXPORTING
+        it_devclass = it_devclass[]
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
+
 ENDFUNCTION.

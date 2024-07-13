@@ -15,16 +15,17 @@ FUNCTION ztrm_get_obj_lock_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>find_object_lock(
-        EXPORTING
-          iv_pgmid    = iv_pgmid
-          iv_object   = iv_object
-          iv_obj_name = iv_obj_name
-        IMPORTING
-          ev_trkorr   = ev_trkorr
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_transport=>find_object_lock(
+      EXPORTING
+        iv_pgmid    = iv_pgmid
+        iv_object   = iv_object
+        iv_obj_name = iv_obj_name
+      RECEIVING
+        ro_transport = lo_transport
+    ).
+    ev_trkorr = lo_transport->get_trkorr( ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

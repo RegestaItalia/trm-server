@@ -13,12 +13,12 @@ FUNCTION ztrm_set_install_devc.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_utility=>add_install_devclass(
-        EXPORTING
-          it_installdevc = it_installdevc[]
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_utility=>add_install_devclass(
+      EXPORTING
+        it_installdevc = it_installdevc[]
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

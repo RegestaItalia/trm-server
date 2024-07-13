@@ -11,12 +11,12 @@ FUNCTION ztrm_list_object_types.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_utility=>get_supported_object_types(
-        IMPORTING
-          et_object_text = et_object_text[]
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_utility=>get_supported_object_types(
+      IMPORTING
+        et_object_text = et_object_text[]
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

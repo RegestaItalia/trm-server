@@ -13,12 +13,12 @@ FUNCTION ztrm_set_integrity.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_utility=>add_package_integrity(
-        EXPORTING
-          is_integrity = is_integrity
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_utility=>add_package_integrity(
+      EXPORTING
+        is_integrity = is_integrity
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

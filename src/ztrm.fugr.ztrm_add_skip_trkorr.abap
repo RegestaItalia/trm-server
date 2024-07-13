@@ -13,12 +13,12 @@ FUNCTION ztrm_add_skip_trkorr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_utility=>add_skip_trkorr(
-        EXPORTING
-          iv_trkorr = iv_trkorr
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_utility=>add_skip_trkorr(
+      EXPORTING
+        iv_trkorr = iv_trkorr
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

@@ -13,14 +13,13 @@ FUNCTION ztrm_get_devclass_objs.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_package=>get_objects(
-        EXPORTING
-          iv_devclass = iv_devclass
-        IMPORTING
-          et_tadir    = et_tadir
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_package EXPORTING iv_devclass = iv_devclass.
+    lo_package->get_objects(
+      IMPORTING
+        et_tadir    = et_tadir
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

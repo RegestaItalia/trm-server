@@ -11,12 +11,10 @@ FUNCTION ztrm_delete_transport.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>delete(
-        EXPORTING
-          iv_trkorr = iv_trkorr
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->delete( ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

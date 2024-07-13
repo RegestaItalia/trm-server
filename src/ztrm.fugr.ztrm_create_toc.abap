@@ -14,15 +14,16 @@ FUNCTION ztrm_create_toc.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>create_transport_of_copies(
-        EXPORTING
-          iv_text   = iv_text
-          iv_target = iv_target
-        IMPORTING
-          ev_trkorr = ev_trkorr
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_transport=>create_transport_of_copies(
+      EXPORTING
+        iv_text   = iv_text
+        iv_target = iv_target
+      RECEIVING
+        ro_transport = lo_transport
+    ).
+    ev_trkorr = lo_transport->get_trkorr( ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

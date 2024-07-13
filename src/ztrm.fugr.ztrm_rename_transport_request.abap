@@ -14,13 +14,13 @@ FUNCTION ztrm_rename_transport_request.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>rename(
-        EXPORTING
-          iv_trkorr  = iv_trkorr
-          iv_as4text = iv_as4text
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->rename(
+      EXPORTING
+        iv_as4text = iv_as4text
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

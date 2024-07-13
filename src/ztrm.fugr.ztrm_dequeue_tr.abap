@@ -12,12 +12,10 @@ FUNCTION ztrm_dequeue_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>dequeue(
-        EXPORTING
-          iv_trkorr = iv_trkorr
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->dequeue( ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

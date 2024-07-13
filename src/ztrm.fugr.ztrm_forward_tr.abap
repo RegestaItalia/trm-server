@@ -14,15 +14,15 @@ FUNCTION ztrm_forward_tr.
   PERFORM check_auth.
 
   TRY.
-      zcl_trm_transport=>forward(
-        EXPORTING
-          iv_trkorr       = iv_trkorr
-          iv_target       = iv_target
-          iv_source       = iv_source
-          iv_import_again = iv_import_again
-      ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->forward(
+      EXPORTING
+        iv_target       = iv_target
+        iv_source       = iv_source
+        iv_import_again = iv_import_again
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.
