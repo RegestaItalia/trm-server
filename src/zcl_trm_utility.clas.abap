@@ -24,6 +24,11 @@ CLASS zcl_trm_utility DEFINITION
       EXPORTING ev_file      TYPE xstring
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS write_binary_file
+      IMPORTING iv_file_path TYPE string
+                iv_file      TYPE xstring
+      RAISING   zcx_trm_exception.
+
     CLASS-METHODS get_dir_trans
       EXPORTING ev_dir_trans TYPE pfevalue
       RAISING   zcx_trm_exception.
@@ -46,6 +51,16 @@ CLASS zcl_trm_utility DEFINITION
 
     CLASS-METHODS add_package_integrity
       IMPORTING is_integrity TYPE ztrm_integrity
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS tadir_interface
+      IMPORTING iv_pgmid     TYPE pgmid
+                iv_object    TYPE trobjtype
+                iv_objname   TYPE sobj_name
+                iv_devclass  TYPE devclass OPTIONAL
+                iv_srcsystem TYPE srcsystem OPTIONAL
+                iv_author    TYPE responsibl OPTIONAL
+                iv_genflag   TYPE genflag OPTIONAL
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
@@ -122,6 +137,18 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     OPEN DATASET iv_file_path FOR INPUT IN BINARY MODE.
     READ DATASET iv_file_path INTO ev_file.
     CLOSE DATASET iv_file_path.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD write_binary_file.
+    OPEN DATASET iv_file_path FOR OUTPUT IN BINARY MODE.
+    TRANSFER iv_file TO iv_file_path.
+    CLOSE DATASET iv_file_path.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_dir_trans.
@@ -187,6 +214,25 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     MODIFY ztrm_integrity FROM is_integrity.
     COMMIT WORK AND WAIT.
     dequeue( iv_tabname = 'ZTRM_INTEGRITY' ).
+  ENDMETHOD.
+
+  METHOD tadir_interface.
+    CALL FUNCTION 'TR_TADIR_INTERFACE'
+      EXPORTING
+        wi_test_modus      = ' '
+        wi_tadir_pgmid     = iv_pgmid
+        wi_tadir_object    = iv_object
+        wi_tadir_obj_name  = iv_objname
+        wi_tadir_devclass  = iv_devclass
+        wi_tadir_srcsystem = iv_srcsystem
+        wi_tadir_author    = iv_author
+        wi_set_genflag     = iv_genflag
+*       iv_no_pak_check    = 'X'
+      EXCEPTIONS
+        OTHERS             = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

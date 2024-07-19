@@ -13,21 +13,21 @@ CLASS zcl_trm_transport DEFINITION
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS create_workbench
-      IMPORTING iv_text   TYPE as4text
-                iv_target TYPE tr_target
+      IMPORTING iv_text             TYPE as4text
+                iv_target           TYPE tr_target
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS create_transport_of_copies
-      IMPORTING iv_text   TYPE as4text
-                iv_target TYPE tr_target
+      IMPORTING iv_text             TYPE as4text
+                iv_target           TYPE tr_target
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
     CLASS-METHODS find_object_lock
-      IMPORTING iv_pgmid    TYPE pgmid
-                iv_object   TYPE trobjtype
-                iv_obj_name TYPE trobj_name
+      IMPORTING iv_pgmid            TYPE pgmid
+                iv_object           TYPE trobjtype
+                iv_obj_name         TYPE trobj_name
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
@@ -44,19 +44,19 @@ CLASS zcl_trm_transport DEFINITION
       RAISING   zcx_trm_exception.
 
     METHODS add_objects
-      IMPORTING iv_lock   TYPE flag
-                it_e071   TYPE tyt_e071
-      EXPORTING et_log    TYPE sprot_u_tab
+      IMPORTING iv_lock TYPE flag
+                it_e071 TYPE tyt_e071
+      EXPORTING et_log  TYPE sprot_u_tab
       RAISING   zcx_trm_exception.
 
     METHODS delete
-      RAISING   zcx_trm_exception.
+      RAISING zcx_trm_exception.
 
     METHODS enqueue
-      RAISING   zcx_trm_exception.
+      RAISING zcx_trm_exception.
 
     METHODS dequeue
-      RAISING   zcx_trm_exception.
+      RAISING zcx_trm_exception.
 
     METHODS forward
       IMPORTING iv_target       TYPE tmssysnam
@@ -78,15 +78,20 @@ CLASS zcl_trm_transport DEFINITION
       RAISING   zcx_trm_exception.
 
     METHODS set_documentation
-      IMPORTING it_doc    TYPE tyt_tline
+      IMPORTING it_doc TYPE tyt_tline
+      RAISING   zcx_trm_exception.
+
+    METHODS copy
+      IMPORTING iv_trkorr TYPE trkorr
+                iv_doc    TYPE trparflag
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS create
-      IMPORTING iv_text   TYPE as4text
-                iv_target TYPE tr_target
-                iv_type   TYPE trfunction
+      IMPORTING iv_text             TYPE as4text
+                iv_target           TYPE tr_target
+                iv_type             TYPE trfunction
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
@@ -308,7 +313,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD find_object_lock.
-    DATA: ls_e070 TYPE e070,
+    DATA: ls_e070   TYPE e070,
           lv_trkorr TYPE trkorr.
     SELECT SINGLE e070~trkorr e070~strkorr
     FROM e071
@@ -490,6 +495,20 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         tt_line             = lt_doc
       EXCEPTIONS
         OTHERS              = 1.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD copy.
+    CALL FUNCTION 'TR_COPY_COMM'
+      EXPORTING
+        wi_dialog                = ' '
+        wi_trkorr_from           = iv_trkorr
+        wi_trkorr_to             = gv_trkorr
+        wi_without_documentation = iv_doc
+      EXCEPTIONS
+        OTHERS                   = 1.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
