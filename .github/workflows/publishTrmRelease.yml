@@ -1,0 +1,55 @@
+name: Publish TRM release
+on:
+  release:
+    types: [published]
+jobs:
+  createTrmRelease:
+    runs-on: [self-hosted, Windows, RegRunner]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Start new NUVE instance
+        id: nuveInstance
+        uses: simonegaffurini/nuveplatform-start-backup@main
+        with:
+          email: ${{ secrets.NUVE_EMAIL }}
+          password: ${{ secrets.NUVE_PASSWORD }}
+          backup: ${{ vars.NUVE_INSTANCE_BACKUP_NAME }}
+          instanceName: ${{ vars.NUVE_INSTANCE_NAME }}
+          instanceProject: trm-samples
+      - name: Pull from main branch
+        id: api-request
+        uses: muhfaris/request-action@v1
+        with:
+          url: ${{ steps.nuveInstance.outputs.webDomain }}/zrestabapgit/pull
+          body: '{ "repoUrl": "${{ github.repositoryUrl }}", "trkorr": "${{ vars.NUVE_PULL_TRKORR }}" }'
+          method: POST
+      - name: TRM Publish
+        uses: RegestaItalia/trm-action-publish@2.1.4
+        with:
+          systemDest: A4H
+          systemAsHost: ${{ steps.nuveInstance.outputs.externalIp }}
+          systemSysnr: '00'
+          systemClient: '001'
+          systemUser: ${{ secrets.A4H_USER }}
+          systemPassword: ${{ secrets.A4H_PASSWORD }}
+          systemLang: EN
+          devclass: ZTRM
+          target: TRM
+          registryAuth: ${{ secrets.TRM_REGISTRY_AUTH }}
+          packageName: trm-server
+          packageVersion: ${{ github.event.release.tag_name }}
+          description: TRM (Transport Request Manager) Server
+          private: false
+          git: ${{ github.repositoryUrl }}
+          website: https://www.trmregistry.com/
+          license: MIT
+          authors: Simone Gaffurini <gaffu@trmregistry.com>
+          keywords: trm
+          readme: ./README.md
+      - name: Stop NUVE instance
+        uses: simonegaffurini/nuveplatform-stop-instance@main
+        with:
+          email: ${{ secrets.NUVE_EMAIL }}
+          password: ${{ secrets.NUVE_PASSWORD }}
+          instanceName: ${{ vars.NUVE_INSTANCE_NAME }}
