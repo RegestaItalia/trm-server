@@ -18,12 +18,13 @@ jobs:
           instanceName: ${{ vars.NUVE_INSTANCE_NAME }}
           instanceProject: trm-publish
       - name: Pull from main branch
-        id: api-request
-        uses: muhfaris/request-action@v1
+        uses: fjogeleit/http-request-action@v1
         with:
           url: ${{ steps.nuveInstance.outputs.webDomain }}/zrestabapgit/pull
-          body: '{ "repoUrl": "${{ github.repositoryUrl }}", "trkorr": "${{ vars.NUVE_PULL_TRKORR }}" }'
-          method: POST
+          method: 'POST'
+          username: ${{ secrets.A4H_USER }}
+          password: ${{ secrets.A4H_PASSWORD }}
+          data: '{ "repoUrl": "${{ github.repositoryUrl }}", "trkorr": "${{ vars.NUVE_PULL_TRKORR }}" }'
       - name: TRM Publish
         uses: RegestaItalia/trm-action-publish@2.1.4
         with:
