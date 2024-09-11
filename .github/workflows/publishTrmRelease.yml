@@ -16,7 +16,7 @@ jobs:
           password: ${{ secrets.NUVE_PASSWORD }}
           backup: ${{ vars.NUVE_INSTANCE_BACKUP_NAME }}
           instanceName: ${{ vars.NUVE_INSTANCE_NAME }}
-          instanceProject: trm-samples
+          instanceProject: trm-publish
       - name: Pull from main branch
         id: api-request
         uses: muhfaris/request-action@v1
@@ -39,7 +39,7 @@ jobs:
           registryAuth: ${{ secrets.TRM_REGISTRY_AUTH }}
           packageName: trm-server
           packageVersion: ${{ github.event.release.tag_name }}
-          description: TRM (Transport Request Manager) Server
+          description: ${{ vars.TRM_DESCRIPTION }}
           private: false
           git: ${{ github.repositoryUrl }}
           website: https://www.trmregistry.com/
