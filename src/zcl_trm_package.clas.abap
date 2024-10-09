@@ -48,7 +48,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
     MOVE is_data TO ls_data.
 
     TRY.
-        CALL METHOD ('CL_PACKAGE_FACTORY')=>('CREATE_NEW_PACKAGE')
+        CALL METHOD ('CL_PACKAGE_FACTORY')=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
           EXPORTING
             i_reuse_deleted_object = 'X'
             i_suppress_dialog      = 'X'
@@ -66,30 +66,24 @@ CLASS zcl_trm_package IMPLEMENTATION.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
-    TRY.
-        CALL METHOD lo_package->('SAVE')
-          EXPORTING
-            i_suppress_dialog      = 'X'
-            i_suppress_corr_insert = 'X'
-          EXCEPTIONS
-            OTHERS                 = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-dyn_call_param_not_found ).
-    ENDTRY.
+    lo_package->save(
+      EXPORTING
+        i_suppress_dialog      = 'X'
+        i_suppress_corr_insert = 'X'
+      EXCEPTIONS
+        OTHERS                 = 1
+    ).
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
-    TRY.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable      = ' '
-            i_suppress_dialog = 'X'
-          EXCEPTIONS
-            OTHERS            = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-dyn_call_param_not_found ).
-    ENDTRY.
+    lo_package->set_changeable(
+      EXPORTING
+        i_changeable      = ' '
+        i_suppress_dialog = 'X'
+      EXCEPTIONS
+        OTHERS            = 1
+    ).
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
