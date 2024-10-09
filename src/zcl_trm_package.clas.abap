@@ -52,7 +52,6 @@ CLASS zcl_trm_package IMPLEMENTATION.
           EXPORTING
             i_reuse_deleted_object = 'X'
             i_suppress_dialog      = 'X'
-            i_boh                  = 'X'
           IMPORTING
             e_package              = lo_package
           CHANGING
