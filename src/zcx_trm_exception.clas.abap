@@ -29,6 +29,7 @@ CLASS zcx_trm_exception DEFINITION
                 iv_reason  TYPE string OPTIONAL
       RAISING   zcx_trm_exception.
 
+    DATA: message TYPE symsg READ-ONLY.
   PROTECTED SECTION.
     DATA: gv_reason TYPE string.
   PRIVATE SECTION.
@@ -44,6 +45,7 @@ CLASS zcx_trm_exception IMPLEMENTATION.
       EXPORTING
         textid   = textid
         previous = previous.
+    MOVE-CORRESPONDING sy TO me->message.
   ENDMETHOD.
 
   METHOD reason.
