@@ -4,6 +4,7 @@ CLASS zcx_trm_exception DEFINITION
   CREATE PROTECTED .
 
   PUBLIC SECTION.
+    TYPES: tyt_log TYPE STANDARD TABLE OF tdline WITH DEFAULT KEY.
 
     CONSTANTS:
       BEGIN OF c_reason,
@@ -24,14 +25,19 @@ CLASS zcx_trm_exception DEFINITION
     METHODS reason
       RETURNING VALUE(rv_reason) TYPE string.
 
+    METHODS log
+      RETURNING VALUE(rt_log) TYPE tyt_log.
+
     CLASS-METHODS raise
       IMPORTING iv_message TYPE string OPTIONAL
                 iv_reason  TYPE string OPTIONAL
+                it_log     TYPE tyt_log OPTIONAL
       RAISING   zcx_trm_exception.
 
     DATA: message TYPE symsg READ-ONLY.
   PROTECTED SECTION.
-    DATA: gv_reason TYPE string.
+    DATA: gv_reason TYPE string,
+          gt_log    TYPE tyt_log.
   PRIVATE SECTION.
 
 ENDCLASS.
@@ -56,6 +62,10 @@ CLASS zcx_trm_exception IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD log.
+    rt_log = gt_log.
+  ENDMETHOD.
+
   METHOD raise.
     DATA lo_exc TYPE REF TO zcx_trm_exception.
     IF iv_message IS SUPPLIED.
@@ -63,6 +73,7 @@ CLASS zcx_trm_exception IMPLEMENTATION.
     ENDIF.
     CREATE OBJECT lo_exc.
     lo_exc->gv_reason = iv_reason.
+    lo_exc->gt_log = it_log.
     RAISE EXCEPTION lo_exc.
   ENDMETHOD.
 

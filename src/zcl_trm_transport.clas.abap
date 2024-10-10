@@ -299,16 +299,37 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD forward.
+    DATA: lt_stdout    TYPE STANDARD TABLE OF tpstdout,
+          ls_stdout    LIKE LINE OF lt_stdout,
+          lt_log       TYPE zcx_trm_exception=>tyt_log,
+          ls_exception TYPE stmscalert.
     CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
       EXPORTING
         iv_request      = gv_trkorr
         iv_target       = iv_target
         iv_source       = iv_source
         iv_import_again = iv_import_again
+        iv_monitor      = space
+      IMPORTING
+        es_exception    = ls_exception
+      TABLES
+        tt_stdout       = lt_stdout
       EXCEPTIONS
         OTHERS          = 1.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
+    ELSEIF ls_exception IS NOT INITIAL.
+      LOOP AT lt_stdout INTO ls_stdout.
+        APPEND ls_stdout-line TO lt_log.
+      ENDLOOP.
+      syst-msgid = ls_exception-msgid.
+      syst-msgno = ls_exception-msgno.
+      syst-msgty = ls_exception-msgty.
+      syst-msgv1 = ls_exception-msgv1.
+      syst-msgv2 = ls_exception-msgv2.
+      syst-msgv3 = ls_exception-msgv3.
+      syst-msgv4 = ls_exception-msgv4.
+      zcx_trm_exception=>raise( it_log = lt_log ).
     ENDIF.
   ENDMETHOD.
 
