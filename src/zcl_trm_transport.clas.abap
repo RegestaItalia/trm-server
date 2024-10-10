@@ -318,7 +318,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         OTHERS          = 1.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
-    ELSEIF ls_exception IS NOT INITIAL.
+    ELSEIF ls_exception-msgty EQ 'E' OR ls_exception-msgty EQ 'A'.
       LOOP AT lt_stdout INTO ls_stdout.
         APPEND ls_stdout-line TO lt_log.
       ENDLOOP.
