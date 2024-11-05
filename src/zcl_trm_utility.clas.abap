@@ -6,7 +6,8 @@ CLASS zcl_trm_utility DEFINITION
   PUBLIC SECTION.
 
     TYPES: tyt_ko100       TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
-           tyt_installdevc TYPE STANDARD TABLE OF ztrm_installdevc WITH DEFAULT KEY.
+           tyt_installdevc TYPE STANDARD TABLE OF ztrm_installdevc WITH DEFAULT KEY,
+           tyt_trnspacett  TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY.
 
     CLASS-METHODS check_functions_authorization
       RETURNING VALUE(rv_authorized) TYPE flag.
@@ -61,6 +62,12 @@ CLASS zcl_trm_utility DEFINITION
                 iv_srcsystem TYPE srcsystem OPTIONAL
                 iv_author    TYPE responsibl OPTIONAL
                 iv_genflag   TYPE genflag OPTIONAL
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS add_namespace
+      IMPORTING iv_namespace  TYPE namespace
+                iv_replicense TYPE trnlicense
+                it_texts      TYPE tyt_trnspacett
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
@@ -233,6 +240,43 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD add_namespace.
+    DATA: ls_trnspacet  TYPE trnspacet,
+          ls_trnspacett TYPE trnspacett.
+
+    ls_trnspacet-namespace = iv_namespace.
+    ls_trnspacet-role       = 'C'.
+    ls_trnspacet-changeuser = sy-uname.
+    ls_trnspacet-changedate = sy-datum.
+    INSERT trnspacet FROM ls_trnspacet.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-insert_error ).
+    ENDIF.
+
+    LOOP AT it_texts INTO ls_trnspacett.
+      CHECK ls_trnspacett-spras IS NOT INITIAL.
+      ls_trnspacett-namespace = iv_namespace.
+      INSERT trnspacett FROM ls_trnspacett.
+      IF sy-subrc <> 0.
+        zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-insert_error ).
+      ENDIF.
+    ENDLOOP.
+
+    CALL FUNCTION 'TR_ACTIVATE_NAMESPACE'
+      EXPORTING
+        iv_namespace         = iv_namespace
+      EXCEPTIONS
+        deletion_not_allowed = 1
+        OTHERS               = 2.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
+
+    UPDATE trnspace SET editflag = 'X' WHERE namespace = iv_namespace.
+
+    COMMIT WORK AND WAIT.
   ENDMETHOD.
 
 ENDCLASS.

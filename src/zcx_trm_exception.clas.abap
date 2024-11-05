@@ -15,6 +15,7 @@ CLASS zcx_trm_exception DEFINITION
         dyn_call_param_not_found TYPE string VALUE 'DYN_CALL_PARAM_NOT_FOUND',
         not_found                TYPE string VALUE 'NOT_FOUND',
         tms_alert                TYPE string VALUE 'TMS_ALERT',
+        insert_error             TYPE string VALUE 'INSERT_ERROR',
       END OF c_reason .
 
     METHODS constructor
