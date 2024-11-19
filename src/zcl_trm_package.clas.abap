@@ -47,6 +47,13 @@ CLASS zcl_trm_package IMPLEMENTATION.
     DATA lo_package TYPE REF TO if_package.
     MOVE is_data TO ls_data.
 
+    IF ls_data-as4user IS INITIAL.
+      ls_data-as4user = sy-uname.
+    ENDIF.
+    IF ls_data-masterlang IS INITIAL.
+      ls_data-masterlang = sy-langu.
+    ENDIF.
+
     TRY.
         CALL METHOD ('CL_PACKAGE_FACTORY')=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
           EXPORTING
@@ -85,6 +92,28 @@ CLASS zcl_trm_package IMPLEMENTATION.
     ).
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
+    ENDIF.
+
+    IF ls_data-devclass(1) <> '$'.
+      DATA: lv_objname    TYPE sobj_name,
+            lv_devclass   TYPE devclass,
+            lv_author     TYPE responsibl,
+            lv_masterlang TYPE masterlang.
+      lv_objname = ls_data-devclass.
+      lv_devclass = ls_data-devclass.
+      lv_author = ls_data-as4user.
+      lv_masterlang = ls_data-masterlang.
+      CALL FUNCTION 'TR_TADIR_INTERFACE'
+        EXPORTING
+          wi_test_modus       = abap_false
+          wi_tadir_pgmid      = 'R3TR'
+          wi_tadir_object     = 'DEVC'
+          wi_tadir_obj_name   = lv_objname
+          wi_tadir_devclass   = lv_devclass
+          wi_tadir_author     = lv_author
+          wi_tadir_masterlang = lv_masterlang
+        EXCEPTIONS
+          OTHERS              = 0.
     ENDIF.
 
     CREATE OBJECT ro_package EXPORTING iv_devclass = ls_data-devclass.
