@@ -16,6 +16,7 @@ CLASS zcx_trm_exception DEFINITION
         not_found                TYPE string VALUE 'NOT_FOUND',
         tms_alert                TYPE string VALUE 'TMS_ALERT',
         insert_error             TYPE string VALUE 'INSERT_ERROR',
+        r3trans_cmd_error        TYPE string VALUE 'R3TRANS_CMD_ERROR',
       END OF c_reason .
 
     METHODS constructor

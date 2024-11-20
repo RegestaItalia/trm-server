@@ -70,6 +70,10 @@ CLASS zcl_trm_utility DEFINITION
                 it_texts      TYPE tyt_trnspacett
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS get_r3trans_info
+      RETURNING VALUE(rv_r3trans) TYPE string
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -277,6 +281,23 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     UPDATE trnspace SET editflag = 'X' WHERE namespace = iv_namespace.
 
     COMMIT WORK AND WAIT.
+  ENDMETHOD.
+
+  METHOD get_r3trans_info.
+    TYPES: ty_cmd TYPE c LENGTH 254,
+           BEGIN OF ty_result,
+             line(255),
+           END OF ty_result.
+    DATA: cmd    TYPE ty_cmd,
+          result TYPE STANDARD TABLE OF ty_result.
+    cmd = 'R3trans'.
+    CALL 'SYSTEM' ID 'COMMAND' FIELD cmd
+                  ID 'TAB'     FIELD result.
+    IF sy-subrc <> 12. "Fatal errors have occurred, R3trans sets to 12 when running without options
+      zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-r3trans_cmd_error ).
+    ENDIF.
+
+    CONCATENATE LINES OF result INTO rv_r3trans RESPECTING BLANKS SEPARATED BY cl_abap_char_utilities=>newline.
   ENDMETHOD.
 
 ENDCLASS.

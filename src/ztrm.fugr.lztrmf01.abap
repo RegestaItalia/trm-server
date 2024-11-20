@@ -26,6 +26,8 @@ FORM handle_exception.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING not_found.
     WHEN zcx_trm_exception=>c_reason-tms_alert.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING tms_alert.
+    WHEN zcx_trm_exception=>c_reason-r3trans_cmd_error.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING r3trans_cmd_error.
     WHEN OTHERS.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING generic.
   ENDCASE.
