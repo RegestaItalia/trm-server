@@ -297,7 +297,7 @@ CLASS zcl_trm_utility IMPLEMENTATION.
       zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-r3trans_cmd_error ).
     ENDIF.
 
-    CONCATENATE LINES OF result INTO rv_r3trans RESPECTING BLANKS SEPARATED BY cl_abap_char_utilities=>newline.
+    CONCATENATE LINES OF result INTO rv_r3trans SEPARATED BY cl_abap_char_utilities=>newline.
   ENDMETHOD.
 
 ENDCLASS.
