@@ -1474,6 +1474,11 @@
        <OPTIONAL>X</OPTIONAL>
        <TYP>FLAG</TYP>
       </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_DEVLAYER</PARAMETER>
+       <OPTIONAL>X</OPTIONAL>
+       <TYP>DEVLAYER</TYP>
+      </RSIMP>
      </IMPORT>
      <EXCEPTION>
       <RSEXC>
@@ -1497,6 +1502,10 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>IV_RM_PARENTCL</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_DEVLAYER</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>

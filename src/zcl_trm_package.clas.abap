@@ -20,6 +20,7 @@ CLASS zcl_trm_package DEFINITION
     METHODS interface
       IMPORTING iv_parentcl    TYPE devclass OPTIONAL
                 iv_rm_parentcl TYPE flag OPTIONAL
+                iv_devlayer    TYPE devlayer OPTIONAL
       RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
@@ -219,11 +220,11 @@ CLASS zcl_trm_package IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD interface.
+    DATA: ls_modify_sign TYPE scompksign,
+          ls_pack_data   TYPE scompkdtln,
+          ls_cr          TYPE e070-trkorr.
     IF iv_rm_parentcl EQ 'X'.
       "SAP Note 636704
-      DATA: ls_modify_sign TYPE scompksign,
-            ls_pack_data   TYPE scompkdtln,
-            ls_cr          TYPE e070-trkorr.
       ls_modify_sign-parentcl = 'X'.
       ls_pack_data-devclass   = gv_devclass.
       modify_package_data(
@@ -234,6 +235,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
           cs_package_data      = ls_pack_data
           cv_transport_request = ls_cr
       ).
+      CLEAR ls_modify_sign.
+      CLEAR ls_pack_data.
+      CLEAR ls_cr.
     ELSEIF iv_parentcl IS NOT INITIAL.
       DATA lo_package TYPE REF TO if_package.
       cl_package_factory=>load_package(
@@ -278,6 +282,22 @@ CLASS zcl_trm_package IMPLEMENTATION.
       IF sy-subrc <> 0.
         zcx_trm_exception=>raise( ).
       ENDIF.
+    ENDIF.
+    IF iv_devlayer IS NOT INITIAL.
+      ls_modify_sign-pdevclass = 'X'.
+      ls_pack_data-devclass   = gv_devclass.
+      ls_pack_data-pdevclass   = iv_devlayer.
+      modify_package_data(
+        EXPORTING
+          is_package_data_sign = ls_modify_sign
+          iv_suppress_dialog   = 'X'
+        CHANGING
+          cs_package_data      = ls_pack_data
+          cv_transport_request = ls_cr
+      ).
+      CLEAR ls_modify_sign.
+      CLEAR ls_pack_data.
+      CLEAR ls_cr.
     ENDIF.
   ENDMETHOD.
 
