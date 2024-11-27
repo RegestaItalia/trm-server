@@ -254,6 +254,7 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     ls_trnspacet-role       = 'C'.
     ls_trnspacet-changeuser = sy-uname.
     ls_trnspacet-changedate = sy-datum.
+    ls_trnspacet-replicense = iv_replicense.
     INSERT trnspacet FROM ls_trnspacet.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-insert_error ).
