@@ -1,20 +1,21 @@
-FUNCTION ZTRM_DEQUEUE_TR.
+FUNCTION ztrm_dequeue_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
 *"     VALUE(IV_TRKORR) TYPE  TRKORR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
+*"      DEQUEUE_ERROR
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  CALL FUNCTION 'DEQUEUE_E_TRKORR'
-    EXPORTING
-      trkorr = iv_trkorr.
+  TRY.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->dequeue( ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

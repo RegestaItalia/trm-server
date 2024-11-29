@@ -1,4 +1,4 @@
-FUNCTION ZTRM_SET_TRANSPORT_DOC.
+FUNCTION ztrm_set_transport_doc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -7,26 +7,21 @@ FUNCTION ZTRM_SET_TRANSPORT_DOC.
 *"      IT_DOC STRUCTURE  TLINE
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      ERROR
+*"      INVALID_INPUT
+*"      ENQUEUE_ERROR
+*"      DEQUEUE_ERROR
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  CALL FUNCTION 'TRINT_DOCU_INTERFACE'
-    EXPORTING
-      iv_object           = iv_trkorr
-      iv_action           = 'M'
-      iv_modify_appending = ''
-    TABLES
-      tt_line             = it_doc.
-
-  IF sy-subrc <> 0.
-    RAISE error.
-  ENDIF.
-
+  TRY.
+    CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+    lo_transport->set_documentation(
+      EXPORTING
+        it_doc    = it_doc[]
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

@@ -75,7 +75,11 @@ With trm-server already installed on your system, there are two ways to keep it 
 1. You may keep using [abapGit](https://abapgit.org/)
    - If it's an online repo, simply pull from the "main" branch
    - If it's an offline repo, download the "main" branch source code as "zip" from Github and import
-3. You may use TRM Client and get from the Public Registry the latest release.
+2. You may use TRM Client and get from the Public Registry the latest release.
+   
+   In this case, simply run the command:
+   
+   `trm update trm-server`
 
 Both methods will assure you the latest version installed on your system.
 

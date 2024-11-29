@@ -1,6 +1,6 @@
 INTERFACE zif_trm
   PUBLIC .
 
-  CONSTANTS version TYPE string VALUE '1.3.1' ##NO_TEXT.
+  CONSTANTS version TYPE string VALUE '2.0.0' ##NO_TEXT.
 
 ENDINTERFACE.

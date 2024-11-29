@@ -1,4 +1,4 @@
-FUNCTION ZTRM_WRITE_BINARY_FILE.
+FUNCTION ztrm_write_binary_file.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -6,18 +6,19 @@ FUNCTION ZTRM_WRITE_BINARY_FILE.
 *"     VALUE(IV_FILE) TYPE  XSTRING
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  OPEN DATASET iv_file_path FOR OUTPUT IN BINARY MODE.
-  TRANSFER iv_file TO iv_file_path.
-  CLOSE DATASET iv_file_path.
-
-
+  TRY.
+    zcl_trm_utility=>write_binary_file(
+      EXPORTING
+        iv_file_path = iv_file_path
+        iv_file      = iv_file
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

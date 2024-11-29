@@ -1,23 +1,19 @@
-FUNCTION ztrm_get_file_sys.
+FUNCTION ztrm_get_r3trans_info.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
-*"     VALUE(EV_FILE_SYS) TYPE  FILESYS
+*"     VALUE(EV_LOG) TYPE  STRING
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      INVALID_INPUT
-*"      NOT_FOUND
+*"      R3TRANS_CMD_ERROR
 *"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
   TRY.
-    zcl_trm_utility=>get_file_sys(
-      IMPORTING
-        ev_file_sys = ev_file_sys
-    ).
-  CATCH zcx_trm_exception INTO lo_exc.
-    PERFORM handle_exception.
+      ev_log = zcl_trm_utility=>get_r3trans_info( ).
+    CATCH zcx_trm_exception INTO lo_exc.
+      PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.

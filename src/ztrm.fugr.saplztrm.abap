@@ -46,8 +46,4 @@
 * INCLUDE LZTRME...                          " Events
 * INCLUDE LZTRMP...                          " Local class implement.
 * INCLUDE LZTRMT99.                          " ABAP Unit tests
-  INCLUDE LZTRMF00                                . " subprograms
-  INCLUDE LZTRMI00                                . " PAI modules
-  INCLUDE LSVIMFXX                                . " subprograms
-  INCLUDE LSVIMOXX                                . " PBO modules
-  INCLUDE LSVIMIXX                                . " PAI modules
+  INCLUDE LZTRMF01                                . " subprograms

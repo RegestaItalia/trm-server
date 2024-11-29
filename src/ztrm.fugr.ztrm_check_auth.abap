@@ -1,16 +1,11 @@
-FUNCTION ZTRM_CHECK_AUTH.
+FUNCTION ztrm_check_auth.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"----------------------------------------------------------------------
-
-  SELECT COUNT( * ) FROM ztrm_users WHERE uname = sy-uname.
-
-  IF sy-dbcnt NE 1.
+  IF zcl_trm_utility=>check_functions_authorization( ) NE 'X'.
     RAISE trm_rfc_unauthorized.
   ENDIF.
-
-
 
 ENDFUNCTION.

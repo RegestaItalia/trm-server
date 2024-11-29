@@ -1,27 +1,24 @@
-FUNCTION ZTRM_ADD_SKIP_TRKORR.
+FUNCTION ztrm_add_skip_trkorr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
 *"     VALUE(IV_TRKORR) TYPE  TRKORR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      INSERT_ERROR
+*"      INVALID_INPUT
+*"      ENQUEUE_ERROR
+*"      DEQUEUE_ERROR
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  DATA ls_data TYPE ztrm_skip_trkorr.
-  ls_data-trkorr = iv_trkorr.
-
-  INSERT ztrm_skip_trkorr FROM ls_data.
-  COMMIT WORK AND WAIT.
-
-  IF sy-subrc <> 0.
-    RAISE insert_error.
-  ENDIF.
+  TRY.
+    zcl_trm_utility=>add_skip_trkorr(
+      EXPORTING
+        iv_trkorr = iv_trkorr
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

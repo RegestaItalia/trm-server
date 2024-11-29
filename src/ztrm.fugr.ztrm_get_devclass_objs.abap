@@ -1,4 +1,4 @@
-FUNCTION ZTRM_GET_DEVCLASS_OBJS.
+FUNCTION ztrm_get_devclass_objs.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -7,30 +7,19 @@ FUNCTION ZTRM_GET_DEVCLASS_OBJS.
 *"     VALUE(ET_TADIR) TYPE  SCTS_TADIR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
-*"      CANCELLED_BY_USER
 *"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  CALL FUNCTION 'TRINT_SELECT_OBJECTS'
-    EXPORTING
-      iv_devclass       = iv_devclass
-      iv_via_selscreen  = ' '
-    IMPORTING
-      et_objects_tadir  = et_tadir
-    EXCEPTIONS
-      cancelled_by_user = 1
-      invalid_input     = 2.
-
-  IF sy-subrc EQ 1.
-    RAISE cancelled_by_user.
-  ELSEIF sy-subrc EQ 2.
-    RAISE invalid_input.
-  ENDIF.
+  TRY.
+    CREATE OBJECT lo_package EXPORTING iv_devclass = iv_devclass.
+    lo_package->get_objects(
+      IMPORTING
+        et_tadir    = et_tadir
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.

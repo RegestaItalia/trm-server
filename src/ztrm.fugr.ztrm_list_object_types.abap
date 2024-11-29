@@ -1,23 +1,22 @@
-FUNCTION ZTRM_LIST_OBJECT_TYPES.
+FUNCTION ztrm_list_object_types.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  TABLES
 *"      ET_OBJECT_TEXT STRUCTURE  KO100
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
+*"      GENERIC
 *"----------------------------------------------------------------------
-  CALL FUNCTION 'ZTRM_CHECK_AUTH'
-    EXCEPTIONS
-      trm_rfc_unauthorized = 1.
-  IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
-  ENDIF.
+  PERFORM check_auth.
 
-  CLEAR et_object_text.
-  CALL FUNCTION 'TR_OBJECT_TABLE'
-    TABLES
-      wt_object_text = et_object_text.
-
-
+  TRY.
+    zcl_trm_utility=>get_supported_object_types(
+      IMPORTING
+        et_object_text = et_object_text[]
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
+  ENDTRY.
 
 ENDFUNCTION.
