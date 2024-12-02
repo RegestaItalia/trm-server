@@ -1645,10 +1645,18 @@
        <PARAMETER>EV_VERSION</PARAMETER>
        <TYP>STRING</TYP>
       </RSEXP>
+      <RSEXP>
+       <PARAMETER>EV_REST</PARAMETER>
+       <TYP>STRING</TYP>
+      </RSEXP>
      </EXPORT>
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>EV_VERSION</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>EV_REST</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
      </DOCUMENTATION>
