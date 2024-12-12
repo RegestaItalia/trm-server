@@ -74,6 +74,9 @@ CLASS zcl_trm_utility DEFINITION
       RETURNING VALUE(rv_r3trans) TYPE string
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS get_installed_trm_packages
+      IMPORTING iv_include_source TYPE flag.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -299,6 +302,70 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     ENDIF.
 
     CONCATENATE LINES OF result INTO rv_r3trans SEPARATED BY cl_abap_char_utilities=>newline.
+  ENDMETHOD.
+
+  METHOD get_installed_trm_packages.
+    TYPES: BEGIN OF ty_all_trkorr,
+             trkorr      TYPE trkorr,
+             tms_sysnam  TYPE tmssysnam,
+             tms_maxrc   TYPE trretcode,
+             tms_impsing TYPE flag,
+           END OF tY_ALL_TRKORR.
+
+    DATA lt_source_trkorr TYPE STANDARD TABLE OF trkorr.
+    DATA lt_ignored_trkorr TYPE STANDARD TABLE OF trkorr.
+    DATA lv_ignored_trkorr LIKE LINE OF lt_ignored_trkorr.
+    DATA lr_ignored_trkorr TYPE RANGE OF trkorr.
+    DATA ls_ignored_trkorr LIKE LINE OF lr_ignored_trkorr.
+
+    DATA lt_all_trkorr TYPE STANDARD TABLE OF ty_all_trkorr.
+    DATA ls_all_trkorr LIKE LINE OF lt_all_trkorr.
+    DATA lt_tms_buffer_trkorr TYPE STANDARD TABLE OF ty_all_trkorr.
+    DATA ls_tms_buffer_trkorr LIKE LINE OF lt_tms_buffer_trkorr.
+
+    IF iv_include_source EQ 'X'.
+      SELECT DISTINCT trkorr FROM ztrm_src_trkorr INTO TABLE lt_source_trkorr.
+    ENDIF.
+    SELECT DISTINCT trkorr FROM ztrm_skip_trkorr INTO TABLE lt_ignored_trkorr.
+
+    SELECT DISTINCT e071~trkorr tmsbuffer~sysnam AS tms_sysnam tmsbuffer~maxrc AS tms_maxrc tmsbuffer~impsing AS tms_impsing
+      FROM e071
+      LEFT OUTER JOIN tmsbuffer ON tmsbuffer~trkorr = e071~trkorr
+      INTO CORRESPONDING FIELDS OF TABLE lt_all_trkorr
+      WHERE e071~pgmid EQ '*' AND e071~object EQ 'ZTRM'.
+
+    SORT lt_all_trkorr BY trkorr ASCENDING.
+
+    LOOP AT lt_all_trkorr INTO ls_all_trkorr.
+      READ TABLE lt_ignored_trkorr TRANSPORTING NO FIELDS WITH KEY table_line = ls_all_trkorr-trkorr.
+      CHECK sy-subrc <> 0.
+      READ TABLE lt_source_trkorr TRANSPORTING NO FIELDS WITH KEY table_line = ls_all_trkorr-trkorr.
+      CHECK sy-subrc <> 0.
+      CLEAR lt_tms_buffer_trkorr.
+      CLEAR ls_tms_buffer_trkorr.
+      LOOP AT lt_all_trkorr INTO ls_tms_buffer_trkorr WHERE trkorr = ls_all_trkorr-trkorr.
+        APPEND ls_tms_buffer_trkorr TO lt_tms_buffer_trkorr.
+      ENDLOOP.
+      IF lt_tms_buffer_trkorr[] IS INITIAL.
+        APPEND ls_all_trkorr-trkorr TO lt_ignored_trkorr.
+      ENDIF.
+    ENDLOOP.
+
+    LOOP AT lt_ignored_trkorr INTO lv_ignored_trkorr.
+      CLEAR ls_ignored_trkorr.
+      ls_ignored_trkorr-sign = 'I'.
+      ls_ignored_trkorr-option = 'EQ'.
+      ls_ignored_trkorr-low = lv_ignored_trkorr.
+      APPEND ls_ignored_trkorr TO lr_ignored_trkorr.
+    ENDLOOP.
+
+    IF lr_ignored_trkorr[] IS NOT INITIAL.
+      DELETE lt_all_trkorr WHERE trkorr IN lr_ignored_trkorr.
+    ENDIF.
+
+    CHECK lt_all_trkorr[] IS NOT INITIAL.
+
+
   ENDMETHOD.
 
 ENDCLASS.
