@@ -200,6 +200,8 @@ CLASS zcl_trm_utility IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_supported_object_types.
+    DATA: lt_lang_objects LIKE et_object_text,
+          ls_lang_objects LIKE LINE OF lt_lang_objects.
     CALL FUNCTION 'TR_OBJECT_TABLE'
       TABLES
         wt_object_text = et_object_text
@@ -208,6 +210,16 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+
+    " add LANG supported objects
+    MOVE et_object_text[] TO lt_lang_objects[].
+    DELETE lt_lang_objects WHERE pgmid <> 'R3TR' AND pgmid <> 'LIMU' OR object = 'ADIR'.
+    LOOP AT lt_lang_objects INTO ls_lang_objects.
+      ls_lang_objects-pgmid = 'LANG'.
+      READ TABLE et_object_text TRANSPORTING NO FIELDS WITH KEY pgmid = ls_lang_objects-pgmid object = ls_lang_objects-object.
+      CHECK sy-subrc <> 0.
+      APPEND ls_lang_objects TO et_object_text.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD add_install_devclass.
