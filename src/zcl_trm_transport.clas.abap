@@ -86,6 +86,10 @@ CLASS zcl_trm_transport DEFINITION
                 iv_doc    TYPE trparflag
       RAISING   zcx_trm_exception.
 
+    METHODS migrate
+      EXPORTING ev_trm_trkorr TYPE ztrm_trkorr
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS create
@@ -533,6 +537,116 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD migrate.
+    DATA: lv_trm_trkorr    TYPE ztrm_trkorr,
+          lt_tmsbuffer     TYPE STANDARD TABLE OF tmsbuffer,
+          ls_tmsbuffer     LIKE LINE OF lt_tmsbuffer,
+          lt_trm_tmsbuffer TYPE zcl_trm_utility=>tyt_migration_tmsbuffer,
+          ls_trm_tmsbuffer LIKE LINE OF lt_trm_tmsbuffer,
+          lt_doktl         TYPE STANDARD TABLE OF doktl,
+          ls_doktl         LIKE LINE OF lt_doktl,
+          lt_trm_doktl     TYPE zcl_trm_utility=>tyt_migration_doktl,
+          ls_trm_doktl     LIKE LINE OF lt_trm_doktl,
+          lt_e071          TYPE STANDARD TABLE OF e071,
+          ls_e071          LIKE LINE OF lt_e071,
+          lt_trm_e071      TYPE zcl_trm_utility=>tyt_migration_e071,
+          ls_trm_e071      LIKE LINE OF lt_trm_e071,
+          lt_e070          TYPE STANDARD TABLE OF e070,
+          ls_e070          LIKE LINE OF lt_e070,
+          lt_trm_e070      TYPE zcl_trm_utility=>tyt_migration_e070,
+          ls_trm_e070      LIKE LINE OF lt_trm_e070,
+          ls_skip_trkorr   TYPE ztrm_skip_trkorr,
+          ls_src_trkorr    TYPE ztrm_src_trkorr.
+
+    " generate new id
+    CALL FUNCTION 'NUMBER_GET_NEXT'
+      EXPORTING
+        nr_range_nr             = '00'
+        object                  = 'ZTRMTRKORR'
+        quantity                = '1'
+      IMPORTING
+        number                  = lv_trm_trkorr
+      EXCEPTIONS
+        interval_not_found      = 1
+        number_range_not_intern = 2
+        object_not_found        = 3
+        quantity_is_0           = 4
+        quantity_is_not_1       = 5
+        interval_overflow       = 6
+        buffer_overflow         = 7
+        OTHERS                  = 8.
+    IF sy-subrc <> 0.
+      IF sy-subrc EQ 1.
+        zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-snro_interval_not_found ).
+      ELSE.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDIF.
+
+    " copy tms buffer
+    SELECT * FROM tmsbuffer INTO TABLE lt_tmsbuffer WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_tmsbuffer INTO ls_tmsbuffer.
+      CLEAR ls_trm_tmsbuffer.
+      MOVE-CORRESPONDING ls_tmsbuffer TO ls_trm_tmsbuffer.
+      ls_trm_tmsbuffer-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_tmsbuffer TO lt_trm_tmsbuffer.
+    ENDLOOP.
+    IF lt_trm_tmsbuffer[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_tmsbuffer( it_data = lt_trm_tmsbuffer ).
+    ENDIF.
+
+    " copy documentation
+    SELECT * FROM doktl INTO TABLE lt_doktl WHERE id EQ 'TA' AND object EQ gv_trkorr.
+    LOOP AT lt_doktl INTO ls_doktl.
+      CLEAR ls_trm_doktl.
+      MOVE-CORRESPONDING ls_doktl TO ls_trm_doktl.
+      ls_trm_doktl-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_doktl TO lt_trm_doktl.
+    ENDLOOP.
+    IF lt_trm_doktl[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_doktl( it_data = lt_trm_doktl ).
+    ENDIF.
+
+    " copy e071
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_e071 INTO ls_e071.
+      CLEAR ls_trm_e071.
+      MOVE-CORRESPONDING ls_e071 TO ls_trm_e071.
+      ls_trm_e071-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_e071 TO lt_trm_e071.
+    ENDLOOP.
+    IF lt_trm_e071[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_e071( it_data = lt_trm_e071 ).
+    ENDIF.
+
+    " copy e070
+    SELECT * FROM e070 INTO TABLE lt_e070 WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_e070 INTO ls_e070.
+      CLEAR ls_trm_e070.
+      MOVE-CORRESPONDING ls_e070 TO ls_trm_e070.
+      ls_trm_e070-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_e070 TO lt_trm_e070.
+    ENDLOOP.
+    IF lt_trm_e070[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_e070( it_data = lt_trm_e070 ).
+    ENDIF.
+
+    " move skip trkorr (if exists)
+    SELECT SINGLE * FROM ztrm_skip_trkorr INTO ls_skip_trkorr WHERE trkorr EQ gv_trkorr.
+    IF sy-subrc EQ 0.
+      zcl_trm_utility=>remove_skip_trkorr( iv_trkorr = gv_trkorr ).
+      zcl_trm_utility=>add_skip_trkorr( iv_trkorr = lv_trm_trkorr ).
+    ENDIF.
+
+    " move src trkorr (if exists)
+    SELECT SINGLE * FROM ztrm_src_trkorr INTO ls_src_trkorr WHERE trkorr EQ gv_trkorr.
+    IF sy-subrc EQ 0.
+      zcl_trm_utility=>remove_source_trkorr( iv_trkorr = gv_trkorr ).
+      zcl_trm_utility=>add_source_trkorr( iv_trkorr = lv_trm_trkorr ).
+    ENDIF.
+
   ENDMETHOD.
 
 ENDCLASS.

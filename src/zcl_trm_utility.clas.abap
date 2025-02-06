@@ -5,9 +5,13 @@ CLASS zcl_trm_utility DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_ko100       TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
-           tyt_installdevc TYPE STANDARD TABLE OF ztrm_installdevc WITH DEFAULT KEY,
-           tyt_trnspacett  TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY.
+    TYPES: tyt_ko100               TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
+           tyt_installdevc         TYPE STANDARD TABLE OF ztrm_installdevc WITH DEFAULT KEY,
+           tyt_trnspacett          TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY,
+           tyt_migration_tmsbuffer TYPE STANDARD TABLE OF ztrm_tmsbuffer WITH DEFAULT KEY,
+           tyt_migration_doktl     TYPE STANDARD TABLE OF ztrm_doktl WITH DEFAULT KEY,
+           tyt_migration_e071      TYPE STANDARD TABLE OF ztrm_e071 WITH DEFAULT KEY,
+           tyt_migration_e070      TYPE STANDARD TABLE OF ztrm_e070 WITH DEFAULT KEY.
 
     CLASS-METHODS check_functions_authorization
       RETURNING VALUE(rv_authorized) TYPE flag.
@@ -16,7 +20,15 @@ CLASS zcl_trm_utility DEFINITION
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS remove_skip_trkorr
+      IMPORTING iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
     CLASS-METHODS add_source_trkorr
+      IMPORTING iv_trkorr TYPE trkorr
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS remove_source_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
@@ -74,6 +86,22 @@ CLASS zcl_trm_utility DEFINITION
       RETURNING VALUE(rv_r3trans) TYPE string
       RAISING   zcx_trm_exception.
 
+    CLASS-METHODS add_migration_tmsbuffer
+      IMPORTING it_data TYPE tyt_migration_tmsbuffer
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS add_migration_doktl
+      IMPORTING it_data TYPE tyt_migration_doktl
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS add_migration_e071
+      IMPORTING it_data TYPE tyt_migration_e071
+      RAISING   zcx_trm_exception.
+
+    CLASS-METHODS add_migration_e070
+      IMPORTING it_data TYPE tyt_migration_e070
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -99,11 +127,25 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     dequeue( iv_tabname = 'ZTRM_SKIP_TRKORR' ).
   ENDMETHOD.
 
+  METHOD remove_skip_trkorr.
+    enqueue( iv_tabname = 'ZTRM_SKIP_TRKORR' ).
+    DELETE FROM ztrm_skip_trkorr WHERE trkorr EQ iv_trkorr.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_SKIP_TRKORR' ).
+  ENDMETHOD.
+
   METHOD add_source_trkorr.
     DATA ls_dummy TYPE ztrm_src_trkorr.
     ls_dummy-trkorr = iv_trkorr.
     enqueue( iv_tabname = 'ZTRM_SRC_TRKORR' ).
     INSERT ztrm_src_trkorr FROM ls_dummy.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_SRC_TRKORR' ).
+  ENDMETHOD.
+
+  METHOD remove_source_trkorr.
+    enqueue( iv_tabname = 'ZTRM_SRC_TRKORR' ).
+    DELETE FROM ztrm_src_trkorr WHERE trkorr EQ iv_trkorr.
     COMMIT WORK AND WAIT.
     dequeue( iv_tabname = 'ZTRM_SRC_TRKORR' ).
   ENDMETHOD.
@@ -311,6 +353,34 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     ENDIF.
 
     CONCATENATE LINES OF result INTO rv_r3trans SEPARATED BY cl_abap_char_utilities=>newline.
+  ENDMETHOD.
+
+  METHOD add_migration_tmsbuffer.
+    enqueue( iv_tabname = 'ZTRM_TMSBUFFER' ).
+    MODIFY ztrm_doktl FROM TABLE it_data.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_TMSBUFFER' ).
+  ENDMETHOD.
+
+  METHOD add_migration_doktl.
+    enqueue( iv_tabname = 'ZTRM_DOKTL' ).
+    MODIFY ztrm_doktl FROM TABLE it_data.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_DOKTL' ).
+  ENDMETHOD.
+
+  METHOD add_migration_e071.
+    enqueue( iv_tabname = 'ZTRM_E071' ).
+    MODIFY ztrm_e071 FROM TABLE it_data.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_E071' ).
+  ENDMETHOD.
+
+  METHOD add_migration_e070.
+    enqueue( iv_tabname = 'ZTRM_E070' ).
+    MODIFY ztrm_e070 FROM TABLE it_data.
+    COMMIT WORK AND WAIT.
+    dequeue( iv_tabname = 'ZTRM_E070' ).
   ENDMETHOD.
 
 ENDCLASS.
