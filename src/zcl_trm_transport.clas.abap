@@ -90,6 +90,13 @@ CLASS zcl_trm_transport DEFINITION
       EXPORTING ev_trm_trkorr TYPE ztrm_trkorr
       RAISING   zcx_trm_exception.
 
+    METHODS delete_from_tms_queue
+      IMPORTING iv_system TYPE tmssysnam
+      RAISING   zcx_trm_exception.
+
+    METHODS refresh_tms_txt
+      RAISING zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS create
@@ -647,6 +654,60 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       zcl_trm_utility=>add_source_trkorr( iv_trkorr = lv_trm_trkorr ).
     ENDIF.
 
+  ENDMETHOD.
+
+  METHOD delete_from_tms_queue.
+    DATA: ls_tmsbuffer    TYPE tmsbuffer,
+          lt_tp_maintains TYPE stms_tp_maintains,
+          ls_tp_maintains LIKE LINE OF lt_tp_maintains,
+          ls_tpstdout     TYPE tpstdout,
+          lt_log          TYPE zcx_trm_exception=>tyt_log,
+          ls_exception    TYPE stmscalert.
+
+    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ iv_system AND trkorr EQ gv_trkorr.
+    CHECK sy-subrc EQ 0.
+
+    CALL FUNCTION 'TMS_MGR_MAINTAIN_TR_QUEUE'
+      EXPORTING
+        iv_command                 = 'DELFROMBUFFER'
+        iv_system                  = ls_tmsbuffer-sysnam
+        iv_domain                  = ls_tmsbuffer-domnam
+        iv_request                 = ls_tmsbuffer-trkorr
+        iv_tarcli                  = ls_tmsbuffer-tarcli
+        iv_monitor                 = ' '
+        iv_verbose                 = ' '
+      IMPORTING
+        et_tp_maintains            = lt_tp_maintains
+        es_exception               = ls_exception
+      EXCEPTIONS
+        read_config_failed         = 1
+        table_of_requests_is_empty = 2
+        OTHERS                     = 3.
+
+    IF sy-subrc <> 0 OR ( ls_exception-error <> 'OK' AND ls_exception-error <> space ).
+      IF lt_tp_maintains[] IS NOT INITIAL.
+        READ TABLE lt_tp_maintains INTO ls_tp_maintains INDEX 1.
+        LOOP AT ls_tp_maintains-tp_stdout INTO ls_tpstdout.
+          APPEND ls_tpstdout-line TO lt_log.
+        ENDLOOP.
+        zcx_trm_exception=>raise( it_log = lt_log ).
+      ELSE.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD refresh_tms_txt.
+    DATA ls_tmsbuftxt TYPE tmsbuftxt.
+    SELECT SINGLE * FROM tmsbuftxt INTO ls_tmsbuftxt WHERE trkorr EQ gv_trkorr.
+    CHECK sy-subrc EQ 0.
+    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli WHERE trkorr EQ gv_trkorr.
+    " there's no standard way to update buffer text table other than clearing the buffer as a whole?
+    MODIFY tmsbuftxt FROM ls_tmsbuftxt.
+    COMMIT WORK AND WAIT.
+    " don't raise exception if it fails!!
   ENDMETHOD.
 
 ENDCLASS.

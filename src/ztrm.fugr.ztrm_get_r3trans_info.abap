@@ -5,6 +5,7 @@ FUNCTION ztrm_get_r3trans_info.
 *"     VALUE(EV_LOG) TYPE  STRING
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
+*"      INVALID_INPUT
 *"      R3TRANS_CMD_ERROR
 *"      GENERIC
 *"----------------------------------------------------------------------
