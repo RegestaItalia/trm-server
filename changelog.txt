@@ -11,4 +11,5 @@ Legend
 2025-02-06 v2.2.0
 -------------------
 
++ handle transports overwriting
 ! add remove transport comments method

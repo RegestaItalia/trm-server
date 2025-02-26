@@ -3,18 +3,18 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <DD04V>
-    <ROLLNAME>ZTRM_PACKAGE_REGISTRY</ROLLNAME>
+    <ROLLNAME>ZTRM_TRKORR</ROLLNAME>
     <DDLANGUAGE>E</DDLANGUAGE>
-    <DOMNAME>ZTRM_PACKAGE_REGISTRY</DOMNAME>
+    <DOMNAME>ZTRM_TRKORR</DOMNAME>
     <HEADLEN>55</HEADLEN>
     <SCRLEN1>10</SCRLEN1>
     <SCRLEN2>20</SCRLEN2>
     <SCRLEN3>40</SCRLEN3>
-    <DDTEXT>TRM Package registry URL</DDTEXT>
-    <REPTEXT>Registry</REPTEXT>
-    <SCRTEXT_S>Reg</SCRTEXT_S>
-    <SCRTEXT_M>Registry</SCRTEXT_M>
-    <SCRTEXT_L>Registry</SCRTEXT_L>
+    <DDTEXT>TRM migrated transport/task</DDTEXT>
+    <REPTEXT>TRM Transport/Task</REPTEXT>
+    <SCRTEXT_S>TRM Tr</SCRTEXT_S>
+    <SCRTEXT_M>TRM Transport/Task</SCRTEXT_M>
+    <SCRTEXT_L>TRM Transport/Task</SCRTEXT_L>
     <DTELMASTER>E</DTELMASTER>
     <REFKIND>D</REFKIND>
    </DD04V>
