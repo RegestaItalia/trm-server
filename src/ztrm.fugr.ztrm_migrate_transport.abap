@@ -8,6 +8,7 @@ FUNCTION ztrm_migrate_transport.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
+*"      SNRO_INTERVAL_CREATE
 *"      SNRO_INTERVAL_NOT_FOUND
 *"      GENERIC
 *"----------------------------------------------------------------------
