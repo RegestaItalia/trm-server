@@ -49,6 +49,10 @@ CLASS zcl_trm_transport DEFINITION
       EXPORTING et_log  TYPE sprot_u_tab
       RAISING   zcx_trm_exception.
 
+    METHODS remove_comments
+      IMPORTING iv_object TYPE trobjtype
+      RAISING   zcx_trm_exception.
+
     METHODS delete
       RAISING zcx_trm_exception.
 
@@ -222,6 +226,43 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD remove_comments.
+    DATA: lt_e071    TYPE STANDARD TABLE OF e071,
+          ls_e071    LIKE LINE OF lt_e071,
+          ls_request TYPE trwbo_request.
+    ls_request-h-trkorr = gv_trkorr.
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ iv_object.
+    CHECK lt_e071[] IS NOT INITIAL.
+    LOOP AT lt_e071 INTO ls_e071.
+      CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
+        EXPORTING
+          is_e071_delete              = ls_e071
+          iv_dialog_flag              = ' '
+        CHANGING
+          cs_request                  = ls_request
+        EXCEPTIONS
+          e_database_access_error     = 1
+          e_empty_lockkey             = 2
+          e_bad_target_request        = 3
+          e_wrong_source_client       = 4
+          n_no_deletion_of_c_objects  = 5
+          n_no_deletion_of_corr_entry = 6
+          n_object_entry_doesnt_exist = 7
+          n_request_already_released  = 8
+          n_request_from_other_system = 9
+          r_action_aborted_by_user    = 10
+          r_foreign_lock              = 11
+          w_bigger_lock_in_same_order = 12
+          w_duplicate_entry           = 13
+          w_no_authorization          = 14
+          w_user_not_owner            = 15
+          OTHERS                      = 16.
+      IF sy-subrc <> 0.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD create_workbench.
