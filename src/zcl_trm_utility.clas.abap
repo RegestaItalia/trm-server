@@ -357,7 +357,7 @@ CLASS zcl_trm_utility IMPLEMENTATION.
 
   METHOD add_migration_tmsbuffer.
     enqueue( iv_tabname = 'ZTRM_TMSBUFFER' ).
-    MODIFY ztrm_doktl FROM TABLE it_data.
+    MODIFY ztrm_tmsbuffer FROM TABLE it_data.
     COMMIT WORK AND WAIT.
     dequeue( iv_tabname = 'ZTRM_TMSBUFFER' ).
   ENDMETHOD.
