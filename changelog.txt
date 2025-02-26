@@ -12,3 +12,4 @@ Legend
 -------------------
 
 + handle transports overwriting
+! add remove transport comments method
