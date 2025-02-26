@@ -39,9 +39,11 @@ ENDCLASS.
 
 CLASS zcl_trm_package IMPLEMENTATION.
 
+
   METHOD constructor.
     gv_devclass = iv_devclass.
   ENDMETHOD.
+
 
   METHOD create.
     DATA ls_data LIKE is_data.
@@ -120,6 +122,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
     CREATE OBJECT ro_package EXPORTING iv_devclass = ls_data-devclass.
   ENDMETHOD.
 
+
   METHOD get_objects.
     CALL FUNCTION 'TRINT_SELECT_OBJECTS'
       EXPORTING
@@ -133,6 +136,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
       zcx_trm_exception=>raise( ).
     ENDIF.
   ENDMETHOD.
+
 
   METHOD modify_package_data.
     DATA: subrc LIKE sy-subrc.
@@ -178,9 +182,10 @@ CLASS zcl_trm_package IMPLEMENTATION.
 
       CALL METHOD lo_package->set_changeable
         EXPORTING
-          i_changeable = ' '
+          i_changeable      = ' '
+          i_suppress_dialog = 'D'
         EXCEPTIONS
-          OTHERS       = 0.
+          OTHERS            = 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
@@ -219,6 +224,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
   METHOD interface.
     DATA: ls_modify_sign TYPE scompksign,
           ls_pack_data   TYPE scompkdtln,
@@ -252,6 +258,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
           i_changeable      = 'X'
           i_suppress_dialog = 'D'
         EXCEPTIONS
+          object_already_changeable = 0                       "ignore it
           OTHERS            = 1 ).
       IF sy-subrc <> 0.
         zcx_trm_exception=>raise( ).
@@ -275,7 +282,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
       ENDIF.
       lo_package->set_changeable(
         EXPORTING
-          i_changeable      = 'X'
+          i_changeable      = ' '
           i_suppress_dialog = 'D'
         EXCEPTIONS
           OTHERS            = 1 ).
@@ -300,5 +307,4 @@ CLASS zcl_trm_package IMPLEMENTATION.
       CLEAR ls_cr.
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.
