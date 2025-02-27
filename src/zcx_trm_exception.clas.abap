@@ -4,6 +4,8 @@ CLASS zcx_trm_exception DEFINITION
   CREATE PROTECTED .
 
   PUBLIC SECTION.
+    INTERFACES if_t100_message.
+
     TYPES: tyt_log TYPE STANDARD TABLE OF tdline WITH DEFAULT KEY.
 
     CONSTANTS:
@@ -57,6 +59,12 @@ CLASS zcx_trm_exception IMPLEMENTATION.
         textid   = textid
         previous = previous.
     MOVE-CORRESPONDING sy TO me->message.
+    if_t100_message~t100key-msgid = me->message-msgid.
+    if_t100_message~t100key-msgno = me->message-msgno.
+    if_t100_message~t100key-attr1 = me->message-msgv1.
+    if_t100_message~t100key-attr2 = me->message-msgv2.
+    if_t100_message~t100key-attr3 = me->message-msgv3.
+    if_t100_message~t100key-attr4 = me->message-msgv4.
   ENDMETHOD.
 
   METHOD reason.

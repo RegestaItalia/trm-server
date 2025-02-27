@@ -13,6 +13,14 @@ CLASS lcl_abapgit_dot_abapgit DEFINITION.
       RETURNING
         VALUE(rv_xstr) TYPE xstring.
 
+    METHODS set_folder_logic
+      IMPORTING
+        iv_logic TYPE string.
+
+    CLASS-METHODS build_default
+      RETURNING
+        VALUE(ro_dot_abapgit) TYPE REF TO lcl_abapgit_dot_abapgit.
+
   PRIVATE SECTION.
 
     DATA: go_instance TYPE REF TO object.
@@ -29,6 +37,21 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
     CALL METHOD go_instance->('SERIALIZE')
       RECEIVING
         rv_xstr = rv_xstr.
+  ENDMETHOD.
+
+  METHOD build_default.
+    DATA lo_dot_abapgit TYPE REF TO data.
+    CREATE DATA lo_dot_abapgit TYPE REF TO ('ZCL_ABAPGIT_DOT_ABAPGIT').
+    CALL METHOD ('ZCL_ABAPGIT_DOT_ABAPGIT')=>('BUILD_DEFAULT')
+      RECEIVING
+        ro_dot_abapgit = lo_dot_abapgit->*.
+    CREATE OBJECT ro_dot_abapgit EXPORTING io_abapgit_dot_abapgit = lo_dot_abapgit->*.
+  ENDMETHOD.
+
+  METHOD set_folder_logic.
+    CALL METHOD go_instance->('SET_FOLDER_LOGIC')
+      EXPORTING
+        iv_logic = iv_logic.
   ENDMETHOD.
 
 ENDCLASS.
@@ -114,6 +137,7 @@ CLASS lcl_abapgit_repo_srv IMPLEMENTATION.
         iv_package = iv_package
       IMPORTING
         ei_repo    = lo_repo->*.
+    CHECK lo_repo->* IS BOUND.
     CREATE OBJECT eo_repo EXPORTING io_repo = lo_repo->*.
   ENDMETHOD.
 
