@@ -77,56 +77,51 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_dot_abapgit.
-    DATA: lx_root TYPE REF TO cx_root,
-          lo_repo TYPE REF TO lcl_abapgit_repo.
-    TRY.
-        lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
-          EXPORTING
-            iv_package = iv_devclass
-          IMPORTING
-            eo_repo    = lo_repo
-        ).
-        IF lo_repo IS NOT BOUND.
-          zcx_trm_exception=>raise( iv_message = 'Repository for package ' && iv_devclass && ' not found' ).
-        ENDIF.
-        rv_dot_abapgit = lo_repo->get_dot_abapgit( )->serialize( ).
-      CATCH cx_root INTO lx_root.
-        handle_root_exception( lx_root ).
-    ENDTRY.
+    DATA lo_repo TYPE REF TO lcl_abapgit_repo.
+    lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
+      EXPORTING
+        iv_package = iv_devclass
+      IMPORTING
+        eo_repo    = lo_repo
+    ).
+    IF lo_repo IS NOT BOUND.
+      zcx_trm_exception=>raise( iv_message = 'Repository for package ' && iv_devclass && ' not found' ).
+    ENDIF.
+    rv_dot_abapgit = lo_repo->get_dot_abapgit( )->serialize( ).
   ENDMETHOD.
 
   METHOD serialize.
     DATA: lx_root           TYPE REF TO cx_root,
           ls_local_settings TYPE REF TO data,
           lo_repo           TYPE REF TO lcl_abapgit_repo,
-          lo_dot_abapgit    TYPE REF TO lcl_abapgit_dot_abapgit.
-    FIELD-SYMBOLS: <fs_local_setting> TYPE data,
-                   <fs_folder_logic>  TYPE string.
-    CREATE DATA ls_local_settings TYPE ('ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS').
-    ASSIGN ls_local_settings->* TO <fs_local_setting>.
-*    TRY.
-*        lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
-*          EXPORTING
-*            iv_package = iv_devclass
-*          IMPORTING
-*            eo_repo    = lo_repo
-*        ).
-*        IF lo_repo IS BOUND.
-*          lo_dot_abapgit = lo_repo->get_dot_abapgit( ).
-*        ENDIF.
-*      CATCH cx_root.
-*    ENDTRY.
-    IF lo_dot_abapgit IS NOT BOUND.
-      TRY.
-          lo_dot_abapgit = lcl_abapgit_dot_abapgit=>build_default( ).
-          ASSIGN ('ZIF_ABAPGIT_DOT_ABAPGIT=>C_FOLDER_LOGIC-FULL') TO <fs_folder_logic>.
-          IF sy-subrc EQ 0.
-            lo_dot_abapgit->set_folder_logic( <fs_folder_logic> ).
-          ENDIF.
-        CATCH cx_root INTO lx_root.
-          handle_root_exception( lx_root ).
-      ENDTRY.
+          lo_dot_abapgit    TYPE REF TO lcl_abapgit_dot_abapgit,
+          lo_serialize      TYPE REF TO lcl_abapgit_serialize.
+    FIELD-SYMBOLS: <fs_folder_logic>  TYPE string.
+
+    create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
+
+    lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
+      EXPORTING
+        iv_package = iv_devclass
+      IMPORTING
+        eo_repo    = lo_repo
+    ).
+    IF lo_repo IS BOUND.
+      lo_dot_abapgit = lo_repo->get_dot_abapgit( ).
     ENDIF.
+    IF lo_dot_abapgit IS NOT BOUND.
+      lo_dot_abapgit = lcl_abapgit_dot_abapgit=>build_default( ).
+      ASSIGN ('ZIF_ABAPGIT_DOT_ABAPGIT=>C_FOLDER_LOGIC-FULL') TO <fs_folder_logic>.
+      IF sy-subrc EQ 0.
+        lo_dot_abapgit->set_folder_logic( <fs_folder_logic> ).
+      ELSE.
+        zcx_trm_exception=>raise( iv_message = 'Cannot set folder logic to FULL' ).
+      ENDIF.
+    ENDIF.
+    CREATE OBJECT lo_serialize
+      EXPORTING
+        io_dot_abapgit    = lo_dot_abapgit
+        is_local_settings = ls_local_settings.
   ENDMETHOD.
 
   METHOD if_oo_adt_classrun~main.

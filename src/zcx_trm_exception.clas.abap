@@ -21,6 +21,7 @@ CLASS zcx_trm_exception DEFINITION
         r3trans_cmd_error        TYPE string VALUE 'R3TRANS_CMD_ERROR',
         snro_interval_create     TYPE string VALUE 'SNRO_INTERVAL_CREATE',
         snro_interval_not_found  TYPE string VALUE 'SNRO_INTERVAL_NOT_FOUND',
+        abapgit_data_error       TYPE string VALUE 'ABAPGIT_DATA_ERROR',
         abapgit_intergration     TYPE string VALUE 'ABAPGIT_INTEGRATION',
       END OF c_reason .
 
