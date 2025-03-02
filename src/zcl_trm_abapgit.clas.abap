@@ -95,7 +95,11 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
           ls_local_settings TYPE REF TO data,
           lo_repo           TYPE REF TO lcl_abapgit_repo,
           lo_dot_abapgit    TYPE REF TO lcl_abapgit_dot_abapgit,
-          lo_serialize      TYPE REF TO lcl_abapgit_serialize.
+          lo_log            TYPE REF TO lcl_abapgit_log,
+          lo_serialize      TYPE REF TO lcl_abapgit_serialize,
+          lt_files          TYPE lif_abapgit_definitions=>ty_files_item_tt,
+          ls_file           LIKE LINE OF lt_files,
+          lt_items          TYPE lif_abapgit_definitions=>ty_item_tt.
     FIELD-SYMBOLS: <fs_folder_logic>  TYPE string.
 
     create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
@@ -118,20 +122,44 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
         zcx_trm_exception=>raise( iv_message = 'Cannot set folder logic to FULL' ).
       ENDIF.
     ENDIF.
+    CREATE OBJECT lo_log.
     CREATE OBJECT lo_serialize
       EXPORTING
         io_dot_abapgit    = lo_dot_abapgit
         is_local_settings = ls_local_settings.
+    lt_files = lo_serialize->files_local(
+      iv_package = iv_devclass
+      ii_log     = lo_log
+    ).
+    ev_zip = lcl_abapgit_zip=>encode_files(
+      EXPORTING
+        it_files = lt_files
+    ).
+    LOOP AT lt_files INTO ls_file WHERE item IS NOT INITIAL.
+      READ TABLE lt_items TRANSPORTING NO FIELDS WITH KEY obj_type = ls_file-item-obj_type obj_name = ls_file-item-obj_name.
+      CHECK sy-subrc <> 0.
+      APPEND ls_file-item TO lt_items.
+    ENDLOOP.
+    IF lt_items[] IS NOT INITIAL.
+      SELECT *
+        FROM tadir
+        INTO CORRESPONDING FIELDS OF TABLE et_objects
+        FOR ALL ENTRIES IN lt_items
+        WHERE pgmid EQ 'R3TR'
+          AND object EQ lt_items-obj_type
+          AND obj_name EQ lt_items-obj_name.
+    ENDIF.
   ENDMETHOD.
 
   METHOD if_oo_adt_classrun~main.
     serialize(
       EXPORTING
         iv_devclass = 'ZTRM'
-*      IMPORTING
-*        ev_zip      =
-*        et_objects  =
+      IMPORTING
+        ev_zip      = DATA(lv_zip)
+        et_objects  = DATA(lt_objects)
     ).
+    CHECK 1 EQ 1.
   ENDMETHOD.
 
 ENDCLASS.
