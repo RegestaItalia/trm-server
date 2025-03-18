@@ -5,7 +5,7 @@
    <VSEOCLASS>
     <CLSNAME>ZCL_TRM_PA_NUMBER_RANGE</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>Post activity: number range</DESCRIPT>
+    <DESCRIPT>Add number range</DESCRIPT>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
     <FIXPT>X</FIXPT>

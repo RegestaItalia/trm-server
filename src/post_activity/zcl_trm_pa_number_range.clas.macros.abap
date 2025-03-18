@@ -64,7 +64,7 @@ DEFINE call_static_method.
   TRY.
     CALL METHOD (&1)=>(&2)
       PARAMETER-TABLE tmp_param_tab.
-    clear tmp_param_tab.
+    CLEAR tmp_param_tab.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING

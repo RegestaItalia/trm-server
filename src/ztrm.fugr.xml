@@ -608,6 +608,32 @@
      </DOCUMENTATION>
     </item>
     <item>
+     <FUNCNAME>ZTRM_EXECUTE_POST_ACTIVITY</FUNCNAME>
+     <SHORT_TEXT>Execute TRM install post activity</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>IV_CLASSNAME</PARAMETER>
+       <TYP>CLASSNAME</TYP>
+      </RSIMP>
+     </IMPORT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>IT_PARAMS</PARAMETER>
+       <DBSTRUCT>ZTRM_PA_PARAM</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>IV_CLASSNAME</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IT_PARAMS</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>ZTRM_FORWARD_TR</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Forward transport request</SHORT_TEXT>

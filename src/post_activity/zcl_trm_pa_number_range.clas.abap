@@ -4,84 +4,68 @@ CLASS zcl_trm_pa_number_range DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    TYPES: BEGIN OF ty_number_range,
-             object    TYPE nrobj,
-             subobject TYPE nrsobj,
-             nrrangenr TYPE nrnr,
-             toyear    TYPE nryear,
-           END OF ty_number_range,
-           BEGIN OF ty_nr_option,
-             transport         TYPE abap_bool,
-             transport_request TYPE trkorr,
-           END OF ty_nr_option.
 
-    METHODS constructor
-      IMPORTING is_number_range TYPE ty_number_range.
-    METHODS exists
-      RETURNING VALUE(rv_exists) TYPE flag.
+    CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
 
-    CLASS-METHODS create_if_not_exists
-      IMPORTING is_number_range    TYPE ty_number_range
-                iv_fromnumber      TYPE nrfrom OPTIONAL
-                iv_tonumber        TYPE nrto OPTIONAL
-                iv_nrlevel         TYPE nrlevel OPTIONAL
-                iv_externind       TYPE nrind OPTIONAL
-                iv_procind         TYPE procind OPTIONAL
-                is_option          TYPE ty_nr_option OPTIONAL
-      RETURNING VALUE(ro_instance) TYPE REF TO zcl_trm_pa_number_range
-      RAISING   zcx_trm_exception.
-
+    CLASS-METHODS execute
+      IMPORTING
+        !object            TYPE nrobj
+        !subobject         TYPE nrsobj
+        !nrrangenr         TYPE nrnr
+        !toyear            TYPE nryear
+        !fromnumber        TYPE nrfrom OPTIONAL
+        !tonumber          TYPE nrto OPTIONAL
+        !nrlevel           TYPE nrlevel OPTIONAL
+        !externind         TYPE nrind OPTIONAL
+        !procind           TYPE procind OPTIONAL
+        !transport_request TYPE trkorr OPTIONAL
+      EXPORTING
+        !messages          TYPE symsg_tab
+      RAISING
+        zcx_trm_exception .
   PROTECTED SECTION.
   PRIVATE SECTION.
-    DATA: gs_number_range TYPE ty_number_range.
 ENDCLASS.
 
 
 
 CLASS zcl_trm_pa_number_range IMPLEMENTATION.
 
-  METHOD constructor.
-    gs_number_range = is_number_range.
-  ENDMETHOD.
 
-  METHOD exists.
-    DATA ls_nriv TYPE nriv.
-    SELECT SINGLE *
-      FROM nriv
-      INTO ls_nriv
-      WHERE object EQ gs_number_range-object
-        AND subobject EQ gs_number_range-subobject
-        AND nrrangenr EQ gs_number_range-nrrangenr
-        AND toyear EQ gs_number_range-toyear.
-    IF sy-subrc EQ 0.
-      rv_exists = 'X'.
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD create_if_not_exists.
-    DATA: lt_interval      TYPE lcl_numberrange_intervals=>nr_interval,
+  METHOD execute.
+    DATA: ls_nriv          TYPE nriv,
+          lt_interval      TYPE lcl_numberrange_intervals=>nr_interval,
           ls_interval      LIKE LINE OF lt_interval,
           lv_object        TYPE lcl_numberrange_intervals=>nr_object,
           lv_subobject     TYPE lcl_numberrange_intervals=>nr_subobject,
           ls_option        TYPE lcl_numberrange_intervals=>nr_option,
           lv_error         TYPE lcl_numberrange_intervals=>nr_error,
           lv_error_message TYPE string.
-    CREATE OBJECT ro_instance
-      EXPORTING
-        is_number_range = is_number_range.
-    CHECK ro_instance->exists( ) <> 'X'.
-    ls_interval-subobject = is_number_range-subobject.
-    ls_interval-nrrangenr = is_number_range-nrrangenr.
-    ls_interval-toyear = is_number_range-toyear.
-    ls_interval-fromnumber = iv_fromnumber.
-    ls_interval-tonumber = iv_tonumber.
-    ls_interval-nrlevel = iv_nrlevel.
-    ls_interval-externind = iv_externind.
-    ls_interval-procind = iv_procind.
+
+    SELECT SINGLE *
+      FROM nriv
+      INTO ls_nriv
+      WHERE object EQ object
+        AND subobject EQ subobject
+        AND nrrangenr EQ nrrangenr
+        AND toyear EQ toyear.
+    CHECK sy-subrc <> 0.
+
+    ls_interval-subobject = subobject.
+    ls_interval-nrrangenr = nrrangenr.
+    ls_interval-toyear = toyear.
+    ls_interval-fromnumber = fromnumber.
+    ls_interval-tonumber = tonumber.
+    ls_interval-nrlevel = nrlevel.
+    ls_interval-externind = externind.
+    ls_interval-procind = procind.
     APPEND ls_interval TO lt_interval.
-    lv_object = is_number_range-object.
-    lv_subobject = is_number_range-subobject.
-    MOVE-CORRESPONDING is_option TO ls_option.
+    lv_object = object.
+    lv_subobject = subobject.
+    IF transport_request IS NOT INITIAL.
+      ls_option-transport = 'X'.
+      ls_option-transport_request = transport_request.
+    ENDIF.
     lcl_numberrange_intervals=>create(
       EXPORTING
         interval  = lt_interval
@@ -100,5 +84,4 @@ CLASS zcl_trm_pa_number_range IMPLEMENTATION.
     ).
     ENDIF.
   ENDMETHOD.
-
 ENDCLASS.
