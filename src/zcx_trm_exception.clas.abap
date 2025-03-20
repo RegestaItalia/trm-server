@@ -23,6 +23,10 @@ CLASS zcx_trm_exception DEFINITION
         abapgit_data_error       TYPE string VALUE 'ABAPGIT_DATA_ERROR',
         abapgit_intergration     TYPE string VALUE 'ABAPGIT_INTEGRATION',
         pa_dynamic               TYPE string VALUE 'PA_DYNAMIC',
+        pa_not_found             TYPE string VALUE 'PA_NOT_FOUND',
+        pa_param_missing         TYPE string VALUE 'PA_PARAM_MISSING',
+        pa_unexpected_param      TYPE string VALUE 'PA_UNEXPECTED_PARAM',
+        pa_exception             TYPE string VALUE 'PA_EXCEPTION',
       END OF c_reason .
 
     METHODS constructor
@@ -82,14 +86,28 @@ CLASS zcx_trm_exception IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD raise.
-    DATA: lo_exc  TYPE REF TO zcx_trm_exception,
-          lo_root TYPE REF TO cx_root.
+    DATA: lo_exc      TYPE REF TO zcx_trm_exception,
+          lo_root     TYPE REF TO cx_root,
+          lo_trm_root TYPE REF TO zcx_trm_exception,
+          lv_dummy    TYPE string.
     IF io_root IS BOUND.
       lo_root = io_root.
       WHILE lo_root->previous IS BOUND.
         lo_root = lo_root->previous.
       ENDWHILE.
-      cl_message_helper=>set_msg_vars_for_clike( lo_root->get_text( ) ).
+      IF lo_root IS INSTANCE OF zcx_trm_exception.
+        lo_trm_root ?= lo_root.
+        MESSAGE ID lo_trm_root->message-msgid
+          TYPE 'I'
+          NUMBER lo_trm_root->message-msgno
+          WITH lo_trm_root->message-msgv1
+               lo_trm_root->message-msgv2
+               lo_trm_root->message-msgv3
+               lo_trm_root->message-msgv4
+          INTO lv_dummy.
+      ELSE.
+        cl_message_helper=>set_msg_vars_for_clike( lo_root->get_text( ) ).
+      ENDIF.
     ELSEIF iv_message IS SUPPLIED.
       cl_message_helper=>set_msg_vars_for_clike( iv_message ).
     ENDIF.

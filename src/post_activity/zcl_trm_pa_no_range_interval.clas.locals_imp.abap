@@ -1,7 +1,7 @@
 *"* use this source file for the definition and implementation of
 *"* local helper classes, interface definitions and type
 *"* declarations
-CLASS lcl_trm_pa_number_range DEFINITION.
+CLASS lcl_trm_pa_no_range_interval DEFINITION.
 
   PUBLIC SECTION.
 
@@ -14,11 +14,11 @@ CLASS lcl_trm_pa_number_range DEFINITION.
   PRIVATE SECTION.
 ENDCLASS.
 
-CLASS lcl_trm_pa_number_range IMPLEMENTATION.
+CLASS lcl_trm_pa_no_range_interval IMPLEMENTATION.
 
 ENDCLASS.
 
-CLASS lcl_numberrange_intervals DEFINITION INHERITING FROM lcl_trm_pa_number_range.
+CLASS lcl_numberrange_intervals DEFINITION INHERITING FROM lcl_trm_pa_no_range_interval.
 
   PUBLIC SECTION.
 
@@ -65,7 +65,7 @@ CLASS lcl_numberrange_intervals IMPLEMENTATION.
     MOVE object TO lv_object->*.
     create_data lv_subobject 'CL_NUMBERRANGE_INTERVALS=>NR_SUBOBJECT'.
     MOVE subobject TO lv_subobject->*.
-    create_data lv_subobject 'CL_NUMBERRANGE_INTERVALS=>NR_OPTION'.
+    create_data ls_option 'CL_NUMBERRANGE_INTERVALS=>NR_OPTION'.
     MOVE-CORRESPONDING option TO ls_option->*.
     add_param 'INTERVAL' lt_interval cl_abap_objectdescr=>exporting.
     add_param 'OBJECT' lv_object cl_abap_objectdescr=>exporting.

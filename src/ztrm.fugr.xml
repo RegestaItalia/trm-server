@@ -612,24 +612,44 @@
      <SHORT_TEXT>Execute TRM install post activity</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
-       <PARAMETER>IV_CLASSNAME</PARAMETER>
-       <TYP>CLASSNAME</TYP>
+       <PARAMETER>IV_DATA</PARAMETER>
+       <TYP>XSTRING</TYP>
       </RSIMP>
      </IMPORT>
-     <TABLES>
-      <RSTBL>
-       <PARAMETER>IT_PARAMS</PARAMETER>
-       <DBSTRUCT>ZTRM_PA_PARAM</DBSTRUCT>
-      </RSTBL>
-     </TABLES>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>INVALID_INPUT</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>PA_NOT_FOUND</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
      <DOCUMENTATION>
       <RSFDO>
-       <PARAMETER>IV_CLASSNAME</PARAMETER>
+       <PARAMETER>IV_DATA</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>IT_PARAMS</PARAMETER>
-       <KIND>P</KIND>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>PA_NOT_FOUND</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
       </RSFDO>
      </DOCUMENTATION>
     </item>

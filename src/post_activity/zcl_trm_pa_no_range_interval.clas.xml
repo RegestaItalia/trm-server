@@ -3,9 +3,9 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <VSEOCLASS>
-    <CLSNAME>ZCL_TRM_PA_NUMBER_RANGE</CLSNAME>
+    <CLSNAME>ZCL_TRM_PA_NO_RANGE_INTERVAL</CLSNAME>
     <LANGU>E</LANGU>
-    <DESCRIPT>Add number range</DESCRIPT>
+    <DESCRIPT>Create number range interval</DESCRIPT>
     <STATE>1</STATE>
     <CLSCCINCL>X</CLSCCINCL>
     <FIXPT>X</FIXPT>

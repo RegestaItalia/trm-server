@@ -1,4 +1,4 @@
-CLASS zcl_trm_pa_number_range DEFINITION
+CLASS zcl_trm_pa_no_range_interval DEFINITION
   PUBLIC
   FINAL
   CREATE PUBLIC .
@@ -22,25 +22,26 @@ CLASS zcl_trm_pa_number_range DEFINITION
       EXPORTING
         !messages          TYPE symsg_tab
       RAISING
-        zcx_trm_exception .
+        zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
 
 
 
-CLASS zcl_trm_pa_number_range IMPLEMENTATION.
-
+CLASS zcl_trm_pa_no_range_interval IMPLEMENTATION.
 
   METHOD execute.
-    DATA: ls_nriv          TYPE nriv,
-          lt_interval      TYPE lcl_numberrange_intervals=>nr_interval,
-          ls_interval      LIKE LINE OF lt_interval,
-          lv_object        TYPE lcl_numberrange_intervals=>nr_object,
-          lv_subobject     TYPE lcl_numberrange_intervals=>nr_subobject,
-          ls_option        TYPE lcl_numberrange_intervals=>nr_option,
-          lv_error         TYPE lcl_numberrange_intervals=>nr_error,
-          lv_error_message TYPE string.
+    DATA: ls_nriv      TYPE nriv,
+          lt_interval  TYPE lcl_numberrange_intervals=>nr_interval,
+          ls_interval  LIKE LINE OF lt_interval,
+          lv_object    TYPE lcl_numberrange_intervals=>nr_object,
+          lv_subobject TYPE lcl_numberrange_intervals=>nr_subobject,
+          ls_option    TYPE lcl_numberrange_intervals=>nr_option,
+          lv_error     TYPE lcl_numberrange_intervals=>nr_error,
+          lv_message   TYPE string,
+          ls_message   LIKE LINE OF messages.
 
     SELECT SINGLE *
       FROM nriv
@@ -76,12 +77,20 @@ CLASS zcl_trm_pa_number_range IMPLEMENTATION.
         error     = lv_error
     ).
     IF lv_error EQ 'X'.
-      CONCATENATE `Can't generate number range` lv_object lv_subobject INTO lv_error_message SEPARATED BY space.
+      CONCATENATE `Can't generate number range` lv_object lv_subobject `interval` INTO lv_message SEPARATED BY space.
       zcx_trm_exception=>raise(
       EXPORTING
         iv_reason  = zcx_trm_exception=>c_reason-generic
-        iv_message = lv_error_message
+        iv_message = lv_message
     ).
+    ELSE.
+      CONCATENATE 'Generated number range ' lv_object lv_subobject 'interval' INTO lv_message SEPARATED BY space.
+      CONDENSE lv_message.
+      cl_message_helper=>set_msg_vars_for_clike( lv_message ).
+      MOVE-CORRESPONDING sy TO ls_message.
+      ls_message-msgty = 'S'.
+      APPEND ls_message TO messages.
     ENDIF.
   ENDMETHOD.
+
 ENDCLASS.
