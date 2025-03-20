@@ -609,6 +609,7 @@
     </item>
     <item>
      <FUNCNAME>ZTRM_EXECUTE_POST_ACTIVITY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Execute TRM install post activity</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
