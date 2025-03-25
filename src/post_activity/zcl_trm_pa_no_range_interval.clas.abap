@@ -7,17 +7,27 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
 
     CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
 
+    TYPES: ty_nrobj   TYPE c LENGTH 10,
+           ty_nrsobj  TYPE c LENGTH 6,
+           ty_nrnr    TYPE c LENGTH 2,
+           ty_nryear  TYPE n LENGTH 4,
+           ty_nrfrom  TYPE c LENGTH 20,
+           ty_nrto    TYPE c LENGTH 20,
+           ty_nrlevel TYPE n LENGTH 20,
+           ty_nrind   TYPE c LENGTH 1,
+           ty_procind TYPE c LENGTH 1.
+
     CLASS-METHODS execute
       IMPORTING
-        !object            TYPE nrobj
-        !subobject         TYPE nrsobj
-        !nrrangenr         TYPE nrnr
-        !toyear            TYPE nryear
-        !fromnumber        TYPE nrfrom OPTIONAL
-        !tonumber          TYPE nrto OPTIONAL
-        !nrlevel           TYPE nrlevel OPTIONAL
-        !externind         TYPE nrind OPTIONAL
-        !procind           TYPE procind OPTIONAL
+        !object            TYPE ty_nrobj
+        !subobject         TYPE ty_nrsobj
+        !nrrangenr         TYPE ty_nrnr
+        !toyear            TYPE ty_nryear
+        !fromnumber        TYPE ty_nrfrom OPTIONAL
+        !tonumber          TYPE ty_nrto OPTIONAL
+        !nrlevel           TYPE ty_nrlevel OPTIONAL
+        !externind         TYPE ty_nrind OPTIONAL
+        !procind           TYPE ty_procind OPTIONAL
         !transport_request TYPE trkorr OPTIONAL
       EXPORTING
         !messages          TYPE symsg_tab
