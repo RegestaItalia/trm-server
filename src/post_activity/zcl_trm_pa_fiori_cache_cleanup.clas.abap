@@ -4,7 +4,7 @@ CLASS zcl_trm_pa_fiori_cache_cleanup DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
+
     CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
 
     TYPES: ty_ui5_repository_ui   TYPE c LENGTH 30.
@@ -19,6 +19,11 @@ CLASS zcl_trm_pa_fiori_cache_cleanup DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    CLASS-METHODS submit
+      IMPORTING report    TYPE raldb_repo
+                selection TYPE rsparams_tt OPTIONAL
+      CHANGING  messages  TYPE symsg_tab
+      RAISING   zcx_trm_exception.
     CLASS-METHODS append_messages_from_memory
       CHANGING
         messages TYPE symsg_tab.
@@ -29,46 +34,144 @@ ENDCLASS.
 CLASS zcl_trm_pa_fiori_cache_cleanup IMPLEMENTATION.
 
   METHOD execute.
-    SUBMIT /ui2/delete_cache_after_imp EXPORTING LIST TO MEMORY AND RETURN.
-    append_messages_from_memory(
+    DATA: lt_seltab    TYPE rsparams_tt,
+          ls_selection LIKE LINE OF lt_seltab,
+          ls_message   LIKE LINE OF messages.
+
+    CLEAR lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/UI2/DELETE_CACHE_AFTER_IMP'
+        selection = lt_seltab
       CHANGING
-        messages = messages
+        messages  = messages
     ).
 
-    SUBMIT /ui2/invalidate_client_caches WITH gv_all = 'X' EXPORTING LIST TO MEMORY AND RETURN.
-    append_messages_from_memory(
+    CLEAR lt_seltab.
+    CLEAR ls_selection.
+    ls_selection-selname ='GV_ALL'.
+    ls_selection-kind = 'P'.
+    ls_selection-low = 'X'.
+    APPEND ls_selection TO lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/UI2/INVALIDATE_CLIENT_CACHES'
+        selection = lt_seltab
       CHANGING
-        messages = messages
+        messages  = messages
     ).
 
+    CLEAR lt_seltab.
     IF ui5_repository IS INITIAL.
-      SUBMIT /ui5/app_index_calculate WITH p_all = 'X'
-                                      WITH p_repo = ''
-                                      WITH p_distl = ' ' EXPORTING LIST TO MEMORY AND RETURN.
+      CLEAR ls_message.
+      cl_message_helper=>set_msg_vars_for_clike( 'Full UI5 repository calculation!' ).
+      MOVE-CORRESPONDING sy TO ls_message.
+      ls_message-msgty = 'W'.
+      APPEND ls_message TO messages.
+      CLEAR ls_selection.
+      ls_selection-selname ='P_ALL'.
+      ls_selection-kind = 'P'.
+      ls_selection-low = 'X'.
+      APPEND ls_selection TO lt_seltab.
+      CLEAR ls_selection.
+      ls_selection-selname ='P_REPO'.
+      ls_selection-kind = 'P'.
+      APPEND ls_selection TO lt_seltab.
     ELSE.
-      SUBMIT /ui5/app_index_calculate WITH p_all = ' '
-                                      WITH p_repo = ui5_repository
-                                      WITH p_distl = ' ' EXPORTING LIST TO MEMORY AND RETURN.
+      CLEAR ls_selection.
+      ls_selection-selname ='P_ALL'.
+      ls_selection-kind = 'P'.
+      ls_selection-low = ' '.
+      APPEND ls_selection TO lt_seltab.
+      CLEAR ls_selection.
+      ls_selection-selname ='P_REPO'.
+      ls_selection-kind = 'P'.
+      ls_selection-low = ui5_repository.
+      APPEND ls_selection TO lt_seltab.
     ENDIF.
-    append_messages_from_memory(
+    CLEAR ls_selection.
+    ls_selection-selname ='P_DISTL'.
+    ls_selection-kind = 'P'.
+    APPEND ls_selection TO lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/UI5/APP_INDEX_CALCULATE'
+        selection = lt_seltab
       CHANGING
-        messages = messages
+        messages  = messages
     ).
 
-    SUBMIT /ui5/del_odata_metadata_cache EXPORTING LIST TO MEMORY AND RETURN.
-    append_messages_from_memory(
+    CLEAR lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/UI5/DEL_ODATA_METADATA_CACHE'
+        selection = lt_seltab
       CHANGING
-        messages = messages
+        messages  = messages
     ).
 
-    SUBMIT /iwfnd/r_med_cache_cleanup WITH allproxy = 'X'
-                                      WITH allmodel = 'X' EXPORTING LIST TO MEMORY AND RETURN.
-    append_messages_from_memory(
+    CLEAR lt_seltab.
+    CLEAR ls_selection.
+    ls_selection-selname ='ALLPROXY'.
+    ls_selection-kind = 'P'.
+    ls_selection-low = 'X'.
+    APPEND ls_selection TO lt_seltab.
+    CLEAR ls_selection.
+    ls_selection-selname ='ALLMODEL'.
+    ls_selection-kind = 'P'.
+    ls_selection-low = 'X'.
+    APPEND ls_selection TO lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/IWFND/R_MED_CACHE_CLEANUP'
+        selection = lt_seltab
       CHANGING
-        messages = messages
+        messages  = messages
     ).
 
-    SUBMIT /iwbep/r_mgw_med_cache_cleanup WITH allmodel = 'X' EXPORTING LIST TO MEMORY AND RETURN.
+    CLEAR lt_seltab.
+    CLEAR ls_selection.
+    ls_selection-selname ='ALLMODEL'.
+    ls_selection-kind = 'P'.
+    ls_selection-low = 'X'.
+    APPEND ls_selection TO lt_seltab.
+    submit(
+      EXPORTING
+        report    = '/IWBEP/R_MGW_MED_CACHE_CLEANUP'
+        selection = lt_seltab
+      CHANGING
+        messages  = messages
+    ).
+  ENDMETHOD.
+
+  METHOD submit.
+    DATA: lv_report    LIKE report,
+          lv_message   TYPE string,
+          ls_selection LIKE LINE OF selection,
+          lt_seltab    TYPE rsparams_tt.
+    lv_report = report.
+    TRANSLATE lv_report TO UPPER CASE.
+    CALL FUNCTION 'RS_REFRESH_FROM_SELECTOPTIONS'
+      EXPORTING
+        curr_report     = lv_report
+      TABLES
+        selection_table = lt_seltab
+      EXCEPTIONS
+        not_found       = 1
+        no_report       = 2
+        OTHERS          = 3.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-pa_exception ).
+    ENDIF.
+    LOOP AT selection INTO ls_selection.
+      READ TABLE lt_seltab TRANSPORTING NO FIELDS WITH KEY selname = ls_selection-selname kind = ls_selection-kind.
+      IF sy-subrc <> 0.
+        CONCATENATE 'Report' lv_report 'selection' ls_selection-selname 'kind' ls_selection-kind 'not allowed' INTO lv_message SEPARATED BY space.
+        zcx_trm_exception=>raise( iv_message = lv_message
+                                  iv_reason = zcx_trm_exception=>c_reason-pa_exception ).
+      ENDIF.
+    ENDLOOP.
+    SUBMIT (lv_report) WITH SELECTION-TABLE selection EXPORTING LIST TO MEMORY AND RETURN.
     append_messages_from_memory(
       CHANGING
         messages = messages
@@ -115,14 +218,11 @@ CLASS zcl_trm_pa_fiori_cache_cleanup IMPLEMENTATION.
       CONDENSE ls_ascii-line.
       cl_message_helper=>set_msg_vars_for_clike( ls_ascii-line ).
       MOVE-CORRESPONDING sy TO ls_message.
+      ls_message-msgty = 'I'.
       READ TABLE messages TRANSPORTING NO FIELDS WITH KEY table_line = ls_message.
       CHECK sy-subrc <> 0.
       APPEND ls_message TO messages.
     ENDLOOP.
-  ENDMETHOD.
-
-  METHOD if_oo_adt_classrun~main.
-    execute( ).
   ENDMETHOD.
 
 ENDCLASS.
