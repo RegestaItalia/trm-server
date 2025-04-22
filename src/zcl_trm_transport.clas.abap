@@ -7,6 +7,10 @@ CLASS zcl_trm_transport DEFINITION
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+    CONSTANTS: c_migrate_nr_range_nr TYPE nrnr VALUE '00',
+               c_migrate_object      TYPE nrobj VALUE 'ZTRMTRKORR',
+               c_migrate_subobj      TYPE nrsobj VALUE space,
+               c_migrate_toyear      TYPE nryear VALUE '0000'.
 
     METHODS constructor
       IMPORTING iv_trkorr TYPE trkorr
@@ -588,10 +592,6 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD migrate.
-    CONSTANTS: c_nr_range_nr TYPE nrnr VALUE '00',
-               c_object      TYPE nrobj VALUE 'ZTRMTRKORR',
-               c_subobj      TYPE nrsobj VALUE space,
-               c_toyear      TYPE nryear VALUE '0000'.
     DATA: ls_nriv          TYPE nriv,
           lt_interval      TYPE cl_numberrange_intervals=>nr_interval,
           ls_interval      LIKE LINE OF lt_interval,
@@ -616,42 +616,12 @@ CLASS zcl_trm_transport IMPLEMENTATION.
           ls_skip_trkorr   TYPE ztrm_skip_trkorr,
           ls_src_trkorr    TYPE ztrm_src_trkorr.
 
-    " generate new id
-    SELECT SINGLE * FROM nriv INTO ls_nriv WHERE object EQ c_object AND subobject EQ c_subobj AND nrrangenr EQ c_nr_range_nr AND toyear EQ c_toyear.
-    IF sy-subrc <> 0.
-      TRY.
-          ls_interval-subobject = c_subobj.
-          ls_interval-nrrangenr = c_nr_range_nr.
-          ls_interval-toyear = c_toyear.
-          ls_interval-fromnumber = '00000000000000000001'.
-          ls_interval-tonumber = '99999999999999999999'.
-          APPEND ls_interval TO lt_interval.
-          cl_numberrange_intervals=>create(
-            EXPORTING
-              interval  = lt_interval
-              object    = c_object
-              subobject = c_subobj
-          IMPORTING
-            error     = lv_interval_err
-          ).
-          IF lv_interval_err EQ 'X'.
-            zcx_trm_exception=>raise(
-              iv_reason = zcx_trm_exception=>c_reason-snro_interval_create
-              iv_message = 'Error during migration transport interval generation'
-            ).
-          ENDIF.
-        CATCH cx_nr_object_not_found.
-          zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-snro_interval_create ).
-        CATCH cx_number_ranges.
-          zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-snro_interval_create ).
-      ENDTRY.
-    ENDIF.
     CALL FUNCTION 'NUMBER_GET_NEXT'
       EXPORTING
-        nr_range_nr             = c_nr_range_nr
-        object                  = c_object
-        subobject               = c_subobj
-        toyear                  = c_toyear
+        nr_range_nr             = c_migrate_nr_range_nr
+        object                  = c_migrate_object
+        subobject               = c_migrate_subobj
+        toyear                  = c_migrate_toyear
         quantity                = '1'
       IMPORTING
         number                  = lv_trm_trkorr

@@ -6,7 +6,7 @@ DEFINE create_data.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING
-        iv_reason  = zcx_trm_exception=>c_reason-abapgit_data_error
+        iv_reason  = zcx_trm_exception=>c_reason-pa_dynamic
         io_root    = tmp_exception
     ).
   ENDTRY.
@@ -18,7 +18,7 @@ DEFINE create_data_ref.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING
-        iv_reason  = zcx_trm_exception=>c_reason-abapgit_data_error
+        iv_reason  = zcx_trm_exception=>c_reason-pa_dynamic
         io_root    = tmp_exception
     ).
   ENDTRY.
@@ -32,7 +32,7 @@ DEFINE create_object.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING
-        iv_reason  = zcx_trm_exception=>c_reason-abapgit_intergration
+        iv_reason  = zcx_trm_exception=>c_reason-pa_dynamic
         io_root    = tmp_exception
     ).
   ENDTRY.
@@ -54,7 +54,7 @@ DEFINE call_object_method.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING
-        iv_reason  = zcx_trm_exception=>c_reason-abapgit_intergration
+        iv_reason  = zcx_trm_exception=>c_reason-pa_dynamic
         io_root    = tmp_exception
     ).
   ENDTRY.
@@ -64,11 +64,11 @@ DEFINE call_static_method.
   TRY.
     CALL METHOD (&1)=>(&2)
       PARAMETER-TABLE tmp_param_tab.
-    clear tmp_param_tab.
+    CLEAR tmp_param_tab.
   CATCH cx_root INTO tmp_exception.
     zcx_trm_exception=>raise(
       EXPORTING
-        iv_reason  = zcx_trm_exception=>c_reason-abapgit_intergration
+        iv_reason  = zcx_trm_exception=>c_reason-pa_dynamic
         io_root    = tmp_exception
     ).
   ENDTRY.
