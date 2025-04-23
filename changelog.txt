@@ -15,3 +15,6 @@ Legend
 ! add remove transport comments method
 + add remove from skipped trkorr
 + abapGit source code download function
++ add post activity support
++ add new number range interval post activity
++ add fiori ui5 cache cleanup post activity
