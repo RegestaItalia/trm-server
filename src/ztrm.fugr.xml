@@ -617,6 +617,12 @@
        <TYP>XSTRING</TYP>
       </RSIMP>
      </IMPORT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>ET_MESSAGES</PARAMETER>
+       <DBSTRUCT>SYMSG</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
      <EXCEPTION>
       <RSEXC>
        <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
@@ -634,6 +640,10 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_DATA</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>ET_MESSAGES</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
