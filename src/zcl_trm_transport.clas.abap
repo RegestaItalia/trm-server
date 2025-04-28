@@ -7,6 +7,10 @@ CLASS zcl_trm_transport DEFINITION
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+    CONSTANTS: c_migrate_nr_range_nr TYPE nrnr VALUE '00',
+               c_migrate_object      TYPE nrobj VALUE 'ZTRMTRKORR',
+               c_migrate_subobj      TYPE nrsobj VALUE space,
+               c_migrate_toyear      TYPE nryear VALUE '0000'.
 
     METHODS constructor
       IMPORTING iv_trkorr TYPE trkorr
@@ -49,6 +53,10 @@ CLASS zcl_trm_transport DEFINITION
       EXPORTING et_log  TYPE sprot_u_tab
       RAISING   zcx_trm_exception.
 
+    METHODS remove_comments
+      IMPORTING iv_object TYPE trobjtype
+      RAISING   zcx_trm_exception.
+
     METHODS delete
       RAISING zcx_trm_exception.
 
@@ -85,6 +93,17 @@ CLASS zcl_trm_transport DEFINITION
       IMPORTING iv_trkorr TYPE trkorr
                 iv_doc    TYPE trparflag
       RAISING   zcx_trm_exception.
+
+    METHODS migrate
+      EXPORTING ev_trm_trkorr TYPE ztrm_trkorr
+      RAISING   zcx_trm_exception.
+
+    METHODS delete_from_tms_queue
+      IMPORTING iv_system TYPE tmssysnam
+      RAISING   zcx_trm_exception.
+
+    METHODS refresh_tms_txt
+      RAISING zcx_trm_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -222,6 +241,43 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD remove_comments.
+    DATA: lt_e071    TYPE STANDARD TABLE OF e071,
+          ls_e071    LIKE LINE OF lt_e071,
+          ls_request TYPE trwbo_request.
+    ls_request-h-trkorr = gv_trkorr.
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ iv_object.
+    CHECK lt_e071[] IS NOT INITIAL.
+    LOOP AT lt_e071 INTO ls_e071.
+      CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
+        EXPORTING
+          is_e071_delete              = ls_e071
+          iv_dialog_flag              = ' '
+        CHANGING
+          cs_request                  = ls_request
+        EXCEPTIONS
+          e_database_access_error     = 1
+          e_empty_lockkey             = 2
+          e_bad_target_request        = 3
+          e_wrong_source_client       = 4
+          n_no_deletion_of_c_objects  = 5
+          n_no_deletion_of_corr_entry = 6
+          n_object_entry_doesnt_exist = 7
+          n_request_already_released  = 8
+          n_request_from_other_system = 9
+          r_action_aborted_by_user    = 10
+          r_foreign_lock              = 11
+          w_bigger_lock_in_same_order = 12
+          w_duplicate_entry           = 13
+          w_no_authorization          = 14
+          w_user_not_owner            = 15
+          OTHERS                      = 16.
+      IF sy-subrc <> 0.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
   METHOD create_workbench.
@@ -533,6 +589,175 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD migrate.
+    DATA: ls_nriv          TYPE nriv,
+          lt_interval      TYPE cl_numberrange_intervals=>nr_interval,
+          ls_interval      LIKE LINE OF lt_interval,
+          lv_interval_err  TYPE cl_numberrange_intervals=>nr_error,
+          lv_trm_trkorr    TYPE ztrm_trkorr,
+          lt_tmsbuffer     TYPE STANDARD TABLE OF tmsbuffer,
+          ls_tmsbuffer     LIKE LINE OF lt_tmsbuffer,
+          lt_trm_tmsbuffer TYPE zcl_trm_utility=>tyt_migration_tmsbuffer,
+          ls_trm_tmsbuffer LIKE LINE OF lt_trm_tmsbuffer,
+          lt_doktl         TYPE STANDARD TABLE OF doktl,
+          ls_doktl         LIKE LINE OF lt_doktl,
+          lt_trm_doktl     TYPE zcl_trm_utility=>tyt_migration_doktl,
+          ls_trm_doktl     LIKE LINE OF lt_trm_doktl,
+          lt_e071          TYPE STANDARD TABLE OF e071,
+          ls_e071          LIKE LINE OF lt_e071,
+          lt_trm_e071      TYPE zcl_trm_utility=>tyt_migration_e071,
+          ls_trm_e071      LIKE LINE OF lt_trm_e071,
+          lt_e070          TYPE STANDARD TABLE OF e070,
+          ls_e070          LIKE LINE OF lt_e070,
+          lt_trm_e070      TYPE zcl_trm_utility=>tyt_migration_e070,
+          ls_trm_e070      LIKE LINE OF lt_trm_e070,
+          ls_skip_trkorr   TYPE ztrm_skip_trkorr,
+          ls_src_trkorr    TYPE ztrm_src_trkorr.
+
+    CALL FUNCTION 'NUMBER_GET_NEXT'
+      EXPORTING
+        nr_range_nr             = c_migrate_nr_range_nr
+        object                  = c_migrate_object
+        subobject               = c_migrate_subobj
+        toyear                  = c_migrate_toyear
+        quantity                = '1'
+      IMPORTING
+        number                  = lv_trm_trkorr
+      EXCEPTIONS
+        interval_not_found      = 1
+        number_range_not_intern = 2
+        object_not_found        = 3
+        quantity_is_0           = 4
+        quantity_is_not_1       = 5
+        interval_overflow       = 6
+        buffer_overflow         = 7
+        OTHERS                  = 8.
+    IF sy-subrc <> 0.
+      IF sy-subrc EQ 1.
+        zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-snro_interval_not_found ).
+      ELSE.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDIF.
+
+    " copy tms buffer
+    SELECT * FROM tmsbuffer INTO TABLE lt_tmsbuffer WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_tmsbuffer INTO ls_tmsbuffer.
+      CLEAR ls_trm_tmsbuffer.
+      MOVE-CORRESPONDING ls_tmsbuffer TO ls_trm_tmsbuffer.
+      ls_trm_tmsbuffer-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_tmsbuffer TO lt_trm_tmsbuffer.
+    ENDLOOP.
+    IF lt_trm_tmsbuffer[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_tmsbuffer( it_data = lt_trm_tmsbuffer ).
+    ENDIF.
+
+    " copy documentation
+    SELECT * FROM doktl INTO TABLE lt_doktl WHERE id EQ 'TA' AND object EQ gv_trkorr.
+    LOOP AT lt_doktl INTO ls_doktl.
+      CLEAR ls_trm_doktl.
+      MOVE-CORRESPONDING ls_doktl TO ls_trm_doktl.
+      ls_trm_doktl-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_doktl TO lt_trm_doktl.
+    ENDLOOP.
+    IF lt_trm_doktl[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_doktl( it_data = lt_trm_doktl ).
+    ENDIF.
+
+    " copy e071
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_e071 INTO ls_e071.
+      CLEAR ls_trm_e071.
+      MOVE-CORRESPONDING ls_e071 TO ls_trm_e071.
+      ls_trm_e071-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_e071 TO lt_trm_e071.
+    ENDLOOP.
+    IF lt_trm_e071[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_e071( it_data = lt_trm_e071 ).
+    ENDIF.
+
+    " copy e070
+    SELECT * FROM e070 INTO TABLE lt_e070 WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_e070 INTO ls_e070.
+      CLEAR ls_trm_e070.
+      MOVE-CORRESPONDING ls_e070 TO ls_trm_e070.
+      ls_trm_e070-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_e070 TO lt_trm_e070.
+    ENDLOOP.
+    IF lt_trm_e070[] IS NOT INITIAL.
+      zcl_trm_utility=>add_migration_e070( it_data = lt_trm_e070 ).
+    ENDIF.
+
+    " move skip trkorr (if exists)
+    SELECT SINGLE * FROM ztrm_skip_trkorr INTO ls_skip_trkorr WHERE trkorr EQ gv_trkorr.
+    IF sy-subrc EQ 0.
+      zcl_trm_utility=>remove_skip_trkorr( iv_trkorr = gv_trkorr ).
+      zcl_trm_utility=>add_skip_trkorr( iv_trkorr = lv_trm_trkorr ).
+    ENDIF.
+
+    " move src trkorr (if exists)
+    SELECT SINGLE * FROM ztrm_src_trkorr INTO ls_src_trkorr WHERE trkorr EQ gv_trkorr.
+    IF sy-subrc EQ 0.
+      zcl_trm_utility=>remove_source_trkorr( iv_trkorr = gv_trkorr ).
+      zcl_trm_utility=>add_source_trkorr( iv_trkorr = lv_trm_trkorr ).
+    ENDIF.
+
+  ENDMETHOD.
+
+  METHOD delete_from_tms_queue.
+    DATA: ls_tmsbuffer    TYPE tmsbuffer,
+          lt_tp_maintains TYPE stms_tp_maintains,
+          ls_tp_maintains LIKE LINE OF lt_tp_maintains,
+          ls_tpstdout     TYPE tpstdout,
+          lt_log          TYPE zcx_trm_exception=>tyt_log,
+          ls_exception    TYPE stmscalert.
+
+    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ iv_system AND trkorr EQ gv_trkorr.
+    CHECK sy-subrc EQ 0.
+
+    CALL FUNCTION 'TMS_MGR_MAINTAIN_TR_QUEUE'
+      EXPORTING
+        iv_command                 = 'DELFROMBUFFER'
+        iv_system                  = ls_tmsbuffer-sysnam
+        iv_domain                  = ls_tmsbuffer-domnam
+        iv_request                 = ls_tmsbuffer-trkorr
+        iv_tarcli                  = ls_tmsbuffer-tarcli
+        iv_monitor                 = ' '
+        iv_verbose                 = ' '
+      IMPORTING
+        et_tp_maintains            = lt_tp_maintains
+        es_exception               = ls_exception
+      EXCEPTIONS
+        read_config_failed         = 1
+        table_of_requests_is_empty = 2
+        OTHERS                     = 3.
+
+    IF sy-subrc <> 0 OR ( ls_exception-error <> 'OK' AND ls_exception-error <> space ).
+      IF lt_tp_maintains[] IS NOT INITIAL.
+        READ TABLE lt_tp_maintains INTO ls_tp_maintains INDEX 1.
+        LOOP AT ls_tp_maintains-tp_stdout INTO ls_tpstdout.
+          APPEND ls_tpstdout-line TO lt_log.
+        ENDLOOP.
+        zcx_trm_exception=>raise( it_log = lt_log ).
+      ELSE.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD refresh_tms_txt.
+    DATA ls_tmsbuftxt TYPE tmsbuftxt.
+    SELECT SINGLE * FROM tmsbuftxt INTO ls_tmsbuftxt WHERE trkorr EQ gv_trkorr.
+    CHECK sy-subrc EQ 0.
+    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli WHERE trkorr EQ gv_trkorr.
+    " there's no standard way to update buffer text table other than clearing the buffer as a whole?
+    MODIFY tmsbuftxt FROM ls_tmsbuftxt.
+    COMMIT WORK AND WAIT.
+    " don't raise exception if it fails!!
   ENDMETHOD.
 
 ENDCLASS.

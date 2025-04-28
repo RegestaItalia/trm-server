@@ -1,18 +1,18 @@
-FUNCTION ztrm_get_r3trans_info.
+FUNCTION ZTRM_REFRESH_TR_TMS_TXT.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
-*"  EXPORTING
-*"     VALUE(EV_LOG) TYPE  STRING
+*"  IMPORTING
+*"     VALUE(IV_TRKORR) TYPE  TRKORR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
-*"      R3TRANS_CMD_ERROR
 *"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
   TRY.
-      ev_log = zcl_trm_utility=>get_r3trans_info( ).
+      CREATE OBJECT lo_transport EXPORTING iv_trkorr = iv_trkorr.
+      lo_transport->refresh_tms_txt( ).
     CATCH zcx_trm_exception INTO lo_exc.
       PERFORM handle_exception.
   ENDTRY.

@@ -1,20 +1,24 @@
-FUNCTION ztrm_get_r3trans_info.
+FUNCTION ztrm_remove_skip_trkorr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
-*"  EXPORTING
-*"     VALUE(EV_LOG) TYPE  STRING
+*"  IMPORTING
+*"     VALUE(IV_TRKORR) TYPE  TRKORR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
-*"      R3TRANS_CMD_ERROR
+*"      ENQUEUE_ERROR
+*"      DEQUEUE_ERROR
 *"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
   TRY.
-      ev_log = zcl_trm_utility=>get_r3trans_info( ).
-    CATCH zcx_trm_exception INTO lo_exc.
-      PERFORM handle_exception.
+    zcl_trm_utility=>remove_skip_trkorr(
+      EXPORTING
+        iv_trkorr = iv_trkorr
+    ).
+  CATCH zcx_trm_exception INTO lo_exc.
+    PERFORM handle_exception.
   ENDTRY.
 
 ENDFUNCTION.
