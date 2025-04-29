@@ -248,7 +248,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
           ls_e071    LIKE LINE OF lt_e071,
           ls_request TYPE trwbo_request.
     ls_request-h-trkorr = gv_trkorr.
-    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ iv_object.
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ iv_object AND trkorr EQ gv_trkorr.
     CHECK lt_e071[] IS NOT INITIAL.
     LOOP AT lt_e071 INTO ls_e071.
       CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
