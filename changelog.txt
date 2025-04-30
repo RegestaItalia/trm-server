@@ -9,7 +9,7 @@ Legend
 - : removed
 
 
-2025-04-29 v2.2.1
+2025-04-29 v2.2.2
 -------------------
 
 * add object to transport dump
