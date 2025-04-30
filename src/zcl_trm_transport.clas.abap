@@ -231,13 +231,14 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       TABLES
         it_e071              = lt_e071
       EXCEPTIONS
+        no_objects_appended  = 0
         invalid_request      = 1
         invalid_request_type = 2
         user_not_owner       = 3
-        no_objects_appended  = 4
-        enqueue_error        = 5
-        cancelled_by_user    = 6
-        recursive_call       = 7.
+        enqueue_error        = 4
+        cancelled_by_user    = 5
+        recursive_call       = 6
+        OTHERS               = 7.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
