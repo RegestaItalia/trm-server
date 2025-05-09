@@ -195,6 +195,16 @@ CLASS lcl_abapgit_dot_abapgit DEFINITION INHERITING FROM lcl_trm_abapgit.
       IMPORTING iv_logic TYPE string
       RAISING   zcx_trm_exception.
 
+    METHODS get_data
+      RETURNING VALUE(rs_data) TYPE lif_abapgit_dot_abapgit=>ty_dot_abapgit
+      RAISING   zcx_trm_exception.
+
+
+    METHODS remove_ignore
+      IMPORTING iv_path     TYPE string
+                iv_filename TYPE string
+      RAISING   zcx_trm_exception.
+
     CLASS-METHODS build_default
       RETURNING VALUE(ro_dot_abapgit) TYPE REF TO lcl_abapgit_dot_abapgit
       RAISING   zcx_trm_exception.
@@ -228,6 +238,24 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
     GET REFERENCE OF iv_logic INTO lo_logic.
     add_param 'IV_LOGIC' lo_logic cl_abap_objectdescr=>exporting.
     call_object_method go_instance 'SET_FOLDER_LOGIC'.
+  ENDMETHOD.
+
+  METHOD get_data.
+    DATA ls_data   TYPE REF TO data.
+    create_data ls_data 'ZIF_ABAPGIT_DOT_ABAPGIT=>TY_DOT_ABAPGIT'.
+    GET REFERENCE OF rs_data INTO ls_data.
+    add_param 'RS_DATA' ls_data cl_abap_objectdescr=>receiving.
+    call_object_method go_instance 'GET_DATA'.
+  ENDMETHOD.
+
+  METHOD remove_ignore.
+    DATA: lo_path     TYPE REF TO data,
+          lo_filename TYPE REF TO data.
+    GET REFERENCE OF iv_path INTO lo_path.
+    add_param 'IV_PATH' lo_path cl_abap_objectdescr=>exporting.
+    GET REFERENCE OF iv_filename INTO lo_filename.
+    add_param 'IV_FILENAME' lo_filename cl_abap_objectdescr=>exporting.
+    call_object_method go_instance 'REMOVE_IGNORE'.
   ENDMETHOD.
 
 ENDCLASS.
