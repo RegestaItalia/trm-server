@@ -27,6 +27,7 @@ CLASS zcx_trm_exception DEFINITION
         pa_param_missing         TYPE string VALUE 'PA_PARAM_MISSING',
         pa_unexpected_param      TYPE string VALUE 'PA_UNEXPECTED_PARAM',
         pa_exception             TYPE string VALUE 'PA_EXCEPTION',
+        program_not_found        TYPE string value 'PROGRAM_NOT_FOUND',
       END OF c_reason .
 
     "! Constructor
