@@ -7,7 +7,7 @@ FORM check_auth.
     EXCEPTIONS
       trm_rfc_unauthorized = 1.
   IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
+    MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING trm_rfc_unauthorized.
   ENDIF.
 ENDFORM.
 

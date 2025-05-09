@@ -1,3 +1,8 @@
+"! Creates a number range interval if it does not already exist
+"!
+"! If an interval already exists, nothing is changed. If not, a new one is created, optionally
+"! assigning it to a transport request.
+"!
 CLASS zcl_trm_pa_no_range_interval DEFINITION
   PUBLIC
   FINAL
@@ -17,6 +22,18 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
            ty_nrind   TYPE c LENGTH 1,
            ty_procind TYPE c LENGTH 1.
 
+    "! @parameter object            | Number range object name
+    "! @parameter subobject         | Subobject key within the number range object
+    "! @parameter nrrangenr         | Number range number
+    "! @parameter toyear            | Target year of the interval ('9999' for permanent)
+    "! @parameter fromnumber        | (Optional) Lower boundary of the interval (default: SAP standard)
+    "! @parameter tonumber          | (Optional) Upper boundary of the interval (default: SAP standard)
+    "! @parameter nrlevel           | (Optional) Current number level (typically left empty for new)
+    "! @parameter externind         | (Optional) External number assignment indicator ('X' or ' ')
+    "! @parameter procind           | (Optional) Processing indicator ('X' or ' ')
+    "! @parameter transport_request | (Optional) Transport request number for customizing changes
+    "! @parameter messages          | Message table capturing success or error feedback
+    "! @raising zcx_trm_exception   | Raised if interval creation fails or input is invalid
     CLASS-METHODS execute
       IMPORTING
         !object            TYPE ty_nrobj

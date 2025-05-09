@@ -1,33 +1,54 @@
+"! Transport API
 CLASS zcl_trm_transport DEFINITION
   PUBLIC
   FINAL
-  CREATE PUBLIC .
+  CREATE PUBLIC.
 
   PUBLIC SECTION.
+
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
+           tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
-    CONSTANTS: c_migrate_nr_range_nr TYPE nrnr VALUE '00',
-               c_migrate_object      TYPE nrobj VALUE 'ZTRMTRKORR',
-               c_migrate_subobj      TYPE nrsobj VALUE space,
-               c_migrate_toyear      TYPE nryear VALUE '0000'.
+    CONSTANTS:
+      c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
+      c_migrate_object      TYPE nrobj  VALUE 'ZTRMTRKORR',
+      c_migrate_subobj      TYPE nrsobj VALUE space,
+      c_migrate_toyear      TYPE nryear VALUE '0000'.
 
+    "! Constructor
+    "! @parameter iv_trkorr | Transport request number
     METHODS constructor
-      IMPORTING iv_trkorr TYPE trkorr
-      RAISING   zcx_trm_exception.
+      IMPORTING iv_trkorr TYPE trkorr.
 
+    "! Create a new workbench request
+    "! @parameter iv_text | Description of the transport
+    "! @parameter iv_target | Target system
+    "! @parameter ro_transport | Created transport object
+    "! @raising zcx_trm_exception | Raised if creation fails
     CLASS-METHODS create_workbench
       IMPORTING iv_text             TYPE as4text
                 iv_target           TYPE tr_target
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
+    "! Create a transport of copies
+    "! @parameter iv_text | Description of the transport
+    "! @parameter iv_target | Target system
+    "! @parameter ro_transport | Created transport object
+    "! @raising zcx_trm_exception | Raised if creation fails
     CLASS-METHODS create_transport_of_copies
       IMPORTING iv_text             TYPE as4text
                 iv_target           TYPE tr_target
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
+    "! Find the transport that currently locks the specified object
+    "! @parameter iv_pgmid | Program ID
+    "! @parameter iv_object | Object type
+    "! @parameter iv_obj_name | Object name
+    "! @parameter ro_transport | Transport containing the object lock
+    "! @raising zcx_trm_exception | Raised if lookup fails
     CLASS-METHODS find_object_lock
       IMPORTING iv_pgmid            TYPE pgmid
                 iv_object           TYPE trobjtype
@@ -35,75 +56,138 @@ CLASS zcl_trm_transport DEFINITION
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
+    "! Read the TMS import queue for a system
+    "! @parameter iv_target | Target system name
+    "! @parameter et_requests | Returned queue requests
+    "! @raising zcx_trm_exception | Raised if queue cannot be read
     CLASS-METHODS read_queue
       IMPORTING iv_target   TYPE tmssysnam
       EXPORTING et_requests TYPE tmsiqreqs
       RAISING   zcx_trm_exception.
 
+    "! Get the current transport request number
+    "! @parameter rv_trkorr | Transport request number
     METHODS get_trkorr
       RETURNING VALUE(rv_trkorr) TYPE trkorr.
 
+    "! Add translation-related objects to the transport
+    "! @parameter it_devclass | Table of development packages to include
+    "! @raising zcx_trm_exception | Raised if translations cannot be added
     METHODS add_translations
       IMPORTING it_devclass TYPE tyt_lxe_packg
       RAISING   zcx_trm_exception.
 
+    "! Add E071 objects to the transport
+    "! @parameter iv_lock | Lock the objects during addition
+    "! @parameter it_e071 | Table of E071 entries to add
+    "! @parameter et_log | Exported log of results
+    "! @raising zcx_trm_exception | Raised if addition fails
     METHODS add_objects
       IMPORTING iv_lock TYPE flag
                 it_e071 TYPE tyt_e071
       EXPORTING et_log  TYPE sprot_u_tab
       RAISING   zcx_trm_exception.
 
+    "! Remove comments for a specific object type
+    "! @parameter iv_object | Object type to clean
+    "! @raising zcx_trm_exception | Raised if deletion fails
     METHODS remove_comments
       IMPORTING iv_object TYPE trobjtype
       RAISING   zcx_trm_exception.
 
+    "! Delete the transport request
+    "! @raising zcx_trm_exception | Raised if deletion fails
     METHODS delete
       RAISING zcx_trm_exception.
 
+    "! Enqueue the transport for editing
+    "! @raising zcx_trm_exception | Raised if enqueue fails
     METHODS enqueue
       RAISING zcx_trm_exception.
 
+    "! Dequeue the transport
+    "! @raising zcx_trm_exception | Raised if dequeue fails
     METHODS dequeue
       RAISING zcx_trm_exception.
 
+    "! Forward the transport to a target system
+    "! @parameter iv_target | Target system
+    "! @parameter iv_source | Source system
+    "! @parameter iv_import_again | Import even if already imported
+    "! @raising zcx_trm_exception | Raised if forwarding fails
     METHODS forward
       IMPORTING iv_target       TYPE tmssysnam
                 iv_source       TYPE tmssysnam
                 iv_import_again TYPE flag
       RAISING   zcx_trm_exception.
 
+    "! Import the transport into a system
+    "! @parameter iv_system | Target system name
+    "! @raising zcx_trm_exception | Raised if import fails
     METHODS import
       IMPORTING iv_system TYPE tmssysnam
       RAISING   zcx_trm_exception.
 
+    "! Release the transport
+    "! @parameter iv_lock | Whether to lock objects before release
+    "! @parameter et_messages | Messages from the release operation
+    "! @raising zcx_trm_exception | Raised if release fails
     METHODS release
       IMPORTING iv_lock     TYPE flag
       EXPORTING et_messages TYPE ctsgerrmsgs
       RAISING   zcx_trm_exception.
 
+    "! Rename the transport (change text)
+    "! @parameter iv_as4text | New description
+    "! @raising zcx_trm_exception | Raised if rename fails
     METHODS rename
       IMPORTING iv_as4text TYPE as4text
       RAISING   zcx_trm_exception.
 
+    "! Set documentation text for the transport
+    "! @parameter it_doc | Documentation lines
+    "! @raising zcx_trm_exception | Raised if update fails
     METHODS set_documentation
       IMPORTING it_doc TYPE tyt_tline
       RAISING   zcx_trm_exception.
 
+    "! Copy another transport’s contents into this one
+    "! @parameter iv_trkorr | Source transport
+    "! @parameter iv_doc | Whether to skip documentation
+    "! @raising zcx_trm_exception | Raised if copy fails
     METHODS copy
       IMPORTING iv_trkorr TYPE trkorr
                 iv_doc    TYPE trparflag
       RAISING   zcx_trm_exception.
 
+    "! Migrate the current transport data to custom
+    "! @parameter ev_trm_trkorr | Generated TRM transport ID
+    "! @raising zcx_trm_exception | Raised on number range or DB failure
     METHODS migrate
       EXPORTING ev_trm_trkorr TYPE ztrm_trkorr
       RAISING   zcx_trm_exception.
 
+    "! Delete transport from the TMS import queue
+    "! @parameter iv_system | Target system name
+    "! @raising zcx_trm_exception | Raised if removal fails
     METHODS delete_from_tms_queue
       IMPORTING iv_system TYPE tmssysnam
       RAISING   zcx_trm_exception.
 
+    "! Update transport description in TMS buffer
+    "! @raising zcx_trm_exception | Raised if refresh fails
     METHODS refresh_tms_txt
       RAISING zcx_trm_exception.
+
+    "! Get list of E071 objects
+    "! @parameter rt_e071 | E071 entries in the transport
+    METHODS get_e071
+      RETURNING VALUE(rt_e071) TYPE tyt_e071.
+
+    "! Get list of E071K entries
+    "! @parameter rt_e071k | E071K entries in the transport
+    METHODS get_e071k
+      RETURNING VALUE(rt_e071k) TYPE tyt_e071k.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -114,7 +198,9 @@ CLASS zcl_trm_transport DEFINITION
       RETURNING VALUE(ro_transport) TYPE REF TO zcl_trm_transport
       RAISING   zcx_trm_exception.
 
-    DATA: gv_trkorr TYPE trkorr.
+    DATA: gv_trkorr TYPE trkorr,
+          gt_e071   TYPE tyt_e071,
+          gt_e071k  TYPE tyt_e071k.
 ENDCLASS.
 
 
@@ -759,6 +845,20 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     MODIFY tmsbuftxt FROM ls_tmsbuftxt.
     COMMIT WORK AND WAIT.
     " don't raise exception if it fails!!
+  ENDMETHOD.
+
+  METHOD get_e071.
+    IF gt_e071[] IS INITIAL.
+      SELECT * FROM e071 INTO CORRESPONDING FIELDS OF TABLE gt_e071 WHERE trkorr EQ gv_trkorr.
+    ENDIF.
+    rt_e071[] = gt_e071[].
+  ENDMETHOD.
+
+  METHOD get_e071k.
+    IF gt_e071k[] IS INITIAL.
+      SELECT * FROM e071k INTO CORRESPONDING FIELDS OF TABLE gt_e071k WHERE trkorr EQ gv_trkorr.
+    ENDIF.
+    rt_e071k[] = gt_e071k[].
   ENDMETHOD.
 
 ENDCLASS.

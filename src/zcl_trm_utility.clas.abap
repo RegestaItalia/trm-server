@@ -23,59 +23,95 @@ CLASS zcl_trm_utility DEFINITION
              parameters TYPE tyt_pa_parameter,
            END OF ty_pa_data.
 
+    "! Check if current user is authorized to execute TRM functions
+    "! @parameter rv_authorized | 'X' if authorized
     CLASS-METHODS check_functions_authorization
       RETURNING VALUE(rv_authorized) TYPE flag.
 
+    "! Add a transport to the TRM skip list
+    "! @parameter iv_trkorr | Transport request to skip
     CLASS-METHODS add_skip_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Remove a transport from the TRM skip list
+    "! @parameter iv_trkorr | Transport request to remove from skip list
     CLASS-METHODS remove_skip_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Add transport to the TRM source list
+    "! @parameter iv_trkorr | Transport request to add to source list
     CLASS-METHODS add_source_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Remove a transport from the TRM source list
+    "! @parameter iv_trkorr | Transport request to remove from source list
     CLASS-METHODS remove_source_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Get a binary file from the application server
+    "! @parameter iv_file_path | Absolute path to the binary file
+    "! @parameter ev_file | File content as xstring
     CLASS-METHODS get_binary_file
       IMPORTING iv_file_path TYPE string
       EXPORTING ev_file      TYPE xstring
       RAISING   zcx_trm_exception.
 
+    "! Write a binary file to the application server
+    "! @parameter iv_file_path | Absolute path to the binary file
+    "! @parameter iv_file | File content as xstring
     CLASS-METHODS write_binary_file
       IMPORTING iv_file_path TYPE string
                 iv_file      TYPE xstring
       RAISING   zcx_trm_exception.
 
+    "! Get the DIR_TRANS path from system profile
+    "! @parameter ev_dir_trans | DIR_TRANS path
     CLASS-METHODS get_dir_trans
       EXPORTING ev_dir_trans TYPE pfevalue
       RAISING   zcx_trm_exception.
 
+    "! Get the current operating system's file system
+    "! @parameter ev_file_sys | OS
     CLASS-METHODS get_file_sys
       EXPORTING ev_file_sys TYPE filesys
       RAISING   zcx_trm_exception.
 
+    "! Get the default transport layer
+    "! @parameter ev_layer | Transport layer
     CLASS-METHODS get_default_transport_layer
       EXPORTING ev_layer TYPE devlayer
       RAISING   zcx_trm_exception.
 
+    "! Get supported object types from transport configuration
+    "! @parameter et_object_text | Supported object types
     CLASS-METHODS get_supported_object_types
       EXPORTING et_object_text TYPE tyt_ko100
       RAISING   zcx_trm_exception.
 
+    "! Add install devclasses into TRM install devclass list
+    "! @parameter it_installdevc | Devclasses to add
     CLASS-METHODS add_install_devclass
       IMPORTING it_installdevc TYPE tyt_installdevc
       RAISING   zcx_trm_exception.
 
+    "! Add package integrity
+    "! @parameter is_integrity | Integrity
     CLASS-METHODS add_package_integrity
       IMPORTING is_integrity TYPE ztrm_integrity
       RAISING   zcx_trm_exception.
 
+    "! Wrapper for TR_TADIR_INTERFACE to register objects in the TADIR table
+    "! @parameter iv_pgmid     | Program ID
+    "! @parameter iv_object    | Object type
+    "! @parameter iv_objname   | Name of the object
+    "! @parameter iv_devclass  | (Optional) Development class the object belongs to
+    "! @parameter iv_srcsystem | (Optional) Logical system the object originates from
+    "! @parameter iv_author    | (Optional) Author of the object
+    "! @parameter iv_genflag   | (Optional) Generation flag (X = generated object)
     CLASS-METHODS tadir_interface
       IMPORTING iv_pgmid     TYPE pgmid
                 iv_object    TYPE trobjtype
@@ -86,36 +122,60 @@ CLASS zcl_trm_utility DEFINITION
                 iv_genflag   TYPE genflag OPTIONAL
       RAISING   zcx_trm_exception.
 
+    "! Add and activate a custom namespace entry in the system
+    "! @parameter iv_namespace  | Namespace key to be added
+    "! @parameter iv_replicense | Repair license key for the namespace
+    "! @parameter it_texts      | Text descriptions for the namespace (multilingual)
     CLASS-METHODS add_namespace
       IMPORTING iv_namespace  TYPE namespace
                 iv_replicense TYPE trnlicense
                 it_texts      TYPE tyt_trnspacett
       RAISING   zcx_trm_exception.
 
+    "! Get R3trans utility version
+    "! @return rv_r3trans | Version
     CLASS-METHODS get_r3trans_info
       RETURNING VALUE(rv_r3trans) TYPE string
       RAISING   zcx_trm_exception.
 
+    "! Add TMS buffer data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_tmsbuffer
       IMPORTING it_data TYPE tyt_migration_tmsbuffer
       RAISING   zcx_trm_exception.
 
+    "! Add documentation data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_doktl
       IMPORTING it_data TYPE tyt_migration_doktl
       RAISING   zcx_trm_exception.
 
+    "! Add E071 data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_e071
       IMPORTING it_data TYPE tyt_migration_e071
       RAISING   zcx_trm_exception.
 
+    "! Add E070 data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_e070
       IMPORTING it_data TYPE tyt_migration_e070
       RAISING   zcx_trm_exception.
 
+    "! Executes a post-activity class dynamically from XML input
+    "! @parameter iv_data     | XML input defining the class and parameters to execute
+    "! @parameter et_messages | Table of messages returned from the execution
     CLASS-METHODS execute_post_activity
       IMPORTING iv_data     TYPE xstring
       EXPORTING et_messages TYPE symsg_tab
       RAISING   zcx_trm_exception.
+
+    "! Reads messages from memory (e.g., after SUBMIT) and appends them to the provided message table
+    "! @parameter messages | Message table to append entries from memory
+    CLASS-METHODS append_messages_from_memory
+      CHANGING
+        messages TYPE symsg_tab.
+
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -586,6 +646,53 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     IF sy-subrc EQ 0.
       MOVE ls_parambind-value->* TO et_messages.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD append_messages_from_memory.
+    DATA: lt_list_tab  TYPE TABLE OF abaplist,
+          lt_ascii_tab TYPE soli_tab,
+          ls_ascii     LIKE LINE OF lt_ascii_tab,
+          lv_lines     TYPE i,
+          ls_message   LIKE LINE OF messages.
+    FIELD-SYMBOLS <fs_msg> TYPE symsg.
+    CALL FUNCTION 'LIST_FROM_MEMORY'
+      TABLES
+        listobject = lt_list_tab
+      EXCEPTIONS
+        not_found  = 1
+        OTHERS     = 2.
+    CALL FUNCTION 'LIST_FREE_MEMORY'
+      EXCEPTIONS
+        error_message = 1
+        OTHERS        = 2.
+    CALL FUNCTION 'LIST_TO_ASCI'
+      TABLES
+        listasci           = lt_ascii_tab
+        listobject         = lt_list_tab
+      EXCEPTIONS
+        empty_list         = 1
+        list_index_invalid = 2
+        error_message      = 3
+        OTHERS             = 4.
+    DESCRIBE TABLE lt_ascii_tab LINES lv_lines.
+    IF lv_lines GE 3. " remove report header
+      READ TABLE lt_ascii_tab INTO ls_ascii INDEX 2.
+      IF '-' CO ls_ascii-line.
+        DELETE lt_ascii_tab FROM 1 TO 3.
+      ENDIF.
+    ENDIF.
+    CLEAR ls_ascii.
+    LOOP AT lt_ascii_tab INTO ls_ascii.
+      CHECK ls_ascii-line IS NOT INITIAL.
+      CLEAR ls_message.
+      CONDENSE ls_ascii-line.
+      cl_message_helper=>set_msg_vars_for_clike( ls_ascii-line ).
+      MOVE-CORRESPONDING sy TO ls_message.
+      ls_message-msgty = 'I'.
+      READ TABLE messages TRANSPORTING NO FIELDS WITH KEY table_line = ls_message.
+      CHECK sy-subrc <> 0.
+      APPEND ls_message TO messages.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

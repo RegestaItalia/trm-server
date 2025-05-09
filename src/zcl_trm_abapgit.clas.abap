@@ -1,3 +1,4 @@
+"! ABAPGit API exposure
 CLASS zcl_trm_abapgit DEFINITION
   PUBLIC
   FINAL
@@ -7,11 +8,20 @@ CLASS zcl_trm_abapgit DEFINITION
 
     TYPES: tyt_tadir TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY.
 
+    "! Retrieves the serialized `.abapgit` configuration file for a given package
+    "! @parameter iv_devclass | Name of the development class (package)
+    "! parameter rv_dot_abapgit | Serialized .abapgit content as xstring
+    "! @raising zcx_trm_exception | Raised if repository cannot be found
     CLASS-METHODS get_dot_abapgit
       IMPORTING iv_devclass           TYPE devclass
       RETURNING VALUE(rv_dot_abapgit) TYPE xstring
       RAISING   zcx_trm_exception.
 
+    "! Serializes the ABAP package contents into ZIP format using abapGit
+    "! @parameter iv_devclass | Name of the development class (package)
+    "! @parameter ev_zip | ZIP file in xstring format
+    "! @parameter et_objects | List of TADIR objects found in the package
+    "! @raising zcx_trm_exception | Raised on serialization errors
     CLASS-METHODS serialize
       IMPORTING iv_devclass TYPE devclass
       EXPORTING ev_zip      TYPE xstring
