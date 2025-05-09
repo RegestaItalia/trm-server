@@ -1,37 +1,22 @@
-"! ABAP package API
 CLASS zcl_trm_package DEFINITION
   PUBLIC
   FINAL
-  CREATE PUBLIC.
+  CREATE PUBLIC .
 
   PUBLIC SECTION.
 
-    "! Constructor
-    "! @parameter iv_devclass | Development class (package name) to operate on
     METHODS constructor
       IMPORTING iv_devclass TYPE devclass.
 
-    "! Creates a new ABAP package based on the given data
-    "! @parameter is_data | Input structure containing package metadata
-    "! @parameter ro_package | Created package instance
-    "! @raising zcx_trm_exception | Raised if package creation fails
     CLASS-METHODS create
       IMPORTING is_data           TYPE scompkdtln
       RETURNING VALUE(ro_package) TYPE REF TO zcl_trm_package
       RAISING   zcx_trm_exception.
 
-    "! Retrieves all TADIR objects
-    "! @parameter et_tadir | Table of TADIR entries
-    "! @raising zcx_trm_exception | Raised if object retrieval fails
     METHODS get_objects
       EXPORTING et_tadir TYPE scts_tadir
       RAISING   zcx_trm_exception.
 
-    "! Adjusts package interface data like super package and devlayer
-    "! @parameter iv_parentcl | Superpackage (optional)
-    "! @parameter iv_rm_parentcl | Flag to remove superpackage link
-    "! @parameter iv_devlayer | Development layer to assign (optional)
-    "! @raising zcx_trm_exception | Raised if update fails
     METHODS interface
       IMPORTING iv_parentcl    TYPE devclass OPTIONAL
                 iv_rm_parentcl TYPE flag OPTIONAL
@@ -44,16 +29,14 @@ CLASS zcl_trm_package DEFINITION
 
     CLASS-METHODS modify_package_data
       IMPORTING is_package_data_sign TYPE scompksign
-                iv_suppress_dialog   TYPE flag
       CHANGING  cs_package_data      TYPE scompkdtln
                 cv_transport_request TYPE e070-trkorr
       RAISING   zcx_trm_exception.
-
 ENDCLASS.
 
 
 
-CLASS zcl_trm_package IMPLEMENTATION.
+CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
 
 
   METHOD constructor.
@@ -174,11 +157,12 @@ CLASS zcl_trm_package IMPLEMENTATION.
 * lock package
     CALL METHOD lo_package->set_changeable
       EXPORTING
-        i_changeable              = 'X'
-        i_suppress_dialog         = 'D'
+        i_changeable                 = 'X'
+        i_suppress_dialog            = 'D'
+        i_suppress_access_permission = 'X'
       EXCEPTIONS
-        object_already_changeable = 0                       "ignore it
-        OTHERS                    = 1.
+        object_already_changeable    = 0                       "ignore it
+        OTHERS                       = 1.
 
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
@@ -198,8 +182,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
 
       CALL METHOD lo_package->set_changeable
         EXPORTING
-          i_changeable      = ' '
-          i_suppress_dialog = 'D'
+          i_changeable                 = ' '
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           OTHERS            = 0.
       zcx_trm_exception=>raise( ).
@@ -209,7 +194,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
     CALL METHOD lo_package->save
       EXPORTING
         i_transport_request    = cv_transport_request
-        i_suppress_dialog      = iv_suppress_dialog
+        i_suppress_dialog      = 'X'
         i_suppress_corr_insert = 'X'
       IMPORTING
         e_transport_request    = cv_transport_request
@@ -229,8 +214,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
 * unlock package
     CALL METHOD lo_package->set_changeable
       EXPORTING
-        i_changeable            = ' '
-        i_suppress_dialog       = 'D'
+        i_changeable                 = ' '
+        i_suppress_dialog            = 'D'
+        i_suppress_access_permission = 'X'
       EXCEPTIONS
         object_already_unlocked = 0                       "ignore
         OTHERS                  = 1.
@@ -252,7 +238,6 @@ CLASS zcl_trm_package IMPLEMENTATION.
       modify_package_data(
         EXPORTING
           is_package_data_sign = ls_modify_sign
-          iv_suppress_dialog   = 'X'
         CHANGING
           cs_package_data      = ls_pack_data
           cv_transport_request = ls_cr
@@ -313,7 +298,6 @@ CLASS zcl_trm_package IMPLEMENTATION.
       modify_package_data(
         EXPORTING
           is_package_data_sign = ls_modify_sign
-          iv_suppress_dialog   = 'X'
         CHANGING
           cs_package_data      = ls_pack_data
           cv_transport_request = ls_cr
