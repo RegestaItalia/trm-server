@@ -256,8 +256,9 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
           OTHERS         = 1 ).
       lo_package->set_changeable(
         EXPORTING
-          i_changeable      = 'X'
-          i_suppress_dialog = 'D'
+          i_changeable                 = 'X'
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           object_already_changeable = 0                       "ignore it
           OTHERS            = 1 ).
@@ -283,8 +284,9 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
       ENDIF.
       lo_package->set_changeable(
         EXPORTING
-          i_changeable      = ' '
-          i_suppress_dialog = 'D'
+          i_changeable                 = ' '
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           OTHERS            = 1 ).
       IF sy-subrc <> 0.
