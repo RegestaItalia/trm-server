@@ -21,11 +21,9 @@ CLASS zcl_trm_abapgit DEFINITION
     "! @parameter iv_devclass | Name of the development class (package)
     "! @parameter ev_zip | ZIP file in xstring format
     "! @parameter et_objects | List of TADIR objects found in the package
-    "! @parameter iv_ignore_dot_abapgit_objs | Ignores ('X' = true) objects defined in .abapgit ignore
     "! @raising zcx_trm_exception | Raised on serialization errors
     CLASS-METHODS serialize
       IMPORTING iv_devclass                TYPE devclass
-                iv_ignore_dot_abapgit_objs TYPE flag DEFAULT ' '
       EXPORTING ev_zip                     TYPE xstring
                 et_objects                 TYPE tyt_tadir
       RAISING   zcx_trm_exception.
@@ -90,15 +88,6 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
       lo_dot_abapgit = lcl_abapgit_dot_abapgit=>build_default( ).
       lo_dot_abapgit->set_folder_logic( lif_abapgit_dot_abapgit=>c_folder_logic-full ).
     ENDIF.
-    IF iv_ignore_dot_abapgit_objs EQ 'X'.
-      ls_dot_abapgit = lo_dot_abapgit->get_data( ).
-      LOOP AT ls_dot_abapgit-ignore INTO lv_ignore.
-        lo_dot_abapgit->remove_ignore(
-          iv_path     = lv_ignore
-          iv_filename = ''
-        ).
-      ENDLOOP.
-    ENDIF.
     CREATE OBJECT lo_log.
     CREATE OBJECT lo_serialize
       EXPORTING
@@ -129,7 +118,17 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_ignored_objects.
-
+  "
+*    DATA lo_repo           TYPE REF TO zif_abapgit_repo.
+*    zcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
+*      EXPORTING
+*        iv_package = iv_devclass
+*      IMPORTING
+*        ei_repo    = lo_repo
+*    ).
+*    IF lo_repo IS BOUND.
+*      DATA(lo_dot_abapgit) = lo_repo->get_dot_abapgit( ).
+*    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
