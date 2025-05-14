@@ -4,7 +4,7 @@ CLASS zcl_trm_core DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
+
     TYPES: BEGIN OF ty_trm_transport,
              trkorr    TYPE trkorr,
              migration TYPE flag,
@@ -16,6 +16,7 @@ CLASS zcl_trm_core DEFINITION
              manifest  TYPE zif_trm_core=>ty_manifest,
              xmanifest TYPE xstring,
              transport TYPE ty_trm_transport,
+             timestamp TYPE timestamp,
            END OF ty_trm_package.
     TYPES: tyt_trkorr           TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
            tyt_migration_trkorr TYPE STANDARD TABLE OF ztrm_trkorr WITH DEFAULT KEY,
@@ -134,19 +135,25 @@ CLASS zcl_trm_core IMPLEMENTATION.
           LOOP AT lt_tms_y_migration INTO ls_tms_y_migration WHERE trkorr EQ ls_trkorr-trkorr.
             CLEAR lv_maxrc.
             lv_maxrc = ls_tms_y_migration-maxrc.
-            IF lv_maxrc GE 0.
+            IF lv_maxrc LT 0.
               APPEND ls_trkorr TO lt_ignored_trkorr.
             ENDIF.
           ENDLOOP.
+          IF sy-subrc <> 0.
+            APPEND ls_trkorr TO lt_ignored_trkorr.
+          ENDIF.
           CLEAR ls_tms_y_migration.
         ELSE.
           LOOP AT lt_tms_n_migration INTO ls_tms_n_migration WHERE trkorr EQ ls_trkorr-trkorr.
             CLEAR lv_maxrc.
             lv_maxrc = ls_tms_n_migration-maxrc.
-            IF lv_maxrc GE 0.
+            IF lv_maxrc LT 0.
               APPEND ls_trkorr TO lt_ignored_trkorr.
             ENDIF.
           ENDLOOP.
+          IF sy-subrc <> 0.
+            APPEND ls_trkorr TO lt_ignored_trkorr.
+          ENDIF.
           CLEAR ls_tms_n_migration.
         ENDIF.
       ENDLOOP.
@@ -191,12 +198,9 @@ CLASS zcl_trm_core IMPLEMENTATION.
       <fs_package>-name = <fs_package>-manifest-name.
       <fs_package>-version = <fs_package>-manifest-version.
       <fs_package>-registry = <fs_package>-manifest-registry.
+      <fs_package>-timestamp = lo_transport->get_date( ).
     ENDLOOP.
-  ENDMETHOD.
-
-  METHOD if_oo_adt_classrun~main.
-    DATA(lt_packages) = get_installed_packages( ).
-    CHECK 1 EQ 1.
+    SORT rt_packages BY timestamp DESCENDING.
   ENDMETHOD.
 
 ENDCLASS.
