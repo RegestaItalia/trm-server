@@ -9,6 +9,15 @@ Legend
 - : removed
 
 
+2025-04-29 v3.0.0
+-------------------
+
+! package interface suppress access permission
++ abapdoc
++ before transport export check/fix
++ regen program
++ installed packages porting
+
 2025-04-29 v2.2.2
 -------------------
 
