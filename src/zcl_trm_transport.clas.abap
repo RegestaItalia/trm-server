@@ -6,10 +6,10 @@ CLASS zcl_trm_transport DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
-           tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
-           tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
-           tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+    TYPES: tyt_lxe_packg  TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
+           tyt_e071       TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
+           tyt_e071k      TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
+           tyt_tline      TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
     CONSTANTS:
       c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
       c_migrate_object      TYPE nrobj  VALUE 'ZTRMTRKORR',
@@ -426,7 +426,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       EXCEPTIONS
         OTHERS = 1.
     IF sy-subrc <> 0.
-      zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-enqueue_error ).
+      zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-enqueue_error ).
     ENDIF.
   ENDMETHOD.
 
@@ -437,7 +437,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       EXCEPTIONS
         OTHERS = 1.
     IF sy-subrc <> 0.
-      zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-dequeue_error ).
+      zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-dequeue_error ).
     ENDIF.
   ENDMETHOD.
 
@@ -561,7 +561,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         NUMBER ls_alog-msgno
         INTO lv_dummy
         WITH ls_alog-msgv1 ls_alog-msgv2 ls_alog-msgv3 ls_alog-msgv4.
-        zcx_trm_exception=>raise( iv_reason  = zcx_trm_exception=>c_reason-tms_alert ).
+        zcx_trm_exception=>raise( iv_reason = zcx_trm_exception=>c_reason-tms_alert ).
       ENDIF.
     ENDIF.
   ENDMETHOD.
