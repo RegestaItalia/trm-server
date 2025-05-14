@@ -66,17 +66,13 @@ INTERFACE lif_abapgit_dot_abapgit.
     ty_requirement_tt TYPE STANDARD TABLE OF ty_requirement WITH DEFAULT KEY .
   TYPES:
     BEGIN OF ty_dot_abapgit,
-      name                  TYPE string,
-      master_language       TYPE spras,
-      i18n_languages        TYPE lif_abapgit_definitions=>ty_languages,
-      use_lxe               TYPE abap_bool,
-      starting_folder       TYPE string,
-      folder_logic          TYPE string,
-      ignore                TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
-      requirements          TYPE ty_requirement_tt,
-      version_constant      TYPE string,
-      abap_language_version TYPE string,
-      original_system       TYPE tadir-srcsystem,
+      master_language              TYPE spras,
+      i18n_languages               TYPE lif_abapgit_definitions=>ty_languages,
+      starting_folder              TYPE string,
+      folder_logic                 TYPE string,
+      ignore                       TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+      requirements                 TYPE ty_requirement_tt,
+      version_constant             TYPE string,
     END OF ty_dot_abapgit .
 ENDINTERFACE.
 
@@ -266,7 +262,7 @@ CLASS lcl_abapgit_serialize DEFINITION INHERITING FROM lcl_trm_abapgit.
 
     METHODS constructor
       IMPORTING io_dot_abapgit    TYPE REF TO lcl_abapgit_dot_abapgit
-                is_local_settings TYPE lif_abapgit_persistence=>ty_repo-local_settings
+                is_local_settings TYPE lif_abapgit_persistence=>ty_repo-local_settings OPTIONAL
       RAISING   zcx_trm_exception.
     METHODS files_local
       IMPORTING iv_package      TYPE devclass
@@ -287,9 +283,11 @@ CLASS lcl_abapgit_serialize IMPLEMENTATION.
     ASSIGN lo_dot_abapgit->* TO <fs_dot_abapgit>.
     <fs_dot_abapgit> ?= io_dot_abapgit->go_instance.
     add_param 'IO_DOT_ABAPGIT' lo_dot_abapgit cl_abap_objectdescr=>exporting.
-    create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
-    MOVE-CORRESPONDING is_local_settings TO ls_local_settings->*.
-    add_param 'IS_LOCAL_SETTINGS' ls_local_settings cl_abap_objectdescr=>exporting.
+    IF is_local_settings IS NOT INITIAL.
+      create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
+      MOVE-CORRESPONDING is_local_settings TO ls_local_settings->*.
+      add_param 'IS_LOCAL_SETTINGS' ls_local_settings cl_abap_objectdescr=>exporting.
+    ENDIF.
     create_object go_instance 'ZCL_ABAPGIT_SERIALIZE'.
   ENDMETHOD.
 
