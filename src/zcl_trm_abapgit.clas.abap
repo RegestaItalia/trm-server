@@ -30,6 +30,15 @@ CLASS zcl_trm_abapgit DEFINITION
                 et_objects                 TYPE tyt_tadir
       RAISING   zcx_trm_exception.
 
+    "! Return list of ignored objects based on `.abapgit` configuration file
+    "! @parameter iv_devclass | Name of the development class (package)
+    "! @parameter rt_objects | List of TADIR objects ignored
+    "! @raising zcx_trm_exception | Raised on errors
+    CLASS-METHODS get_ignored_objects
+      IMPORTING iv_devclass       TYPE devclass
+      RETURNING VALUE(rt_objects) TYPE tyt_tadir
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 
@@ -117,6 +126,10 @@ CLASS zcl_trm_abapgit IMPLEMENTATION.
           AND object EQ lt_items-obj_type
           AND obj_name EQ lt_items-obj_name.
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_ignored_objects.
+
   ENDMETHOD.
 
 ENDCLASS.
