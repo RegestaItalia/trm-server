@@ -26,6 +26,25 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
     "! @parameter subobject         | Subobject key within the number range object
     "! @parameter nrrangenr         | Number range number
     "! @parameter toyear            | Target year of the interval ('9999' for permanent)
+    "! @parameter execute           | If post activity should be executed (X = true)
+    "! @parameter messages          | Message table capturing success or error feedback
+    "! @raising zcx_trm_exception   | Raised if interval creation fails or input is invalid
+    CLASS-METHODS pre
+      IMPORTING
+        !object    TYPE ty_nrobj
+        !subobject TYPE ty_nrsobj
+        !nrrangenr TYPE ty_nrnr
+        !toyear    TYPE ty_nryear
+      EXPORTING
+        !messages  TYPE symsg_tab
+        !execute   TYPE flag
+      RAISING
+        zcx_trm_exception.
+
+    "! @parameter object            | Number range object name
+    "! @parameter subobject         | Subobject key within the number range object
+    "! @parameter nrrangenr         | Number range number
+    "! @parameter toyear            | Target year of the interval ('9999' for permanent)
     "! @parameter fromnumber        | (Optional) Lower boundary of the interval (default: SAP standard)
     "! @parameter tonumber          | (Optional) Upper boundary of the interval (default: SAP standard)
     "! @parameter nrlevel           | (Optional) Current number level (typically left empty for new)
@@ -53,11 +72,46 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+
+    CLASS-METHODS get_interval
+      IMPORTING
+                !object     TYPE ty_nrobj
+                !subobject  TYPE ty_nrsobj
+                !nrrangenr  TYPE ty_nrnr
+                !toyear     TYPE ty_nryear
+      RETURNING VALUE(nriv) TYPE nriv.
+
 ENDCLASS.
 
 
 
 CLASS zcl_trm_pa_no_range_interval IMPLEMENTATION.
+
+  METHOD get_interval.
+    SELECT SINGLE *
+      FROM nriv
+      INTO nriv
+      WHERE object EQ object
+        AND subobject EQ subobject
+        AND nrrangenr EQ nrrangenr
+        AND toyear EQ toyear.
+  ENDMETHOD.
+
+  METHOD pre.
+    DATA ls_nriv TYPE nriv.
+
+    CLEAR execute.
+    ls_nriv = get_interval(
+      object    = object
+      subobject = subobject
+      nrrangenr = nrrangenr
+      toyear    = toyear
+    ).
+
+    IF ls_nriv IS INITIAL.
+      execute = 'X'.
+    ENDIF.
+  ENDMETHOD.
 
   METHOD execute.
     DATA: ls_nriv      TYPE nriv,
@@ -70,14 +124,12 @@ CLASS zcl_trm_pa_no_range_interval IMPLEMENTATION.
           lv_message   TYPE string,
           ls_message   LIKE LINE OF messages.
 
-    SELECT SINGLE *
-      FROM nriv
-      INTO ls_nriv
-      WHERE object EQ object
-        AND subobject EQ subobject
-        AND nrrangenr EQ nrrangenr
-        AND toyear EQ toyear.
-    CHECK sy-subrc <> 0.
+    ls_nriv = get_interval(
+      object    = object
+      subobject = subobject
+      nrrangenr = nrrangenr
+      toyear    = toyear
+    ).
 
     ls_interval-subobject = subobject.
     ls_interval-nrrangenr = nrrangenr.

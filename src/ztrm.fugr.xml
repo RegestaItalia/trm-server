@@ -616,7 +616,18 @@
        <PARAMETER>IV_DATA</PARAMETER>
        <TYP>XSTRING</TYP>
       </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_PRE</PARAMETER>
+       <OPTIONAL>X</OPTIONAL>
+       <TYP>FLAG</TYP>
+      </RSIMP>
      </IMPORT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>EV_EXECUTE</PARAMETER>
+       <TYP>FLAG</TYP>
+      </RSEXP>
+     </EXPORT>
      <TABLES>
       <RSTBL>
        <PARAMETER>ET_MESSAGES</PARAMETER>
@@ -640,6 +651,14 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_DATA</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_PRE</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>EV_EXECUTE</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
