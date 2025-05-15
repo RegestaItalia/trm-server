@@ -71,10 +71,13 @@ CLASS zcl_trm_core IMPLEMENTATION.
           lo_transport        TYPE REF TO lcl_trm_transport,
           lt_trkorr_package   TYPE STANDARD TABLE OF ty_trkorr_package,
           ls_trkorr_package   LIKE LINE OF lt_trkorr_package,
-          lo_package          TYPE REF TO lcl_trm_package.
-    FIELD-SYMBOLS: <fs_trkorr>         TYPE ty_all_trkorr,
-                   <fs_trkorr_package> TYPE ty_trkorr_package,
-                   <fs_package>        TYPE ty_trm_package.
+          lo_package          TYPE REF TO lcl_trm_package,
+          ls_trm_server       LIKE LINE OF rt_packages,
+          ls_trm_rest         LIKE LINE OF rt_packages.
+    FIELD-SYMBOLS: <fs_trkorr>           TYPE ty_all_trkorr,
+                   <fs_trkorr_package>   TYPE ty_trkorr_package,
+                   <fs_package>          TYPE ty_trm_package,
+                   <fs_trm_rest_version> TYPE string.
 
     lt_source_trkorr = get_source_trkorr( ).
     lt_ignored_trkorr = get_ignored_trkorr( ).
@@ -201,6 +204,46 @@ CLASS zcl_trm_core IMPLEMENTATION.
       <fs_package>-timestamp = lo_transport->get_date( ).
     ENDLOOP.
     SORT rt_packages BY timestamp DESCENDING.
+
+    "add trm-server and trm-rest (in installed)
+    LOOP AT rt_packages INTO ls_trm_server WHERE name = 'trm-server' AND registry IS INITIAL.
+      CONTINUE.
+    ENDLOOP.
+    IF sy-subrc <> 0.
+      ls_trm_server-name = 'trm-server'.
+      ls_trm_server-version = zif_trm=>version.
+    ELSE.
+      DELETE rt_packages INDEX sy-tabix.
+      IF ls_trm_server-version <> zif_trm=>version.
+        CLEAR ls_trm_server-timestamp.
+        CLEAR ls_trm_server-transport.
+        CLEAR ls_trm_server-manifest.
+        CLEAR ls_trm_server-xmanifest.
+        ls_trm_server-version = zif_trm=>version.
+      ENDIF.
+    ENDIF.
+    INSERT ls_trm_server INTO rt_packages INDEX 1.
+
+    ASSIGN ('ZIF_TRM_REST')=>('VERSION') TO <fs_trm_rest_version>.
+    IF sy-subrc EQ 0.
+      LOOP AT rt_packages INTO ls_trm_rest WHERE name = 'trm-rest' AND registry IS INITIAL.
+        CONTINUE.
+      ENDLOOP.
+      IF sy-subrc <> 0.
+        ls_trm_rest-name = 'trm-rest'.
+        ls_trm_rest-version = <fs_trm_rest_version>.
+      ELSE.
+        DELETE rt_packages INDEX sy-tabix.
+        IF ls_trm_rest-version <> <fs_trm_rest_version>.
+          CLEAR ls_trm_rest-timestamp.
+          CLEAR ls_trm_rest-transport.
+          CLEAR ls_trm_rest-manifest.
+          CLEAR ls_trm_rest-xmanifest.
+          ls_trm_rest-version = <fs_trm_rest_version>.
+        ENDIF.
+      ENDIF.
+      INSERT ls_trm_rest INTO rt_packages INDEX 2.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
