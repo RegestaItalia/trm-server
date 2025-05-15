@@ -739,24 +739,17 @@
        <PARAMETER>IV_DEVCLASS</PARAMETER>
        <TYP>DEVCLASS</TYP>
       </RSIMP>
-      <RSIMP>
-       <PARAMETER>IV_IGNORE_DOT_ABAPGIT_OBJS</PARAMETER>
-       <OPTIONAL>X</OPTIONAL>
-       <TYP>FLAG</TYP>
-      </RSIMP>
      </IMPORT>
      <EXPORT>
       <RSEXP>
        <PARAMETER>EV_ZIP</PARAMETER>
        <TYP>XSTRING</TYP>
       </RSEXP>
+      <RSEXP>
+       <PARAMETER>EV_OBJECTS</PARAMETER>
+       <TYP>XSTRING</TYP>
+      </RSEXP>
      </EXPORT>
-     <TABLES>
-      <RSTBL>
-       <PARAMETER>ET_OBJECTS</PARAMETER>
-       <DBSTRUCT>TADIR</DBSTRUCT>
-      </RSTBL>
-     </TABLES>
      <EXCEPTION>
       <RSEXC>
        <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
@@ -780,15 +773,11 @@
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>IV_IGNORE_DOT_ABAPGIT_OBJS</PARAMETER>
-       <KIND>P</KIND>
-      </RSFDO>
-      <RSFDO>
        <PARAMETER>EV_ZIP</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>ET_OBJECTS</PARAMETER>
+       <PARAMETER>EV_OBJECTS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
@@ -2201,6 +2190,16 @@
      </DOCUMENTATION>
     </item>
    </FUNCTIONS>
+   <I18N_TPOOL>
+    <item>
+     <LANGUAGE>I</LANGUAGE>
+     <TEXTPOOL>
+      <item>
+       <ID>R</ID>
+      </item>
+     </TEXTPOOL>
+    </item>
+   </I18N_TPOOL>
   </asx:values>
  </asx:abap>
 </abapGit>
