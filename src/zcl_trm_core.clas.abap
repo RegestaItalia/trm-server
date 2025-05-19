@@ -209,18 +209,23 @@ CLASS zcl_trm_core IMPLEMENTATION.
     LOOP AT rt_packages INTO ls_trm_server WHERE name = 'trm-server' AND registry IS INITIAL.
       CONTINUE.
     ENDLOOP.
-    IF sy-subrc <> 0.
-      ls_trm_server-name = 'trm-server'.
-      ls_trm_server-version = zif_trm=>version.
-    ELSE.
+    IF sy-subrc EQ 0.
       DELETE rt_packages INDEX sy-tabix.
       IF ls_trm_server-version <> zif_trm=>version.
         CLEAR ls_trm_server-timestamp.
         CLEAR ls_trm_server-transport.
         CLEAR ls_trm_server-manifest.
         CLEAR ls_trm_server-xmanifest.
-        ls_trm_server-version = zif_trm=>version.
       ENDIF.
+    ENDIF.
+    ls_trm_server-name = 'trm-server'.
+    ls_trm_server-version = zif_trm=>version.
+    ls_trm_server-manifest-name = ls_trm_server-name.
+    ls_trm_server-manifest-version = ls_trm_server-version.
+    IF ls_trm_server-xmanifest IS INITIAL.
+      CALL TRANSFORMATION id
+      SOURCE trm_manifest = ls_trm_server-manifest
+      RESULT XML ls_trm_server-xmanifest.
     ENDIF.
     INSERT ls_trm_server INTO rt_packages INDEX 1.
 
@@ -229,10 +234,7 @@ CLASS zcl_trm_core IMPLEMENTATION.
       LOOP AT rt_packages INTO ls_trm_rest WHERE name = 'trm-rest' AND registry IS INITIAL.
         CONTINUE.
       ENDLOOP.
-      IF sy-subrc <> 0.
-        ls_trm_rest-name = 'trm-rest'.
-        ls_trm_rest-version = <fs_trm_rest_version>.
-      ELSE.
+      IF sy-subrc EQ 0.
         DELETE rt_packages INDEX sy-tabix.
         IF ls_trm_rest-version <> <fs_trm_rest_version>.
           CLEAR ls_trm_rest-timestamp.
@@ -241,6 +243,15 @@ CLASS zcl_trm_core IMPLEMENTATION.
           CLEAR ls_trm_rest-xmanifest.
           ls_trm_rest-version = <fs_trm_rest_version>.
         ENDIF.
+      ENDIF.
+      ls_trm_rest-name = 'trm-rest'.
+      ls_trm_rest-version = <fs_trm_rest_version>.
+      ls_trm_rest-manifest-name = ls_trm_rest-name.
+      ls_trm_rest-manifest-version = ls_trm_rest-version.
+      IF ls_trm_rest-xmanifest IS INITIAL.
+        CALL TRANSFORMATION id
+        SOURCE trm_manifest = ls_trm_rest-manifest
+        RESULT XML ls_trm_rest-xmanifest.
       ENDIF.
       INSERT ls_trm_rest INTO rt_packages INDEX 2.
     ENDIF.

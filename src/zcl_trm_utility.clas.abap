@@ -123,7 +123,7 @@ CLASS zcl_trm_utility DEFINITION
       RAISING   zcx_trm_exception.
 
     "! Get R3trans utility version
-    "! @return rv_r3trans | Version
+    "! @parameter rv_r3trans | Version
     CLASS-METHODS get_r3trans_info
       RETURNING VALUE(rv_r3trans) TYPE string
       RAISING   zcx_trm_exception.
