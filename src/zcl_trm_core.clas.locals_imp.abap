@@ -105,6 +105,9 @@ CLASS lcl_trm_transport DEFINITION.
     METHODS get_date
       RETURNING VALUE(rv_date) TYPE timestamp.
 
+    METHODS get_devclass
+      RETURNING VALUE(rv_devclass) TYPE devclass.
+
     CLASS-METHODS get_latest
       IMPORTING it_transports       TYPE tyt_transport
       RETURNING VALUE(ro_transport) TYPE REF TO lcl_trm_transport.
@@ -282,6 +285,10 @@ CLASS lcl_trm_transport IMPLEMENTATION.
   METHOD get_date.
     DATA(ls_e070) = get_e070( ).
     CONVERT DATE ls_e070-as4date TIME ls_e070-as4time INTO TIME STAMP rv_date TIME ZONE sy-zonlo.
+  ENDMETHOD.
+
+  METHOD get_devclass.
+
   ENDMETHOD.
 
 ENDCLASS.

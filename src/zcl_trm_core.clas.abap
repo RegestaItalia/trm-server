@@ -13,6 +13,7 @@ CLASS zcl_trm_core DEFINITION
              name      TYPE string,
              version   TYPE string,
              registry  TYPE string,
+             devclass  TYPE devclass,
              manifest  TYPE zif_trm_core=>ty_manifest,
              xmanifest TYPE xstring,
              transport TYPE ty_trm_transport,
