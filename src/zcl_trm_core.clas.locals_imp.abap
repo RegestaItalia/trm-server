@@ -93,7 +93,8 @@ CLASS lcl_trm_transport DEFINITION.
 
   PUBLIC SECTION.
 
-    TYPES: tyt_transport TYPE STANDARD TABLE OF REF TO lcl_trm_transport WITH DEFAULT KEY.
+    TYPES: tyt_transport TYPE STANDARD TABLE OF REF TO lcl_trm_transport WITH DEFAULT KEY,
+           tyt_tdevc     TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY.
 
     METHODS constructor
       IMPORTING iv_trkorr    TYPE trkorr
@@ -105,8 +106,8 @@ CLASS lcl_trm_transport DEFINITION.
     METHODS get_date
       RETURNING VALUE(rv_date) TYPE timestamp.
 
-    METHODS get_devclass
-      RETURNING VALUE(rv_devclass) TYPE devclass.
+    METHODS get_tdevc
+      RETURNING VALUE(rt_tdevc) TYPE tyt_tdevc.
 
     CLASS-METHODS get_latest
       IMPORTING it_transports       TYPE tyt_transport
@@ -129,7 +130,8 @@ CLASS lcl_trm_transport DEFINITION.
     DATA: gs_e070           TYPE e070,
           gt_e071           TYPE tyt_e071,
           go_linked_package TYPE REF TO lcl_trm_package,
-          gt_docs           TYPE tyt_documentation.
+          gt_docs           TYPE tyt_documentation,
+          gt_tdevc          TYPE tyt_tdevc.
 
     METHODS get_e070
       RETURNING VALUE(rs_e070) TYPE e070.
@@ -287,8 +289,57 @@ CLASS lcl_trm_transport IMPLEMENTATION.
     CONVERT DATE ls_e070-as4date TIME ls_e070-as4time INTO TIME STAMP rv_date TIME ZONE sy-zonlo.
   ENDMETHOD.
 
-  METHOD get_devclass.
-
+  METHOD get_tdevc.
+    DATA: lt_devclass   TYPE STANDARD TABLE OF devclass,
+          lv_devclass   LIKE LINE OF lt_devclass,
+          lv_parentcl   TYPE parentcl,
+          lt_e071       TYPE tyt_e071,
+          ls_e071       LIKE LINE OF lt_e071,
+          lt_tadir_conv TYPE STANDARD TABLE OF tadir,
+          lt_tadir      TYPE STANDARD TABLE OF tadir,
+          ls_tadir      LIKE LINE OF lt_tadir,
+          lt_tdevc      TYPE STANDARD TABLE OF tdevc.
+    FIELD-SYMBOLS <fs_tadir_conv> TYPE tadir.
+    IF gt_tdevc[] IS INITIAL.
+      lt_e071 = get_e071( ).
+      LOOP AT lt_e071 INTO ls_e071 WHERE pgmid EQ 'R3TR'.
+        UNASSIGN <fs_tadir_conv>.
+        IF ls_e071-object EQ 'DEVC'.
+          APPEND ls_e071-obj_name TO lt_devclass.
+        ENDIF.
+        APPEND INITIAL LINE TO lt_tadir_conv ASSIGNING <fs_tadir_conv>.
+        <fs_tadir_conv>-pgmid = ls_e071-pgmid.
+        <fs_tadir_conv>-object = ls_e071-object.
+        <fs_tadir_conv>-obj_name = ls_e071-obj_name.
+      ENDLOOP.
+      IF lt_tadir_conv[] IS NOT INITIAL.
+        SELECT devclass FROM tadir
+        INTO CORRESPONDING FIELDS OF TABLE lt_tadir
+        FOR ALL ENTRIES IN lt_tadir_conv
+        WHERE pgmid EQ lt_tadir_conv-pgmid AND object EQ lt_tadir_conv-object AND obj_name EQ lt_tadir_conv-obj_name.
+        LOOP AT lt_tadir INTO ls_tadir.
+          APPEND ls_tadir-devclass TO lt_devclass.
+        ENDLOOP.
+      ENDIF.
+      LOOP AT lt_devclass INTO lv_devclass.
+        CLEAR lv_parentcl.
+        lv_parentcl = lv_devclass.
+        WHILE lv_parentcl IS NOT INITIAL.
+          SELECT SINGLE parentcl FROM tdevc INTO @lv_parentcl WHERE devclass EQ @lv_parentcl.
+          CHECK lv_parentcl IS NOT INITIAL.
+          APPEND lv_parentcl TO lt_devclass.
+        ENDWHILE.
+      ENDLOOP.
+      SORT lt_devclass.
+      DELETE ADJACENT DUPLICATES FROM lt_devclass.
+      IF lt_devclass[] IS NOT INITIAL.
+        SELECT * FROM tdevc
+        INTO CORRESPONDING FIELDS OF TABLE gt_tdevc
+        FOR ALL ENTRIES IN lt_devclass
+        WHERE devclass EQ lt_devclass-table_line.
+      ENDIF.
+    ENDIF.
+    rt_tdevc[] = gt_tdevc[].
   ENDMETHOD.
 
 ENDCLASS.

@@ -5,7 +5,8 @@ CLASS zcl_trm_core DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: BEGIN OF ty_trm_transport,
+    TYPES: tyt_tdevc TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+           BEGIN OF ty_trm_transport,
              trkorr    TYPE trkorr,
              migration TYPE flag,
            END OF ty_trm_transport,
@@ -13,7 +14,7 @@ CLASS zcl_trm_core DEFINITION
              name      TYPE string,
              version   TYPE string,
              registry  TYPE string,
-             devclass  TYPE devclass,
+             tdevc     TYPE tyt_tdevc,
              manifest  TYPE zif_trm_core=>ty_manifest,
              xmanifest TYPE xstring,
              transport TYPE ty_trm_transport,
@@ -73,8 +74,10 @@ CLASS zcl_trm_core IMPLEMENTATION.
           lt_trkorr_package   TYPE STANDARD TABLE OF ty_trkorr_package,
           ls_trkorr_package   LIKE LINE OF lt_trkorr_package,
           lo_package          TYPE REF TO lcl_trm_package,
+          lv_tabix            TYPE syst_tabix,
           ls_trm_server       LIKE LINE OF rt_packages,
-          ls_trm_rest         LIKE LINE OF rt_packages.
+          ls_trm_rest         LIKE LINE OF rt_packages,
+          lv_devclass         TYPE devclass.
     FIELD-SYMBOLS: <fs_trkorr>           TYPE ty_all_trkorr,
                    <fs_trkorr_package>   TYPE ty_trkorr_package,
                    <fs_package>          TYPE ty_trm_package,
@@ -203,22 +206,26 @@ CLASS zcl_trm_core IMPLEMENTATION.
       <fs_package>-version = <fs_package>-manifest-version.
       <fs_package>-registry = <fs_package>-manifest-registry.
       <fs_package>-timestamp = lo_transport->get_date( ).
+      <fs_package>-tdevc = lo_transport->get_tdevc( ).
     ENDLOOP.
     SORT rt_packages BY timestamp DESCENDING.
 
     "add trm-server and trm-rest (in installed)
+    CLEAR lv_tabix.
     LOOP AT rt_packages INTO ls_trm_server WHERE name = 'trm-server' AND registry IS INITIAL.
-      CONTINUE.
+      lv_tabix = sy-tabix.
     ENDLOOP.
     IF sy-subrc EQ 0.
-      DELETE rt_packages INDEX sy-tabix.
+      DELETE rt_packages INDEX lv_tabix.
       IF ls_trm_server-version <> zif_trm=>version.
         CLEAR ls_trm_server-timestamp.
         CLEAR ls_trm_server-transport.
         CLEAR ls_trm_server-manifest.
         CLEAR ls_trm_server-xmanifest.
+        CLEAR ls_trm_server-tdevc.
       ENDIF.
     ENDIF.
+    CLEAR lv_devclass.
     ls_trm_server-name = 'trm-server'.
     ls_trm_server-version = zif_trm=>version.
     ls_trm_server-manifest-name = ls_trm_server-name.
@@ -228,23 +235,29 @@ CLASS zcl_trm_core IMPLEMENTATION.
       SOURCE trm_manifest = ls_trm_server-manifest
       RESULT XML ls_trm_server-xmanifest.
     ENDIF.
+    SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ 'ZIF_TRM'.
+    IF lv_devclass IS NOT INITIAL.
+      SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc WHERE devclass EQ lv_devclass.
+    ENDIF.
     INSERT ls_trm_server INTO rt_packages INDEX 1.
 
     ASSIGN ('ZIF_TRM_REST')=>('VERSION') TO <fs_trm_rest_version>.
     IF sy-subrc EQ 0.
+      CLEAR lv_tabix.
       LOOP AT rt_packages INTO ls_trm_rest WHERE name = 'trm-rest' AND registry IS INITIAL.
-        CONTINUE.
+        lv_tabix = sy-tabix.
       ENDLOOP.
       IF sy-subrc EQ 0.
-        DELETE rt_packages INDEX sy-tabix.
+        DELETE rt_packages INDEX lv_tabix.
         IF ls_trm_rest-version <> <fs_trm_rest_version>.
           CLEAR ls_trm_rest-timestamp.
           CLEAR ls_trm_rest-transport.
           CLEAR ls_trm_rest-manifest.
           CLEAR ls_trm_rest-xmanifest.
-          ls_trm_rest-version = <fs_trm_rest_version>.
+          CLEAR ls_trm_rest-tdevc.
         ENDIF.
       ENDIF.
+      CLEAR lv_devclass.
       ls_trm_rest-name = 'trm-rest'.
       ls_trm_rest-version = <fs_trm_rest_version>.
       ls_trm_rest-manifest-name = ls_trm_rest-name.
@@ -253,6 +266,10 @@ CLASS zcl_trm_core IMPLEMENTATION.
         CALL TRANSFORMATION id
         SOURCE trm_manifest = ls_trm_rest-manifest
         RESULT XML ls_trm_rest-xmanifest.
+      ENDIF.
+      SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ 'ZIF_TRM_REST'.
+      IF lv_devclass IS NOT INITIAL.
+        SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_rest-tdevc WHERE devclass EQ lv_devclass.
       ENDIF.
       INSERT ls_trm_rest INTO rt_packages INDEX 2.
     ENDIF.
