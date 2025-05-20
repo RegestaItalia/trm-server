@@ -66,13 +66,17 @@ INTERFACE lif_abapgit_dot_abapgit.
     ty_requirement_tt TYPE STANDARD TABLE OF ty_requirement WITH DEFAULT KEY .
   TYPES:
     BEGIN OF ty_dot_abapgit,
-      master_language              TYPE spras,
-      i18n_languages               TYPE lif_abapgit_definitions=>ty_languages,
-      starting_folder              TYPE string,
-      folder_logic                 TYPE string,
-      ignore                       TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
-      requirements                 TYPE ty_requirement_tt,
-      version_constant             TYPE string,
+      name                  TYPE string,
+      master_language       TYPE spras,
+      i18n_languages        TYPE lif_abapgit_definitions=>ty_languages,
+      use_lxe               TYPE abap_bool,
+      starting_folder       TYPE string,
+      folder_logic          TYPE string,
+      ignore                TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+      requirements          TYPE ty_requirement_tt,
+      version_constant      TYPE string,
+      abap_language_version TYPE string,
+      original_system       TYPE tadir-srcsystem,
     END OF ty_dot_abapgit .
 ENDINTERFACE.
 
