@@ -29,7 +29,6 @@ CLASS zcl_trm_package DEFINITION
 
     CLASS-METHODS modify_package_data
       IMPORTING is_package_data_sign TYPE scompksign
-                iv_suppress_dialog   TYPE flag
       CHANGING  cs_package_data      TYPE scompkdtln
                 cv_transport_request TYPE e070-trkorr
       RAISING   zcx_trm_exception.
@@ -37,7 +36,7 @@ ENDCLASS.
 
 
 
-CLASS zcl_trm_package IMPLEMENTATION.
+CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
 
 
   METHOD constructor.
@@ -158,11 +157,12 @@ CLASS zcl_trm_package IMPLEMENTATION.
 * lock package
     CALL METHOD lo_package->set_changeable
       EXPORTING
-        i_changeable              = 'X'
-        i_suppress_dialog         = 'D'
+        i_changeable                 = 'X'
+        i_suppress_dialog            = 'D'
+        i_suppress_access_permission = 'X'
       EXCEPTIONS
-        object_already_changeable = 0                       "ignore it
-        OTHERS                    = 1.
+        object_already_changeable    = 0                       "ignore it
+        OTHERS                       = 1.
 
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
@@ -182,8 +182,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
 
       CALL METHOD lo_package->set_changeable
         EXPORTING
-          i_changeable      = ' '
-          i_suppress_dialog = 'D'
+          i_changeable                 = ' '
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           OTHERS            = 0.
       zcx_trm_exception=>raise( ).
@@ -193,7 +194,7 @@ CLASS zcl_trm_package IMPLEMENTATION.
     CALL METHOD lo_package->save
       EXPORTING
         i_transport_request    = cv_transport_request
-        i_suppress_dialog      = iv_suppress_dialog
+        i_suppress_dialog      = 'X'
         i_suppress_corr_insert = 'X'
       IMPORTING
         e_transport_request    = cv_transport_request
@@ -213,8 +214,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
 * unlock package
     CALL METHOD lo_package->set_changeable
       EXPORTING
-        i_changeable            = ' '
-        i_suppress_dialog       = 'D'
+        i_changeable                 = ' '
+        i_suppress_dialog            = 'D'
+        i_suppress_access_permission = 'X'
       EXCEPTIONS
         object_already_unlocked = 0                       "ignore
         OTHERS                  = 1.
@@ -236,7 +238,6 @@ CLASS zcl_trm_package IMPLEMENTATION.
       modify_package_data(
         EXPORTING
           is_package_data_sign = ls_modify_sign
-          iv_suppress_dialog   = 'X'
         CHANGING
           cs_package_data      = ls_pack_data
           cv_transport_request = ls_cr
@@ -255,8 +256,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
           OTHERS         = 1 ).
       lo_package->set_changeable(
         EXPORTING
-          i_changeable      = 'X'
-          i_suppress_dialog = 'D'
+          i_changeable                 = 'X'
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           object_already_changeable = 0                       "ignore it
           OTHERS            = 1 ).
@@ -282,8 +284,9 @@ CLASS zcl_trm_package IMPLEMENTATION.
       ENDIF.
       lo_package->set_changeable(
         EXPORTING
-          i_changeable      = ' '
-          i_suppress_dialog = 'D'
+          i_changeable                 = ' '
+          i_suppress_dialog            = 'D'
+          i_suppress_access_permission = 'X'
         EXCEPTIONS
           OTHERS            = 1 ).
       IF sy-subrc <> 0.
@@ -297,7 +300,6 @@ CLASS zcl_trm_package IMPLEMENTATION.
       modify_package_data(
         EXPORTING
           is_package_data_sign = ls_modify_sign
-          iv_suppress_dialog   = 'X'
         CHANGING
           cs_package_data      = ls_pack_data
           cv_transport_request = ls_cr

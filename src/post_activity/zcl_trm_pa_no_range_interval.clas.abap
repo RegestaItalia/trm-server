@@ -1,3 +1,8 @@
+"! Creates a number range interval if it does not already exist
+"!
+"! If an interval already exists, nothing is changed. If not, a new one is created, optionally
+"! assigning it to a transport request.
+"!
 CLASS zcl_trm_pa_no_range_interval DEFINITION
   PUBLIC
   FINAL
@@ -17,6 +22,37 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
            ty_nrind   TYPE c LENGTH 1,
            ty_procind TYPE c LENGTH 1.
 
+    "! @parameter object            | Number range object name
+    "! @parameter subobject         | Subobject key within the number range object
+    "! @parameter nrrangenr         | Number range number
+    "! @parameter toyear            | Target year of the interval ('9999' for permanent)
+    "! @parameter execute           | If post activity should be executed (X = true)
+    "! @parameter messages          | Message table capturing success or error feedback
+    "! @raising zcx_trm_exception   | Raised if interval creation fails or input is invalid
+    CLASS-METHODS pre
+      IMPORTING
+        !object    TYPE ty_nrobj
+        !subobject TYPE ty_nrsobj
+        !nrrangenr TYPE ty_nrnr
+        !toyear    TYPE ty_nryear
+      EXPORTING
+        !messages  TYPE symsg_tab
+        !execute   TYPE flag
+      RAISING
+        zcx_trm_exception.
+
+    "! @parameter object            | Number range object name
+    "! @parameter subobject         | Subobject key within the number range object
+    "! @parameter nrrangenr         | Number range number
+    "! @parameter toyear            | Target year of the interval ('9999' for permanent)
+    "! @parameter fromnumber        | (Optional) Lower boundary of the interval (default: SAP standard)
+    "! @parameter tonumber          | (Optional) Upper boundary of the interval (default: SAP standard)
+    "! @parameter nrlevel           | (Optional) Current number level (typically left empty for new)
+    "! @parameter externind         | (Optional) External number assignment indicator ('X' or ' ')
+    "! @parameter procind           | (Optional) Processing indicator ('X' or ' ')
+    "! @parameter transport_request | (Optional) Transport request number for customizing changes
+    "! @parameter messages          | Message table capturing success or error feedback
+    "! @raising zcx_trm_exception   | Raised if interval creation fails or input is invalid
     CLASS-METHODS execute
       IMPORTING
         !object            TYPE ty_nrobj
@@ -36,11 +72,28 @@ CLASS zcl_trm_pa_no_range_interval DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+
 ENDCLASS.
 
 
 
 CLASS zcl_trm_pa_no_range_interval IMPLEMENTATION.
+
+  METHOD pre.
+    DATA ls_nriv TYPE nriv.
+
+    CLEAR execute.
+    SELECT SINGLE *
+      FROM nriv
+      INTO ls_nriv
+      WHERE object EQ object
+        AND subobject EQ subobject
+        AND nrrangenr EQ nrrangenr
+        AND toyear EQ toyear.
+    IF sy-subrc <> 0.
+      execute = 'X'.
+    ENDIF.
+  ENDMETHOD.
 
   METHOD execute.
     DATA: ls_nriv      TYPE nriv,
@@ -52,15 +105,6 @@ CLASS zcl_trm_pa_no_range_interval IMPLEMENTATION.
           lv_error     TYPE lcl_numberrange_intervals=>nr_error,
           lv_message   TYPE string,
           ls_message   LIKE LINE OF messages.
-
-    SELECT SINGLE *
-      FROM nriv
-      INTO ls_nriv
-      WHERE object EQ object
-        AND subobject EQ subobject
-        AND nrrangenr EQ nrrangenr
-        AND toyear EQ toyear.
-    CHECK sy-subrc <> 0.
 
     ls_interval-subobject = subobject.
     ls_interval-nrrangenr = nrrangenr.

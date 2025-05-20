@@ -66,17 +66,13 @@ INTERFACE lif_abapgit_dot_abapgit.
     ty_requirement_tt TYPE STANDARD TABLE OF ty_requirement WITH DEFAULT KEY .
   TYPES:
     BEGIN OF ty_dot_abapgit,
-      name                  TYPE string,
-      master_language       TYPE spras,
-      i18n_languages        TYPE lif_abapgit_definitions=>ty_languages,
-      use_lxe               TYPE abap_bool,
-      starting_folder       TYPE string,
-      folder_logic          TYPE string,
-      ignore                TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
-      requirements          TYPE ty_requirement_tt,
-      version_constant      TYPE string,
-      abap_language_version TYPE string,
-      original_system       TYPE tadir-srcsystem,
+      master_language              TYPE spras,
+      i18n_languages               TYPE lif_abapgit_definitions=>ty_languages,
+      starting_folder              TYPE string,
+      folder_logic                 TYPE string,
+      ignore                       TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+      requirements                 TYPE ty_requirement_tt,
+      version_constant             TYPE string,
     END OF ty_dot_abapgit .
 ENDINTERFACE.
 
@@ -195,6 +191,16 @@ CLASS lcl_abapgit_dot_abapgit DEFINITION INHERITING FROM lcl_trm_abapgit.
       IMPORTING iv_logic TYPE string
       RAISING   zcx_trm_exception.
 
+    METHODS get_data
+      RETURNING VALUE(rs_data) TYPE lif_abapgit_dot_abapgit=>ty_dot_abapgit
+      RAISING   zcx_trm_exception.
+
+
+    METHODS remove_ignore
+      IMPORTING iv_path     TYPE string
+                iv_filename TYPE string
+      RAISING   zcx_trm_exception.
+
     CLASS-METHODS build_default
       RETURNING VALUE(ro_dot_abapgit) TYPE REF TO lcl_abapgit_dot_abapgit
       RAISING   zcx_trm_exception.
@@ -230,6 +236,24 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
     call_object_method go_instance 'SET_FOLDER_LOGIC'.
   ENDMETHOD.
 
+  METHOD get_data.
+    DATA ls_data   TYPE REF TO data.
+    create_data ls_data 'ZIF_ABAPGIT_DOT_ABAPGIT=>TY_DOT_ABAPGIT'.
+    GET REFERENCE OF rs_data INTO ls_data.
+    add_param 'RS_DATA' ls_data cl_abap_objectdescr=>receiving.
+    call_object_method go_instance 'GET_DATA'.
+  ENDMETHOD.
+
+  METHOD remove_ignore.
+    DATA: lo_path     TYPE REF TO data,
+          lo_filename TYPE REF TO data.
+    GET REFERENCE OF iv_path INTO lo_path.
+    add_param 'IV_PATH' lo_path cl_abap_objectdescr=>exporting.
+    GET REFERENCE OF iv_filename INTO lo_filename.
+    add_param 'IV_FILENAME' lo_filename cl_abap_objectdescr=>exporting.
+    call_object_method go_instance 'REMOVE_IGNORE'.
+  ENDMETHOD.
+
 ENDCLASS.
 
 CLASS lcl_abapgit_serialize DEFINITION INHERITING FROM lcl_trm_abapgit.
@@ -238,7 +262,7 @@ CLASS lcl_abapgit_serialize DEFINITION INHERITING FROM lcl_trm_abapgit.
 
     METHODS constructor
       IMPORTING io_dot_abapgit    TYPE REF TO lcl_abapgit_dot_abapgit
-                is_local_settings TYPE lif_abapgit_persistence=>ty_repo-local_settings
+                is_local_settings TYPE lif_abapgit_persistence=>ty_repo-local_settings OPTIONAL
       RAISING   zcx_trm_exception.
     METHODS files_local
       IMPORTING iv_package      TYPE devclass
@@ -259,9 +283,11 @@ CLASS lcl_abapgit_serialize IMPLEMENTATION.
     ASSIGN lo_dot_abapgit->* TO <fs_dot_abapgit>.
     <fs_dot_abapgit> ?= io_dot_abapgit->go_instance.
     add_param 'IO_DOT_ABAPGIT' lo_dot_abapgit cl_abap_objectdescr=>exporting.
-    create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
-    MOVE-CORRESPONDING is_local_settings TO ls_local_settings->*.
-    add_param 'IS_LOCAL_SETTINGS' ls_local_settings cl_abap_objectdescr=>exporting.
+    IF is_local_settings IS NOT INITIAL.
+      create_data ls_local_settings 'ZIF_ABAPGIT_PERSISTENCE=>TY_REPO-LOCAL_SETTINGS'.
+      MOVE-CORRESPONDING is_local_settings TO ls_local_settings->*.
+      add_param 'IS_LOCAL_SETTINGS' ls_local_settings cl_abap_objectdescr=>exporting.
+    ENDIF.
     create_object go_instance 'ZCL_ABAPGIT_SERIALIZE'.
   ENDMETHOD.
 

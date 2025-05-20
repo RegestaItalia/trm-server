@@ -13,69 +13,95 @@ CLASS zcl_trm_utility DEFINITION
            tyt_migration_e071      TYPE STANDARD TABLE OF ztrm_e071 WITH DEFAULT KEY,
            tyt_migration_e070      TYPE STANDARD TABLE OF ztrm_e070 WITH DEFAULT KEY.
 
-    TYPES: BEGIN OF ty_pa_parameter,
-             name  TYPE string,
-             value TYPE string,
-           END OF ty_pa_parameter,
-           tyt_pa_parameter TYPE STANDARD TABLE OF ty_pa_parameter WITH DEFAULT KEY,
-           BEGIN OF ty_pa_data,
-             name       TYPE classname,
-             parameters TYPE tyt_pa_parameter,
-           END OF ty_pa_data.
-
+    "! Check if current user is authorized to execute TRM functions
+    "! @parameter rv_authorized | 'X' if authorized
     CLASS-METHODS check_functions_authorization
       RETURNING VALUE(rv_authorized) TYPE flag.
 
+    "! Add a transport to the TRM skip list
+    "! @parameter iv_trkorr | Transport request to skip
     CLASS-METHODS add_skip_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Remove a transport from the TRM skip list
+    "! @parameter iv_trkorr | Transport request to remove from skip list
     CLASS-METHODS remove_skip_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Add transport to the TRM source list
+    "! @parameter iv_trkorr | Transport request to add to source list
     CLASS-METHODS add_source_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Remove a transport from the TRM source list
+    "! @parameter iv_trkorr | Transport request to remove from source list
     CLASS-METHODS remove_source_trkorr
       IMPORTING iv_trkorr TYPE trkorr
       RAISING   zcx_trm_exception.
 
+    "! Get a binary file from the application server
+    "! @parameter iv_file_path | Absolute path to the binary file
+    "! @parameter ev_file | File content as xstring
     CLASS-METHODS get_binary_file
       IMPORTING iv_file_path TYPE string
       EXPORTING ev_file      TYPE xstring
       RAISING   zcx_trm_exception.
 
+    "! Write a binary file to the application server
+    "! @parameter iv_file_path | Absolute path to the binary file
+    "! @parameter iv_file | File content as xstring
     CLASS-METHODS write_binary_file
       IMPORTING iv_file_path TYPE string
                 iv_file      TYPE xstring
       RAISING   zcx_trm_exception.
 
+    "! Get the DIR_TRANS path from system profile
+    "! @parameter ev_dir_trans | DIR_TRANS path
     CLASS-METHODS get_dir_trans
       EXPORTING ev_dir_trans TYPE pfevalue
       RAISING   zcx_trm_exception.
 
+    "! Get the current operating system's file system
+    "! @parameter ev_file_sys | OS
     CLASS-METHODS get_file_sys
       EXPORTING ev_file_sys TYPE filesys
       RAISING   zcx_trm_exception.
 
+    "! Get the default transport layer
+    "! @parameter ev_layer | Transport layer
     CLASS-METHODS get_default_transport_layer
       EXPORTING ev_layer TYPE devlayer
       RAISING   zcx_trm_exception.
 
+    "! Get supported object types from transport configuration
+    "! @parameter et_object_text | Supported object types
     CLASS-METHODS get_supported_object_types
       EXPORTING et_object_text TYPE tyt_ko100
       RAISING   zcx_trm_exception.
 
+    "! Add install devclasses into TRM install devclass list
+    "! @parameter it_installdevc | Devclasses to add
     CLASS-METHODS add_install_devclass
       IMPORTING it_installdevc TYPE tyt_installdevc
       RAISING   zcx_trm_exception.
 
+    "! Add package integrity
+    "! @parameter is_integrity | Integrity
     CLASS-METHODS add_package_integrity
       IMPORTING is_integrity TYPE ztrm_integrity
       RAISING   zcx_trm_exception.
 
+    "! Wrapper for TR_TADIR_INTERFACE to register objects in the TADIR table
+    "! @parameter iv_pgmid     | Program ID
+    "! @parameter iv_object    | Object type
+    "! @parameter iv_objname   | Name of the object
+    "! @parameter iv_devclass  | (Optional) Development class the object belongs to
+    "! @parameter iv_srcsystem | (Optional) Logical system the object originates from
+    "! @parameter iv_author    | (Optional) Author of the object
+    "! @parameter iv_genflag   | (Optional) Generation flag (X = generated object)
     CLASS-METHODS tadir_interface
       IMPORTING iv_pgmid     TYPE pgmid
                 iv_object    TYPE trobjtype
@@ -86,36 +112,58 @@ CLASS zcl_trm_utility DEFINITION
                 iv_genflag   TYPE genflag OPTIONAL
       RAISING   zcx_trm_exception.
 
+    "! Add and activate a custom namespace entry in the system
+    "! @parameter iv_namespace  | Namespace key to be added
+    "! @parameter iv_replicense | Repair license key for the namespace
+    "! @parameter it_texts      | Text descriptions for the namespace (multilingual)
     CLASS-METHODS add_namespace
       IMPORTING iv_namespace  TYPE namespace
                 iv_replicense TYPE trnlicense
                 it_texts      TYPE tyt_trnspacett
       RAISING   zcx_trm_exception.
 
+    "! Get R3trans utility version
+    "! @parameter rv_r3trans | Version
     CLASS-METHODS get_r3trans_info
       RETURNING VALUE(rv_r3trans) TYPE string
       RAISING   zcx_trm_exception.
 
+    "! Add TMS buffer data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_tmsbuffer
       IMPORTING it_data TYPE tyt_migration_tmsbuffer
       RAISING   zcx_trm_exception.
 
+    "! Add documentation data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_doktl
       IMPORTING it_data TYPE tyt_migration_doktl
       RAISING   zcx_trm_exception.
 
+    "! Add E071 data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_e071
       IMPORTING it_data TYPE tyt_migration_e071
       RAISING   zcx_trm_exception.
 
+    "! Add E070 data to migration tables
+    "! @parameter it_data | Data
     CLASS-METHODS add_migration_e070
       IMPORTING it_data TYPE tyt_migration_e070
       RAISING   zcx_trm_exception.
 
-    CLASS-METHODS execute_post_activity
-      IMPORTING iv_data     TYPE xstring
-      EXPORTING et_messages TYPE symsg_tab
+    "! Reads messages from memory (e.g., after SUBMIT) and appends them to the provided message table
+    "! @parameter messages | Message table to append entries from memory
+    CLASS-METHODS append_messages_from_memory
+      CHANGING
+        messages TYPE symsg_tab.
+
+    "! Regenerate program
+    "! @parameter iv_progname | Program name
+    CLASS-METHODS regen_program
+      IMPORTING iv_progname TYPE progname
       RAISING   zcx_trm_exception.
+
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -398,193 +446,61 @@ CLASS zcl_trm_utility IMPLEMENTATION.
     dequeue( iv_tabname = 'ZTRM_E070' ).
   ENDMETHOD.
 
-  METHOD execute_post_activity.
-    CONSTANTS: lc_pa_attribute TYPE abap_attrname VALUE 'TRM_PA',
-               lc_pa_execute   TYPE abap_methname VALUE 'EXECUTE',
-               lc_pa_messages  TYPE abap_parmname VALUE 'MESSAGES'.
-    DATA: ls_data          TYPE ty_pa_data,
-          lv_error         TYPE string,
-          lo_typedescr     TYPE REF TO cl_abap_typedescr,
-          lo_classdescr    TYPE REF TO cl_abap_classdescr,
-          lo_pa_attribute  TYPE REF TO cl_abap_datadescr,
-          ls_method        TYPE abap_methdescr,
-          ls_method_param  TYPE abap_parmdescr,
-          ls_param         TYPE ty_pa_parameter,
-          lt_parambind_tab TYPE abap_parmbind_tab,
-          ls_parambind     LIKE LINE OF lt_parambind_tab,
-          lo_paramtype     TYPE REF TO cl_abap_datadescr,
-          lx_root          TYPE REF TO cx_root.
-    FIELD-SYMBOLS: <fs_pa_parameter>       TYPE ty_pa_parameter,
-                   <fs_pa_attribute_value> TYPE flag.
-
-    CALL TRANSFORMATION id
-    SOURCE XML iv_data
-    RESULT data = ls_data.
-
-    TRANSLATE ls_data-name TO UPPER CASE.
-    CONDENSE ls_data-name.
-    LOOP AT ls_data-parameters ASSIGNING <fs_pa_parameter>.
-      TRANSLATE <fs_pa_parameter>-name TO UPPER CASE.
-      CONDENSE <fs_pa_parameter>-name.
+  METHOD append_messages_from_memory.
+    DATA: lt_list_tab  TYPE TABLE OF abaplist,
+          lt_ascii_tab TYPE soli_tab,
+          ls_ascii     LIKE LINE OF lt_ascii_tab,
+          lv_lines     TYPE i,
+          ls_message   LIKE LINE OF messages.
+    FIELD-SYMBOLS <fs_msg> TYPE symsg.
+    CALL FUNCTION 'LIST_FROM_MEMORY'
+      TABLES
+        listobject = lt_list_tab
+      EXCEPTIONS
+        not_found  = 1
+        OTHERS     = 2.
+    CALL FUNCTION 'LIST_FREE_MEMORY'
+      EXCEPTIONS
+        error_message = 1
+        OTHERS        = 2.
+    CALL FUNCTION 'LIST_TO_ASCI'
+      TABLES
+        listasci           = lt_ascii_tab
+        listobject         = lt_list_tab
+      EXCEPTIONS
+        empty_list         = 1
+        list_index_invalid = 2
+        error_message      = 3
+        OTHERS             = 4.
+    DESCRIBE TABLE lt_ascii_tab LINES lv_lines.
+    IF lv_lines GE 3. " remove report header
+      READ TABLE lt_ascii_tab INTO ls_ascii INDEX 2.
+      IF '-' CO ls_ascii-line.
+        DELETE lt_ascii_tab FROM 1 TO 3.
+      ENDIF.
+    ENDIF.
+    CLEAR ls_ascii.
+    LOOP AT lt_ascii_tab INTO ls_ascii.
+      CHECK ls_ascii-line IS NOT INITIAL.
+      CLEAR ls_message.
+      CONDENSE ls_ascii-line.
+      cl_message_helper=>set_msg_vars_for_clike( ls_ascii-line ).
+      MOVE-CORRESPONDING sy TO ls_message.
+      ls_message-msgty = 'I'.
+      READ TABLE messages TRANSPORTING NO FIELDS WITH KEY table_line = ls_message.
+      CHECK sy-subrc <> 0.
+      APPEND ls_message TO messages.
     ENDLOOP.
-    IF ls_data-name IS INITIAL.
-      zcx_trm_exception=>raise(
-        iv_message = 'Post activity was not specified'
-        iv_reason  = zcx_trm_exception=>c_reason-invalid_input
-      ).
+  ENDMETHOD.
+
+  METHOD regen_program.
+    IF cl_abap_program_admin=>touch( iv_progname ).
+      COMMIT WORK AND WAIT.
     ELSE.
-      CONCATENATE 'Post Activity' ls_data-name 'not found' INTO lv_error SEPARATED BY space.
-    ENDIF.
-    cl_abap_classdescr=>describe_by_name(
-      EXPORTING
-        p_name         = ls_data-name
-      RECEIVING
-        p_descr_ref    = lo_typedescr
-      EXCEPTIONS
-        type_not_found = 1
-        OTHERS         = 2
-    ).
-    IF sy-subrc <> 0 OR lo_typedescr IS NOT BOUND.
       zcx_trm_exception=>raise(
-        iv_message = lv_error
-        iv_reason  = zcx_trm_exception=>c_reason-pa_not_found
+        iv_message = 'Program not found'
+        iv_reason  = zcx_trm_exception=>c_reason-program_not_found
       ).
-    ENDIF.
-
-    lo_classdescr ?= lo_typedescr.
-
-    " read trm_pa attribute
-    lo_classdescr->get_attribute_type(
-      EXPORTING
-        p_name              = lc_pa_attribute
-      RECEIVING
-        p_descr_ref         = lo_pa_attribute
-      EXCEPTIONS
-        attribute_not_found = 1
-        OTHERS              = 2
-    ).
-    IF sy-subrc <> 0 OR lo_pa_attribute IS NOT BOUND.
-      zcx_trm_exception=>raise(
-        iv_message = lv_error
-        iv_reason  = zcx_trm_exception=>c_reason-pa_not_found
-      ).
-    ENDIF.
-
-    IF lo_pa_attribute->get_relative_name( ) <> 'FLAG'.
-      zcx_trm_exception=>raise(
-        iv_message = lv_error
-        iv_reason  = zcx_trm_exception=>c_reason-pa_not_found
-      ).
-    ENDIF.
-    ASSIGN (ls_data-name)=>(lc_pa_attribute) TO <fs_pa_attribute_value>.
-    IF sy-subrc <> 0 OR <fs_pa_attribute_value> <> 'X'.
-      zcx_trm_exception=>raise(
-        iv_message = lv_error
-        iv_reason  = zcx_trm_exception=>c_reason-pa_not_found
-      ).
-    ENDIF.
-
-    " execute
-    READ TABLE lo_classdescr->methods INTO ls_method WITH KEY name = lc_pa_execute visibility = 'U' is_class = 'X'.
-    IF sy-subrc <> 0.
-      zcx_trm_exception=>raise(
-        iv_message = lv_error
-        iv_reason  = zcx_trm_exception=>c_reason-pa_not_found
-      ).
-    ENDIF.
-
-    LOOP AT ls_method-parameters INTO ls_method_param.
-      READ TABLE ls_data-parameters INTO ls_param WITH KEY name = ls_method_param-name.
-      IF sy-subrc <> 0.
-        IF ls_method_param-is_optional <> 'X'.
-          CONCATENATE 'Obligatory parameter' ls_method_param-name 'missing' INTO lv_error SEPARATED BY space.
-          zcx_trm_exception=>raise(
-            iv_message = lv_error
-            iv_reason  = zcx_trm_exception=>c_reason-pa_param_missing
-          ).
-        ELSE.
-          CONTINUE.
-        ENDIF.
-      ENDIF.
-      IF ls_method_param-parm_kind <> 'I'.
-        CONCATENATE 'Unexpected parameter' ls_method_param-name INTO lv_error SEPARATED BY space.
-        zcx_trm_exception=>raise(
-          iv_message = lv_error
-          iv_reason  = zcx_trm_exception=>c_reason-pa_unexpected_param
-        ).
-      ENDIF.
-      CLEAR lo_paramtype.
-      lo_classdescr->get_method_parameter_type(
-        EXPORTING
-          p_method_name       = ls_method-name
-          p_parameter_name    = ls_method_param-name
-        RECEIVING
-          p_descr_ref         = lo_paramtype
-        EXCEPTIONS
-          parameter_not_found = 1
-          method_not_found    = 2
-          OTHERS              = 3
-      ).
-      IF sy-subrc <> 0.
-        zcx_trm_exception=>raise(
-          iv_reason  = zcx_trm_exception=>c_reason-pa_param_missing
-        ).
-      ENDIF.
-      IF lo_paramtype->kind <> cl_abap_datadescr=>kind_elem.
-        CONCATENATE ls_method_param-name ': Only elementary data is supported' INTO lv_error SEPARATED BY space.
-        zcx_trm_exception=>raise(
-          iv_message = lv_error
-          iv_reason  = zcx_trm_exception=>c_reason-pa_unexpected_param
-        ).
-      ENDIF.
-      CLEAR ls_parambind.
-      ls_parambind-name = ls_method_param-name.
-      ls_parambind-kind = 'E'.
-      CREATE DATA ls_parambind-value TYPE HANDLE lo_paramtype.
-      ls_parambind-value->* = ls_param-value.
-      INSERT ls_parambind INTO TABLE lt_parambind_tab.
-    ENDLOOP.
-
-    CLEAR ls_method_param.
-    READ TABLE ls_method-parameters INTO ls_method_param WITH KEY name = lc_pa_messages.
-    IF sy-subrc EQ 0.
-      CLEAR lo_paramtype.
-      lo_classdescr->get_method_parameter_type(
-        EXPORTING
-          p_method_name       = ls_method-name
-          p_parameter_name    = lc_pa_messages
-        RECEIVING
-          p_descr_ref         = lo_paramtype
-        EXCEPTIONS
-          parameter_not_found = 1
-          method_not_found    = 2
-          OTHERS              = 3
-      ).
-      IF sy-subrc EQ 0.
-        IF lo_paramtype->get_relative_name( ) EQ 'SYMSG_TAB'.
-          CLEAR ls_parambind.
-          ls_parambind-name = lc_pa_messages.
-          ls_parambind-kind = 'I'.
-          CREATE DATA ls_parambind-value TYPE HANDLE lo_paramtype.
-          INSERT ls_parambind INTO TABLE lt_parambind_tab.
-        ENDIF.
-      ENDIF.
-    ENDIF.
-
-    TRY.
-        CALL METHOD (ls_data-name)=>(lc_pa_execute)
-          PARAMETER-TABLE lt_parambind_tab.
-      CATCH cx_root INTO lx_root.
-        zcx_trm_exception=>raise(
-          io_root    = lx_root
-          iv_reason  = zcx_trm_exception=>c_reason-pa_exception
-        ).
-    ENDTRY.
-
-    CLEAR ls_parambind.
-    READ TABLE lt_parambind_tab INTO ls_parambind WITH KEY name = lc_pa_messages.
-    IF sy-subrc EQ 0.
-      MOVE ls_parambind-value->* TO et_messages.
     ENDIF.
   ENDMETHOD.
 

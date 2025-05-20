@@ -616,7 +616,18 @@
        <PARAMETER>IV_DATA</PARAMETER>
        <TYP>XSTRING</TYP>
       </RSIMP>
+      <RSIMP>
+       <PARAMETER>IV_PRE</PARAMETER>
+       <OPTIONAL>X</OPTIONAL>
+       <TYP>FLAG</TYP>
+      </RSIMP>
      </IMPORT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>EV_EXECUTE</PARAMETER>
+       <TYP>FLAG</TYP>
+      </RSEXP>
+     </EXPORT>
      <TABLES>
       <RSTBL>
        <PARAMETER>ET_MESSAGES</PARAMETER>
@@ -640,6 +651,14 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>IV_DATA</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>IV_PRE</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>EV_EXECUTE</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
@@ -745,13 +764,11 @@
        <PARAMETER>EV_ZIP</PARAMETER>
        <TYP>XSTRING</TYP>
       </RSEXP>
+      <RSEXP>
+       <PARAMETER>EV_OBJECTS</PARAMETER>
+       <TYP>XSTRING</TYP>
+      </RSEXP>
      </EXPORT>
-     <TABLES>
-      <RSTBL>
-       <PARAMETER>ET_OBJECTS</PARAMETER>
-       <DBSTRUCT>TADIR</DBSTRUCT>
-      </RSTBL>
-     </TABLES>
      <EXCEPTION>
       <RSEXC>
        <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
@@ -779,7 +796,7 @@
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>ET_OBJECTS</PARAMETER>
+       <PARAMETER>EV_OBJECTS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
@@ -1040,6 +1057,46 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>NOT_FOUND</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>ZTRM_GET_INSTALLED_PACKAGES</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get TRM packages on system</SHORT_TEXT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>EV_PACKAGES</PARAMETER>
+       <TYP>XSTRING</TYP>
+      </RSEXP>
+     </EXPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>INVALID_INPUT</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>EV_PACKAGES</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>INVALID_INPUT</PARAMETER>
        <KIND>X</KIND>
       </RSFDO>
       <RSFDO>
@@ -1468,6 +1525,46 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>ZTRM_REGEN_PROG</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Regenerate program</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>IV_PROGNAME</PARAMETER>
+       <TYP>PROGNAME</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>PROGRAM_NOT_FOUND</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>IV_PROGNAME</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>PROGRAM_NOT_FOUND</PARAMETER>
        <KIND>X</KIND>
       </RSFDO>
       <RSFDO>
@@ -2152,6 +2249,16 @@
      </DOCUMENTATION>
     </item>
    </FUNCTIONS>
+   <I18N_TPOOL>
+    <item>
+     <LANGUAGE>I</LANGUAGE>
+     <TEXTPOOL>
+      <item>
+       <ID>R</ID>
+      </item>
+     </TEXTPOOL>
+    </item>
+   </I18N_TPOOL>
   </asx:values>
  </asx:abap>
 </abapGit>

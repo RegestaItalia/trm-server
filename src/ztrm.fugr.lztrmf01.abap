@@ -7,7 +7,7 @@ FORM check_auth.
     EXCEPTIONS
       trm_rfc_unauthorized = 1.
   IF sy-subrc EQ 1.
-    RAISE trm_rfc_unauthorized.
+    MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING trm_rfc_unauthorized.
   ENDIF.
 ENDFORM.
 
@@ -36,6 +36,8 @@ FORM handle_exception.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING abapgit_intergration.
     WHEN zcx_trm_exception=>c_reason-pa_dynamic.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING pa_dynamic.
+    WHEN zcx_trm_exception=>c_reason-program_not_found.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING program_not_found.
     WHEN OTHERS.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING generic.
   ENDCASE.

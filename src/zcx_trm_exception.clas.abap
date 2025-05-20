@@ -27,19 +27,34 @@ CLASS zcx_trm_exception DEFINITION
         pa_param_missing         TYPE string VALUE 'PA_PARAM_MISSING',
         pa_unexpected_param      TYPE string VALUE 'PA_UNEXPECTED_PARAM',
         pa_exception             TYPE string VALUE 'PA_EXCEPTION',
+        program_not_found        TYPE string value 'PROGRAM_NOT_FOUND',
       END OF c_reason .
 
+    "! Constructor
+    "! Initializes the exception with optional text ID and root cause
+    "! @parameter textid | Optional message class ID
+    "! @parameter previous | Optional reference to previous (inner) exception
     METHODS constructor
       IMPORTING
         !textid   LIKE textid OPTIONAL
         !previous LIKE previous OPTIONAL.
 
+    "! Returns the stored reason code for the exception
+    "! @parameter rv_reason | One of the defined constants in `c_reason`, or 'GENERIC' by default
     METHODS reason
       RETURNING VALUE(rv_reason) TYPE string.
 
+    "! Returns the exception log
+    "! @parameter rt_log | Table of log lines associated with the exception
     METHODS log
       RETURNING VALUE(rt_log) TYPE tyt_log.
 
+    "! Factory method to raise a ZCX_TRM_EXCEPTION with optional context
+    "! @parameter iv_message | Optional plain-text message (used if no root exception given)
+    "! @parameter io_root    | Optional root exception to wrap (e.g., CX_ROOT or subclass)
+    "! @parameter iv_reason  | Optional reason identifier (use `c_reason-*`)
+    "! @parameter it_log     | Optional detailed message log for diagnostics
+    "! @raising zcx_trm_exception | Always raises itself
     CLASS-METHODS raise
       IMPORTING iv_message TYPE string OPTIONAL
                 io_root    TYPE REF TO cx_root OPTIONAL
