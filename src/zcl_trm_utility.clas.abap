@@ -494,7 +494,7 @@ CLASS zcl_trm_utility IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD regen_program.
-    IF cl_abap_program_admin=>touch( iv_progname ).
+    IF cl_abap_program_admin=>touch( iv_progname ) EQ 'X'.
       COMMIT WORK AND WAIT.
     ELSE.
       zcx_trm_exception=>raise(
