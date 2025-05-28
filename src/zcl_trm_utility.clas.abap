@@ -158,12 +158,6 @@ CLASS zcl_trm_utility DEFINITION
       CHANGING
         messages TYPE symsg_tab.
 
-    "! Regenerate program
-    "! @parameter iv_progname | Program name
-    CLASS-METHODS regen_program
-      IMPORTING iv_progname TYPE progname
-      RAISING   zcx_trm_exception.
-
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -491,17 +485,6 @@ CLASS zcl_trm_utility IMPLEMENTATION.
       CHECK sy-subrc <> 0.
       APPEND ls_message TO messages.
     ENDLOOP.
-  ENDMETHOD.
-
-  METHOD regen_program.
-    IF cl_abap_program_admin=>touch( iv_progname ) EQ 'X'.
-      COMMIT WORK AND WAIT.
-    ELSE.
-      zcx_trm_exception=>raise(
-        iv_message = 'Program not found'
-        iv_reason  = zcx_trm_exception=>c_reason-program_not_found
-      ).
-    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
