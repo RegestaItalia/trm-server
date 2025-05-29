@@ -9,6 +9,13 @@ Legend
 - : removed
 
 
+2025-05-29 v3.1.0
+-------------------
+
+! set check auth rfc enabled
+- unused regen method
++ wb transport to installed packages list
+
 2025-04-29 v3.0.0
 -------------------
 
