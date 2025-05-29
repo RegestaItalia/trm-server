@@ -18,6 +18,7 @@ CLASS zcl_trm_core DEFINITION
              manifest  TYPE zif_trm_core=>ty_manifest,
              xmanifest TYPE xstring,
              transport TYPE ty_trm_transport,
+             trkorr    TYPE trkorr,
              timestamp TYPE timestamp,
            END OF ty_trm_package.
     TYPES: tyt_trkorr           TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
@@ -40,13 +41,11 @@ ENDCLASS.
 
 CLASS zcl_trm_core IMPLEMENTATION.
 
-  METHOD get_source_trkorr.
-    SELECT trkorr FROM ztrm_src_trkorr INTO TABLE rt_trkorr.
-  ENDMETHOD.
 
   METHOD get_ignored_trkorr.
     SELECT trkorr FROM ztrm_skip_trkorr INTO TABLE rt_trkorr.
   ENDMETHOD.
+
 
   METHOD get_installed_packages.
     TYPES: BEGIN OF ty_all_trkorr,
@@ -59,29 +58,49 @@ CLASS zcl_trm_core IMPLEMENTATION.
              package          TYPE REF TO lcl_trm_package,
              package_name     TYPE string,
              package_registry TYPE string,
-           END OF ty_trkorr_package.
-    DATA: lt_source_trkorr    TYPE tyt_trkorr,
-          lt_ignored_trkorr   TYPE tyt_trkorr,
-          lt_actual_trkorr    TYPE tyt_trkorr,
-          lv_actual_trkorr    LIKE LINE OF lt_actual_trkorr,
-          lt_migration_trkorr TYPE tyt_migration_trkorr,
-          lv_migration_trkorr LIKE LINE OF lt_migration_trkorr,
-          lt_trkorr           TYPE STANDARD TABLE OF ty_all_trkorr,
-          lt_trkorr_copy      LIKE lt_trkorr,
-          ls_trkorr           LIKE LINE OF lt_trkorr,
-          lt_transport        TYPE STANDARD TABLE OF REF TO lcl_trm_transport,
-          lo_transport        TYPE REF TO lcl_trm_transport,
-          lt_trkorr_package   TYPE STANDARD TABLE OF ty_trkorr_package,
-          ls_trkorr_package   LIKE LINE OF lt_trkorr_package,
-          lo_package          TYPE REF TO lcl_trm_package,
-          lv_tabix            TYPE syst_tabix,
-          ls_trm_server       LIKE LINE OF rt_packages,
-          ls_trm_rest         LIKE LINE OF rt_packages,
-          lv_devclass         TYPE devclass.
-    FIELD-SYMBOLS: <fs_trkorr>           TYPE ty_all_trkorr,
-                   <fs_trkorr_package>   TYPE ty_trkorr_package,
-                   <fs_package>          TYPE ty_trm_package,
-                   <fs_trm_rest_version> TYPE string.
+           END OF ty_trkorr_package,
+           BEGIN OF ty_wb_trkorr_package,
+             obj_name  TYPE trobj_name, "name=*
+             trkorr    TYPE trkorr,
+             transport TYPE REF TO lcl_trm_transport,
+             package   TYPE REF TO lcl_trm_package,
+           END OF ty_wb_trkorr_package,
+           BEGIN OF ty_package_wb_transport,
+             package_name     TYPE string,
+             package_registry TYPE string,
+             transports       TYPE tyt_transport,
+           END OF ty_package_wb_transport.
+    DATA: lt_source_trkorr         TYPE tyt_trkorr,
+          lt_ignored_trkorr        TYPE tyt_trkorr,
+          lt_actual_trkorr         TYPE tyt_trkorr,
+          lv_actual_trkorr         LIKE LINE OF lt_actual_trkorr,
+          lt_migration_trkorr      TYPE tyt_migration_trkorr,
+          lv_migration_trkorr      LIKE LINE OF lt_migration_trkorr,
+          lt_trkorr                TYPE STANDARD TABLE OF ty_all_trkorr,
+          lt_trkorr_copy           LIKE lt_trkorr,
+          ls_trkorr                LIKE LINE OF lt_trkorr,
+          lt_transport             TYPE STANDARD TABLE OF REF TO lcl_trm_transport,
+          lo_transport             TYPE REF TO lcl_trm_transport,
+          lt_trkorr_package        TYPE STANDARD TABLE OF ty_trkorr_package,
+          ls_trkorr_package        LIKE LINE OF lt_trkorr_package,
+          lo_package               TYPE REF TO lcl_trm_package,
+          lv_tabix                 TYPE syst_tabix,
+          ls_trm_server            LIKE LINE OF rt_packages,
+          ls_trm_rest              LIKE LINE OF rt_packages,
+          lv_devclass              TYPE devclass,
+          ls_trm_package           TYPE ty_trm_package,
+          lt_wb_trkorr_name        TYPE STANDARD TABLE OF trobj_name,
+          lt_wb_trkorr_package     TYPE STANDARD TABLE OF ty_wb_trkorr_package,
+          lt_package_wb_transports TYPE STANDARD TABLE OF ty_package_wb_transport,
+          ls_package_wb_transports LIKE LINE OF lt_package_wb_transports,
+          lo_wb_transport          TYPE REF TO lcl_trm_transport.
+    FIELD-SYMBOLS: <fs_trkorr>               TYPE ty_all_trkorr,
+                   <fs_trkorr_package>       TYPE ty_trkorr_package,
+                   <fs_package>              TYPE ty_trm_package,
+                   <fs_trm_rest_version>     TYPE string,
+                   <fs_wb_trkorr_name>       TYPE trobj_name,
+                   <fs_wb_trkorr_package>    TYPE ty_wb_trkorr_package,
+                   <fs_package_wb_transport> TYPE ty_package_wb_transport.
 
     lt_source_trkorr = get_source_trkorr( ).
     lt_ignored_trkorr = get_ignored_trkorr( ).
@@ -273,6 +292,50 @@ CLASS zcl_trm_core IMPLEMENTATION.
       ENDIF.
       INSERT ls_trm_rest INTO rt_packages INDEX 2.
     ENDIF.
+
+    "set workbench transports where possible
+    LOOP AT rt_packages INTO ls_trm_package.
+      UNASSIGN <fs_wb_trkorr_name>.
+      APPEND INITIAL LINE TO lt_wb_trkorr_name ASSIGNING <fs_wb_trkorr_name>.
+      CONCATENATE 'name=' ls_trm_package-name INTO <fs_wb_trkorr_name>.
+    ENDLOOP.
+    IF lt_wb_trkorr_name[] IS NOT INITIAL.
+      SELECT DISTINCT e070~trkorr e071~obj_name FROM e071
+        INNER JOIN e070 ON e071~trkorr = e070~trkorr
+        INTO CORRESPONDING FIELDS OF TABLE lt_wb_trkorr_package
+        FOR ALL ENTRIES IN lt_wb_trkorr_name
+        WHERE e070~trstatus EQ 'D' AND e071~pgmid EQ '*' AND e071~object EQ 'ZTRM' AND e071~obj_name EQ lt_wb_trkorr_name-table_line.
+      "for each transport read its manifest
+      LOOP AT lt_wb_trkorr_package ASSIGNING <fs_wb_trkorr_package>.
+        UNASSIGN <fs_package_wb_transport>.
+        CREATE OBJECT <fs_wb_trkorr_package>-transport EXPORTING iv_trkorr = <fs_wb_trkorr_package>-trkorr iv_migration = ''.
+        <fs_wb_trkorr_package>-package = <fs_wb_trkorr_package>-transport->get_linked_package( ).
+        CHECK <fs_wb_trkorr_package>-package IS BOUND.
+        READ TABLE lt_package_wb_transports ASSIGNING <fs_package_wb_transport> WITH KEY package_name = <fs_wb_trkorr_package>-package->name package_registry = <fs_wb_trkorr_package>-package->registry.
+        IF sy-subrc <> 0.
+          APPEND INITIAL LINE TO lt_package_wb_transports ASSIGNING <fs_package_wb_transport>.
+          <fs_package_wb_transport>-package_name = <fs_wb_trkorr_package>-package->name.
+          <fs_package_wb_transport>-package_registry = <fs_wb_trkorr_package>-package->registry.
+        ENDIF.
+        APPEND <fs_wb_trkorr_package>-transport TO <fs_package_wb_transport>-transports.
+      ENDLOOP.
+
+      UNASSIGN <fs_package>.
+      LOOP AT rt_packages ASSIGNING <fs_package>.
+        CLEAR ls_package_wb_transports.
+        CLEAR lo_wb_transport.
+        READ TABLE lt_package_wb_transports INTO ls_package_wb_transports WITH KEY package_name = <fs_package>-name package_registry = <fs_package>-registry.
+        IF ls_package_wb_transports-transports[] IS NOT INITIAL.
+          lo_wb_transport = lcl_trm_transport=>get_latest( ls_package_wb_transports-transports[] ).
+          CHECK lo_wb_transport IS BOUND.
+          <fs_package>-trkorr = lo_wb_transport->trkorr.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_source_trkorr.
+    SELECT trkorr FROM ztrm_src_trkorr INTO TABLE rt_trkorr.
   ENDMETHOD.
 
 ENDCLASS.
