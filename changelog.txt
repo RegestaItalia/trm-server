@@ -9,6 +9,14 @@ Legend
 - : removed
 
 
+2025-06-03 v4.0.0
+-------------------
+
+! context singleton for installed packages list
+! manifest interface with dependencies
+! trm-rest with trm-server dependency
++ change tr owner api
+
 2025-05-29 v3.1.0
 -------------------
 

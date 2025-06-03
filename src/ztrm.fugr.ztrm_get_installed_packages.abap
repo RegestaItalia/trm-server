@@ -12,7 +12,7 @@ FUNCTION ztrm_get_installed_packages.
 
   TRY.
       DATA lt_packages TYPE zcl_trm_core=>tyt_trm_package.
-      lt_packages = zcl_trm_core=>get_installed_packages( ).
+      lt_packages = zcl_trm_singleton=>get( )->get_installed_packages( ).
       CALL TRANSFORMATION id
       SOURCE packages = lt_packages
       RESULT XML ev_packages.
