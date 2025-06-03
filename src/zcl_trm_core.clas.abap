@@ -98,6 +98,7 @@ CLASS zcl_trm_core IMPLEMENTATION.
                    <fs_trkorr_package>       TYPE ty_trkorr_package,
                    <fs_package>              TYPE ty_trm_package,
                    <fs_trm_rest_version>     TYPE string,
+                   <fs_dependency>           TYPE zif_trm_core=>ty_dependency,
                    <fs_wb_trkorr_name>       TYPE trobj_name,
                    <fs_wb_trkorr_package>    TYPE ty_wb_trkorr_package,
                    <fs_package_wb_transport> TYPE ty_package_wb_transport.
@@ -280,6 +281,12 @@ CLASS zcl_trm_core IMPLEMENTATION.
       ls_trm_rest-name = 'trm-rest'.
       ls_trm_rest-version = <fs_trm_rest_version>.
       ls_trm_rest-manifest-name = ls_trm_rest-name.
+      IF ls_trm_rest-manifest-dependencies[] IS INITIAL.
+        UNASSIGN <fs_dependency>.
+        APPEND INITIAL LINE TO ls_trm_rest-manifest-dependencies ASSIGNING <fs_dependency>.
+        <fs_dependency>-name = 'trm-server'.
+        CONCATENATE '^' zif_trm=>version INTO <fs_dependency>-version.
+      ENDIF.
       ls_trm_rest-manifest-version = ls_trm_rest-version.
       IF ls_trm_rest-xmanifest IS INITIAL.
         CALL TRANSFORMATION id

@@ -6,10 +6,10 @@ CLASS zcl_trm_transport DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_lxe_packg  TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
-           tyt_e071       TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
-           tyt_e071k      TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
-           tyt_tline      TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+    TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
+           tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
+           tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
+           tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
     CONSTANTS:
       c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
       c_migrate_object      TYPE nrobj  VALUE 'ZTRMTRKORR',
@@ -188,6 +188,13 @@ CLASS zcl_trm_transport DEFINITION
     "! @parameter rt_e071k | E071K entries in the transport
     METHODS get_e071k
       RETURNING VALUE(rt_e071k) TYPE tyt_e071k.
+
+    "! Change transport owner
+    "! @parameter iv_user         | New owner
+    "! @raising zcx_trm_exception | Raised if owner change fails
+    METHODS set_owner
+      IMPORTING iv_user TYPE tr_as4user
+      RAISING   zcx_trm_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -859,6 +866,28 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       SELECT * FROM e071k INTO CORRESPONDING FIELDS OF TABLE gt_e071k WHERE trkorr EQ gv_trkorr.
     ENDIF.
     rt_e071k[] = gt_e071k[].
+  ENDMETHOD.
+
+  METHOD set_owner.
+    CALL FUNCTION 'TR_CHANGE_USERNAME'
+      EXPORTING
+        wi_dialog           = ' '
+        wi_trkorr           = gv_trkorr
+        wi_user             = iv_user
+      EXCEPTIONS
+        already_released    = 1
+        e070_update_error   = 2
+        file_access_error   = 3
+        not_exist_e070      = 4
+        user_does_not_exist = 5
+        tr_enqueue_failed   = 6
+        no_authorization    = 7
+        wrong_client        = 8
+        unallowed_user      = 9
+        OTHERS              = 10.
+    IF sy-subrc <> 0.
+      zcx_trm_exception=>raise( ).
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
