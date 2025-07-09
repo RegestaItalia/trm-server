@@ -321,15 +321,16 @@ CLASS lcl_trm_transport IMPLEMENTATION.
           APPEND ls_tadir-devclass TO lt_devclass.
         ENDLOOP.
       ENDIF.
-      LOOP AT lt_devclass INTO lv_devclass.
-        CLEAR lv_parentcl.
-        lv_parentcl = lv_devclass.
-        WHILE lv_parentcl IS NOT INITIAL.
-          SELECT SINGLE parentcl FROM tdevc INTO @lv_parentcl WHERE devclass EQ @lv_parentcl.
-          CHECK lv_parentcl IS NOT INITIAL.
-          APPEND lv_parentcl TO lt_devclass.
-        ENDWHILE.
-      ENDLOOP.
+*      Issue #143 trm-core
+*      LOOP AT lt_devclass INTO lv_devclass.
+*        CLEAR lv_parentcl.
+*        lv_parentcl = lv_devclass.
+*        WHILE lv_parentcl IS NOT INITIAL.
+*          SELECT SINGLE parentcl FROM tdevc INTO @lv_parentcl WHERE devclass EQ @lv_parentcl.
+*          CHECK lv_parentcl IS NOT INITIAL.
+*          APPEND lv_parentcl TO lt_devclass.
+*        ENDWHILE.
+*      ENDLOOP.
       SORT lt_devclass.
       DELETE ADJACENT DUPLICATES FROM lt_devclass.
       IF lt_devclass[] IS NOT INITIAL.
