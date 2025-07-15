@@ -9,6 +9,11 @@ Legend
 - : removed
 
 
+2025-07-15 v5.0.0
+-------------------
+
+! update root package find (core issue)
+
 2025-06-03 v4.0.0
 -------------------
 
