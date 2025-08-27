@@ -9,6 +9,11 @@ Legend
 - : removed
 
 
+2025-08-27 v5.0.1
+-------------------
+
++ add client to import tr function
+
 2025-07-15 v5.0.0
 -------------------
 
