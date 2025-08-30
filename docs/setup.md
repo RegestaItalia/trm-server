@@ -21,7 +21,7 @@ Once abapGit installed, you can either install trm-server as an online or offlin
 1. Run abapGit (standalone/developer)
 2. On the repository list page, select "New Online"
 3. Enter `https://github.com/RegestaItalia/trm-server` for the URL
-4. Enter package name `ZTRM`
+4. Enter package name `$TRM`
 5. Select "Clone Online Repo"
 6. Select "Pull"
 
@@ -36,7 +36,7 @@ First download the latest release source code from
 With the source code zip file saved on your computer
 1. Run abapGit (standalone/developer)
 2. On the repository list page, select "New Offline"
-3. Enter repo name `trm-server` and package name `ZTRM`
+3. Enter repo name `trm-server` and package name `$TRM`
 1. Select "Create Offline Repo"
 1. Select "Import <sup>zip</sup>"
 1. Select the _trm-server-main.zip_ file
