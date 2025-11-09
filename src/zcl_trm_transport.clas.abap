@@ -510,6 +510,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
       EXPORTING
         iv_system             = iv_system
         iv_request            = gv_trkorr
+        iv_client             = sy-mandt
         iv_ctc_active         = ' '
         iv_overtake           = 'X'
         iv_import_again       = 'X'
