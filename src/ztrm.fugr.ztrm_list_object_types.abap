@@ -11,7 +11,7 @@ FUNCTION ztrm_list_object_types.
   PERFORM check_auth.
 
   TRY.
-    zcl_trm_utility=>get_supported_object_types(
+    zcl_trm_singleton=>get( )->get_supported_object_types(
       IMPORTING
         et_object_text = et_object_text[]
     ).

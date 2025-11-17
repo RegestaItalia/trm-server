@@ -33,6 +33,11 @@ CLASS zcl_trm_core DEFINITION
     CLASS-METHODS get_installed_packages
       RETURNING VALUE(rt_packages) TYPE tyt_trm_package.
 
+    CLASS-METHODS get_lockfile
+      IMPORTING iv_package_name     TYPE ztrm_package_name
+                iv_package_registry TYPE ztrm_package_registry OPTIONAL
+      RETURNING VALUE(rv_lockfile)  TYPE string.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -343,6 +348,10 @@ CLASS zcl_trm_core IMPLEMENTATION.
 
   METHOD get_source_trkorr.
     SELECT trkorr FROM ztrm_src_trkorr INTO TABLE rt_trkorr.
+  ENDMETHOD.
+
+  METHOD get_lockfile.
+    " TODO
   ENDMETHOD.
 
 ENDCLASS.
