@@ -1,10 +1,11 @@
 CLASS zcl_trm_object DEFINITION
   PUBLIC
-  CREATE PRIVATE
+  CREATE PUBLIC
   GLOBAL FRIENDS zcl_trm_object_dispacher.
 
   PUBLIC SECTION.
     INTERFACES zif_trm_object.
+    DATA: key TYPE ztrm_object READ-ONLY.
 
     METHODS constructor
       IMPORTING key TYPE ztrm_object.
@@ -12,7 +13,6 @@ CLASS zcl_trm_object DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
     TYPES: tyt_senvi TYPE STANDARD TABLE OF senvi.
-    DATA: key TYPE ztrm_object.
 
     METHODS parse_senvi
       IMPORTING is_senvi        TYPE senvi
