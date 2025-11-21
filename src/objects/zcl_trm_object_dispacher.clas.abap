@@ -31,8 +31,8 @@ CLASS zcl_trm_object_dispacher IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_oo_adt_classrun~main.
-     SELECT SINGLE * FROM tadir INTO @DATA(ls_tadir) WHERE object EQ 'DDLX' AND obj_name EQ 'YCB_PROTES'.
-*    SELECT SINGLE * FROM tadir INTO @DATA(ls_tadir) WHERE object EQ 'CLAS' AND obj_name EQ 'ZCL_RD_REST_HANDLER'.
+    SELECT SINGLE * FROM tadir INTO @DATA(ls_tadir) WHERE object EQ 'TTYP' AND obj_name EQ 'ZTTEST'.
+    CHECK sy-subrc EQ 0.
     zcl_trm_object_dispacher=>get( CORRESPONDING #( ls_tadir ) )->get_dependencies(
       IMPORTING
         et_dependencies = DATA(lt_deps)

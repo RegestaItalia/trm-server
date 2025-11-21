@@ -34,6 +34,8 @@ CLASS zcl_trm_abap DEFINITION
     DATA: function_modules TYPE tyt_function_module.
 
     METHODS handle_clas.
+    METHODS handle_fugr.
+    METHODS handle_prog.
     METHODS extract_function_modules
       IMPORTING it_tokens     TYPE tyt_tokens
                 it_statements TYPE tyt_statements.
@@ -49,10 +51,6 @@ CLASS zcl_trm_abap IMPLEMENTATION.
   METHOD constructor.
     super->constructor( key = key ).
     me->object = object.
-    CASE object.
-      WHEN 'CLAS'.
-        handle_clas( ).
-    ENDCASE.
   ENDMETHOD.
 
   METHOD zif_trm_object~get_dependencies.
@@ -61,6 +59,14 @@ CLASS zcl_trm_abap IMPLEMENTATION.
       IMPORTING
         et_dependencies = et_dependencies
     ).
+    CASE object.
+      WHEN 'CLAS'.
+        handle_clas( ).
+      WHEN 'FUGR'.
+        handle_fugr( ).
+      WHEN 'PROG'.
+        handle_prog( ).
+    ENDCASE.
     add_nrob( CHANGING ct_dependencies = et_dependencies ).
   ENDMETHOD.
 
@@ -71,7 +77,7 @@ CLASS zcl_trm_abap IMPLEMENTATION.
           lt_include_src    TYPE STANDARD TABLE OF string,
           lt_src_tokens     TYPE TABLE OF stoken,
           lt_src_statements TYPE TABLE OF sstmnt.
-    lv_classname = me->key-obj_name.
+    lv_classname = key-obj_name.
     TRY.
         lt_includes = cl_oo_classname_service=>get_all_method_includes( lv_classname ).
       CATCH cx_class_not_existent.
@@ -81,6 +87,57 @@ CLASS zcl_trm_abap IMPLEMENTATION.
       CLEAR lt_src_tokens[].
       CLEAR lt_src_statements[].
       READ REPORT ls_include-incname INTO lt_include_src.
+      SCAN ABAP-SOURCE lt_include_src
+        TOKENS INTO    lt_src_tokens
+        STATEMENTS INTO lt_src_statements.
+      extract_function_modules(
+        it_tokens     = lt_src_tokens
+        it_statements = lt_src_statements
+      ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD handle_fugr.
+    DATA: ls_senvi          TYPE senvi,
+          lt_include_src    TYPE STANDARD TABLE OF string,
+          lt_src_tokens     TYPE TABLE OF stoken,
+          lt_src_statements TYPE TABLE OF sstmnt.
+    LOOP AT senvi INTO ls_senvi WHERE type EQ 'INCL'.
+      CLEAR lt_include_src[].
+      CLEAR lt_src_tokens[].
+      CLEAR lt_src_statements[].
+      READ REPORT ls_senvi-object INTO lt_include_src.
+      SCAN ABAP-SOURCE lt_include_src
+        TOKENS INTO    lt_src_tokens
+        STATEMENTS INTO lt_src_statements.
+      extract_function_modules(
+        it_tokens     = lt_src_tokens
+        it_statements = lt_src_statements
+      ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD handle_prog.
+    DATA: lt_senvi          LIKE senvi,
+          ls_senvi          TYPE senvi,
+          lt_include_src    TYPE STANDARD TABLE OF string,
+          lt_src_tokens     TYPE TABLE OF stoken,
+          lt_src_statements TYPE TABLE OF sstmnt.
+    FIELD-SYMBOLS <fs_dummy_senvi> TYPE senvi.
+    " adding a dummy record to read the report source code (besides includes)
+    READ TABLE senvi TRANSPORTING NO FIELDS WITH KEY type = 'INCL' object = key-obj_name.
+    IF sy-subrc <> 0.
+      APPEND INITIAL LINE TO lt_senvi ASSIGNING <fs_dummy_senvi>.
+      <fs_dummy_senvi>-type = 'INCL'.
+      <fs_dummy_senvi>-object = key-obj_name.
+    ENDIF.
+    APPEND LINES OF senvi TO lt_senvi.
+    "
+    LOOP AT lt_senvi INTO ls_senvi WHERE type EQ 'INCL'.
+      CLEAR lt_include_src[].
+      CLEAR lt_src_tokens[].
+      CLEAR lt_src_statements[].
+      READ REPORT ls_senvi-object INTO lt_include_src.
       SCAN ABAP-SOURCE lt_include_src
         TOKENS INTO    lt_src_tokens
         STATEMENTS INTO lt_src_statements.

@@ -5,14 +5,17 @@ CLASS zcl_trm_object DEFINITION
 
   PUBLIC SECTION.
     INTERFACES zif_trm_object.
-    DATA: key TYPE ztrm_object READ-ONLY.
+
+    TYPES: tyt_senvi TYPE STANDARD TABLE OF senvi.
+
+    DATA: key TYPE ztrm_object READ-ONLY,
+          senvi TYPE tyt_senvi READ-ONLY.
 
     METHODS constructor
       IMPORTING key TYPE ztrm_object.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    TYPES: tyt_senvi TYPE STANDARD TABLE OF senvi.
 
     METHODS parse_senvi
       IMPORTING is_senvi        TYPE senvi
@@ -30,7 +33,6 @@ CLASS zcl_trm_object IMPLEMENTATION.
   METHOD zif_trm_object~get_dependencies.
     DATA: lv_obj_type         TYPE seu_obj,
           lv_obj_name         TYPE sobj_name,
-          lt_senvi            TYPE tyt_senvi,
           ls_senvi            TYPE senvi,
           lt_dependencies_tmp TYPE ztrm_object_dependency_t,
           ls_dependencies_tmp LIKE LINE OF lt_dependencies_tmp.
@@ -49,10 +51,10 @@ CLASS zcl_trm_object IMPLEMENTATION.
 *       compiler_grade  = '2'
 *       cds_view_elements = ' '
       TABLES
-        environment_tab = lt_senvi
+        environment_tab = senvi
 *       source_objects  =
       .
-    LOOP AT lt_senvi INTO ls_senvi.
+    LOOP AT senvi INTO ls_senvi.
       CLEAR lt_dependencies_tmp[].
       CLEAR ls_dependencies_tmp.
       parse_senvi(
@@ -92,6 +94,8 @@ CLASS zcl_trm_object IMPLEMENTATION.
       CATCH zcx_trm_exception.
     ENDTRY.
     CASE is_senvi-type.
+      WHEN 'INCL'.
+        " used in object specific implementation
       WHEN 'OM'.
         APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
         <fs_dep>-tabname = 'TADIR'.
@@ -103,6 +107,14 @@ CLASS zcl_trm_object IMPLEMENTATION.
         APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
         <fs_dep>-tabname = 'TADIR'.
         CONCATENATE 'R3TR' 'FUGR' is_senvi-encl_obj INTO <fs_dep>-tabkey.
+      WHEN 'DGT'.
+        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
+        <fs_dep>-tabname = 'TADIR'.
+        CONCATENATE 'R3TR' 'TYPE' is_senvi-encl_obj INTO <fs_dep>-tabkey.
+      WHEN 'STRU'.
+        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
+        <fs_dep>-tabname = 'TADIR'.
+        CONCATENATE 'R3TR' 'TABL' is_senvi-object INTO <fs_dep>-tabkey.
     ENDCASE.
   ENDMETHOD.
 
