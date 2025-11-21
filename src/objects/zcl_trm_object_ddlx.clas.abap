@@ -22,21 +22,52 @@ CLASS zcl_trm_object_ddlx IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_trm_object~get_dependencies.
-    DATA: lv_entity_id TYPE if_sadl_entity=>ty_entity_id,
-          lo_entity    TYPE REF TO if_sadl_entity.
-    lv_entity_id = key-obj_name.
-    lo_entity = cl_sadl_entity_factory=>get_instance( )->get_entity(
-      iv_id   = lv_entity_id
-      iv_type = cl_sadl_entity_factory=>co_type-cds
-    ).
-    lo_entity->get_annotations(
-      IMPORTING
-        et_entity_annotations      = data(et_entity_annotations)
-        et_element_annotations     = data(et_element_annotations)
-        et_action_annotations      = data(et_action_annotations)
-        et_association_annotations = data(et_association_annotations)
-        et_parameter_annotations   = data(et_parameter_annotations)
-    ).
+    DATA: lo_provider   TYPE REF TO object,
+          lt_queries    TYPE REF TO data,
+          lt_ddlx_names TYPE REF TO data,
+          lv_tabkey     TYPE string.
+    FIELD-SYMBOLS: <fs_queries>    TYPE STANDARD TABLE,
+                   <fs_query>      TYPE any,
+                   <fs_entity>     TYPE any,
+                   <fs_ddlx_names> TYPE STANDARD TABLE,
+                   <fs_row>        TYPE any,
+                   <fs_dependency> TYPE ztrm_object_dependency.
+
+    TRY.
+        CREATE OBJECT lo_provider TYPE ('CL_DDLX_METADATA_PROVIDER').
+        CREATE DATA lt_queries TYPE ('IF_DDLX_METADATA_PROVIDER=>TY_T_MDATA_QUERY').
+        CREATE DATA lt_ddlx_names TYPE ('IF_DDLX_METADATA_PROVIDER=>TY_T_DDLXNAME_EXT').
+        ASSIGN lt_queries->* TO <fs_queries>.
+        CHECK <fs_queries> IS ASSIGNED.
+        ASSIGN lt_ddlx_names->* TO <fs_ddlx_names>.
+        CHECK <fs_ddlx_names> IS ASSIGNED.
+        APPEND INITIAL LINE TO <fs_queries> ASSIGNING <fs_query>.
+        CHECK <fs_query> IS ASSIGNED.
+        ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_query> TO <fs_entity>.
+        CHECK <fs_entity> IS ASSIGNED.
+        <fs_entity> = key-obj_name.
+
+        CALL METHOD lo_provider->('GET_ANNOTATIONS_FOR_ENTITIES')
+          EXPORTING
+            i_mdata_queries = <fs_queries>
+          IMPORTING
+            e_ddlxnames     = <fs_ddlx_names>.
+      CATCH cx_dynamic_check.
+        RETURN.
+    ENDTRY.
+
+    LOOP AT <fs_ddlx_names> ASSIGNING <fs_row>.
+      UNASSIGN <fs_entity>.
+      CLEAR lv_tabkey.
+      ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_row> TO <fs_entity>.
+      CHECK <fs_entity> IS ASSIGNED.
+      CONCATENATE 'R3TR' 'DDLS' <fs_entity> INTO lv_tabkey.
+      READ TABLE et_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = lv_tabkey.
+      CHECK sy-subrc <> 0.
+      APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dependency>.
+      <fs_dependency>-tabname = 'TADIR'.
+      <fs_dependency>-tabkey = lv_tabkey.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
