@@ -14,7 +14,8 @@ CLASS zcl_trm_package DEFINITION
       RAISING   zcx_trm_exception.
 
     METHODS get_objects
-      EXPORTING et_tadir TYPE scts_tadir
+      IMPORTING iv_incl_sub TYPE flag DEFAULT ' '
+      EXPORTING et_tadir    TYPE scts_tadir
       RAISING   zcx_trm_exception.
 
     METHODS interface
@@ -36,7 +37,7 @@ ENDCLASS.
 
 
 
-CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
+CLASS zcl_trm_package IMPLEMENTATION.
 
 
   METHOD constructor.
@@ -123,17 +124,28 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
 
 
   METHOD get_objects.
-    CALL FUNCTION 'TRINT_SELECT_OBJECTS'
-      EXPORTING
-        iv_devclass      = gv_devclass
-        iv_via_selscreen = ' '
-      IMPORTING
-        et_objects_tadir = et_tadir
-      EXCEPTIONS
-        OTHERS           = 1.
-    IF sy-subrc <> 0.
-      zcx_trm_exception=>raise( ).
+    DATA: lt_devclass TYPE STANDARD TABLE OF devclass,
+          lv_devclass TYPE devclass,
+          lt_tadir    LIKE et_tadir.
+    IF iv_incl_sub EQ 'X'.
+      SELECT devclass FROM tdevc INTO TABLE lt_devclass WHERE parentcl EQ gv_devclass.
     ENDIF.
+    APPEND gv_devclass TO lt_devclass.
+    LOOP AT lt_devclass INTO lv_devclass.
+      CLEAR lt_tadir[].
+      CALL FUNCTION 'TRINT_SELECT_OBJECTS'
+        EXPORTING
+          iv_devclass      = lv_devclass
+          iv_via_selscreen = ' '
+        IMPORTING
+          et_objects_tadir = lt_tadir
+        EXCEPTIONS
+          OTHERS           = 1.
+      IF sy-subrc <> 0.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+      APPEND LINES OF lt_tadir TO et_tadir.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -186,7 +198,7 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
           i_suppress_dialog            = 'D'
           i_suppress_access_permission = 'X'
         EXCEPTIONS
-          OTHERS            = 0.
+          OTHERS                       = 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
@@ -218,8 +230,8 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
         i_suppress_dialog            = 'D'
         i_suppress_access_permission = 'X'
       EXCEPTIONS
-        object_already_unlocked = 0                       "ignore
-        OTHERS                  = 1.
+        object_already_unlocked      = 0                       "ignore
+        OTHERS                       = 1.
 
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).

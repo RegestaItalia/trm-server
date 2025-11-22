@@ -1,7 +1,6 @@
 CLASS zcl_trm_object DEFINITION
   PUBLIC
-  CREATE PUBLIC
-  GLOBAL FRIENDS zcl_trm_object_dispacher.
+  CREATE PUBLIC.
 
   PUBLIC SECTION.
     INTERFACES zif_trm_object.
