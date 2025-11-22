@@ -28,14 +28,19 @@ CLASS zcl_trm_abap DEFINITION
              changing  TYPE tyt_param,
            END OF ty_function_module,
            tyt_function_module TYPE STANDARD TABLE OF ty_function_module WITH DEFAULT KEY.
-    TYPES: tyt_tokens     TYPE TABLE OF stoken,
+    TYPES: ty_program     TYPE c LENGTH 180,
+           tyt_programs   TYPE STANDARD TABLE OF ty_program WITH DEFAULT KEY,
+           tyt_tokens     TYPE TABLE OF stoken,
            tyt_statements TYPE TABLE OF sstmnt.
 
     DATA: function_modules TYPE tyt_function_module.
 
-    METHODS handle_clas.
-    METHODS handle_fugr.
-    METHODS handle_prog.
+    METHODS get_clas_programs
+      RETURNING VALUE(rt_programs) TYPE tyt_programs.
+    METHODS get_fugr_programs
+      RETURNING VALUE(rt_programs) TYPE tyt_programs.
+    METHODS get_prog_programs
+      RETURNING VALUE(rt_programs) TYPE tyt_programs.
     METHODS extract_function_modules
       IMPORTING it_tokens     TYPE tyt_tokens
                 it_statements TYPE tyt_statements.
@@ -54,97 +59,78 @@ CLASS zcl_trm_abap IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_trm_object~get_dependencies.
-    DATA: lt_function_modules TYPE tyt_function_module.
+    DATA: lt_programs       TYPE tyt_programs,
+          lv_program        LIKE LINE OF lt_programs,
+          lt_program_src    TYPE STANDARD TABLE OF string,
+          lt_src_tokens     TYPE TABLE OF stoken,
+          lt_src_statements TYPE TABLE OF sstmnt.
+
     super->zif_trm_object~get_dependencies(
       IMPORTING
         et_dependencies = et_dependencies
     ).
+
     CASE object.
       WHEN 'CLAS'.
-        handle_clas( ).
+        lt_programs = get_clas_programs( ).
       WHEN 'FUGR'.
-        handle_fugr( ).
+        lt_programs = get_fugr_programs( ).
       WHEN 'PROG'.
-        handle_prog( ).
+        lt_programs = get_prog_programs( ).
     ENDCASE.
+
+    CHECK lt_programs[] IS NOT INITIAL.
+
+    LOOP AT lt_programs INTO lv_program.
+      CLEAR lt_program_src[].
+      CLEAR lt_src_tokens[].
+      CLEAR lt_src_statements[].
+      READ REPORT lv_program INTO lt_program_src.
+      SCAN ABAP-SOURCE lt_program_src
+        TOKENS INTO    lt_src_tokens
+        STATEMENTS INTO lt_src_statements.
+      extract_function_modules(
+        it_tokens     = lt_src_tokens
+        it_statements = lt_src_statements
+      ).
+    ENDLOOP.
+
     add_nrob( CHANGING ct_dependencies = et_dependencies ).
   ENDMETHOD.
 
-  METHOD handle_clas.
-    DATA: lv_classname      TYPE seoclsname,
-          lt_includes       TYPE seop_methods_w_include,
-          ls_include        LIKE LINE OF lt_includes,
-          lt_include_src    TYPE STANDARD TABLE OF string,
-          lt_src_tokens     TYPE TABLE OF stoken,
-          lt_src_statements TYPE TABLE OF sstmnt.
+  METHOD get_clas_programs.
+    DATA: lv_classname TYPE seoclsname,
+          lt_includes  TYPE seop_methods_w_include,
+          ls_include   LIKE LINE OF lt_includes.
     lv_classname = key-obj_name.
     TRY.
-        lt_includes = cl_oo_classname_service=>get_all_method_includes( lv_classname ).
+        lt_includes = cl_oo_classname_service=>get_all_method_includes(
+          EXPORTING
+            clsname           = lv_classname
+            with_enhancements = 'X'
+        ).
       CATCH cx_class_not_existent.
     ENDTRY.
     LOOP AT lt_includes INTO ls_include.
-      CLEAR lt_include_src[].
-      CLEAR lt_src_tokens[].
-      CLEAR lt_src_statements[].
-      READ REPORT ls_include-incname INTO lt_include_src.
-      SCAN ABAP-SOURCE lt_include_src
-        TOKENS INTO    lt_src_tokens
-        STATEMENTS INTO lt_src_statements.
-      extract_function_modules(
-        it_tokens     = lt_src_tokens
-        it_statements = lt_src_statements
-      ).
+      APPEND ls_include-incname TO rt_programs.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD handle_fugr.
-    DATA: ls_senvi          TYPE senvi,
-          lt_include_src    TYPE STANDARD TABLE OF string,
-          lt_src_tokens     TYPE TABLE OF stoken,
-          lt_src_statements TYPE TABLE OF sstmnt.
+  METHOD get_fugr_programs.
+    DATA ls_senvi TYPE senvi.
     LOOP AT senvi INTO ls_senvi WHERE type EQ 'INCL'.
-      CLEAR lt_include_src[].
-      CLEAR lt_src_tokens[].
-      CLEAR lt_src_statements[].
-      READ REPORT ls_senvi-object INTO lt_include_src.
-      SCAN ABAP-SOURCE lt_include_src
-        TOKENS INTO    lt_src_tokens
-        STATEMENTS INTO lt_src_statements.
-      extract_function_modules(
-        it_tokens     = lt_src_tokens
-        it_statements = lt_src_statements
-      ).
+      APPEND ls_senvi-object TO rt_programs.
     ENDLOOP.
   ENDMETHOD.
 
-  METHOD handle_prog.
-    DATA: lt_senvi          LIKE senvi,
-          ls_senvi          TYPE senvi,
-          lt_include_src    TYPE STANDARD TABLE OF string,
-          lt_src_tokens     TYPE TABLE OF stoken,
-          lt_src_statements TYPE TABLE OF sstmnt.
-    FIELD-SYMBOLS <fs_dummy_senvi> TYPE senvi.
-    " adding a dummy record to read the report source code (besides includes)
+  METHOD get_prog_programs.
+    DATA ls_senvi TYPE senvi.
     READ TABLE senvi TRANSPORTING NO FIELDS WITH KEY type = 'INCL' object = key-obj_name.
     IF sy-subrc <> 0.
-      APPEND INITIAL LINE TO lt_senvi ASSIGNING <fs_dummy_senvi>.
-      <fs_dummy_senvi>-type = 'INCL'.
-      <fs_dummy_senvi>-object = key-obj_name.
+      APPEND key-obj_name TO rt_programs.
     ENDIF.
-    APPEND LINES OF senvi TO lt_senvi.
-    "
-    LOOP AT lt_senvi INTO ls_senvi WHERE type EQ 'INCL'.
-      CLEAR lt_include_src[].
-      CLEAR lt_src_tokens[].
-      CLEAR lt_src_statements[].
-      READ REPORT ls_senvi-object INTO lt_include_src.
-      SCAN ABAP-SOURCE lt_include_src
-        TOKENS INTO    lt_src_tokens
-        STATEMENTS INTO lt_src_statements.
-      extract_function_modules(
-        it_tokens     = lt_src_tokens
-        it_statements = lt_src_statements
-      ).
+    LOOP AT senvi INTO ls_senvi WHERE type EQ 'INCL'.
+      APPEND ls_senvi-object TO rt_programs.
     ENDLOOP.
   ENDMETHOD.
 
@@ -249,6 +235,7 @@ CLASS zcl_trm_abap IMPLEMENTATION.
         APPEND ls_exporting-value TO lt_nrob_check.
       ENDIF.
     ENDLOOP.
+
     CHECK lt_nrob_check[] IS NOT INITIAL.
 
     SELECT pgmid object obj_name
