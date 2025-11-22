@@ -2,10 +2,10 @@ FUNCTION ztrm_get_dependencies.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
-*"     REFERENCE(IV_DEVCLASS) TYPE  DEVCLASS
-*"     REFERENCE(IV_INCL_SUB) TYPE  FLAG
-*"  TABLES
-*"      ET_DEPENDENCIES TYPE  ZTRM_OBJECT_DEPENDENCIES_T
+*"     VALUE(IV_DEVCLASS) TYPE  DEVCLASS
+*"     VALUE(IV_INCL_SUB) TYPE  FLAG
+*"  EXPORTING
+*"     VALUE(ET_DEPENDENCIES) TYPE  ZTRM_OBJECT_DEPENDENCIES_T
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT

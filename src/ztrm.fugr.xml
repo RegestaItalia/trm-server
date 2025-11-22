@@ -922,25 +922,24 @@
     </item>
     <item>
      <FUNCNAME>ZTRM_GET_DEPENDENCIES</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get package object dependencies</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
        <PARAMETER>IV_DEVCLASS</PARAMETER>
-       <REFERENCE>X</REFERENCE>
        <TYP>DEVCLASS</TYP>
       </RSIMP>
       <RSIMP>
        <PARAMETER>IV_INCL_SUB</PARAMETER>
-       <REFERENCE>X</REFERENCE>
        <TYP>FLAG</TYP>
       </RSIMP>
      </IMPORT>
-     <TABLES>
-      <RSTBL>
+     <EXPORT>
+      <RSEXP>
        <PARAMETER>ET_DEPENDENCIES</PARAMETER>
        <TYP>ZTRM_OBJECT_DEPENDENCIES_T</TYP>
-      </RSTBL>
-     </TABLES>
+      </RSEXP>
+     </EXPORT>
      <EXCEPTION>
       <RSEXC>
        <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
