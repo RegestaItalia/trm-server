@@ -4,4 +4,5 @@ FUNCTION-POOL ztrm                       MESSAGE-ID sv.
 
 DATA: lo_exc TYPE REF TO zcx_trm_exception,
       lo_transport TYPE REF TO zcl_trm_transport,
-      lo_package TYPE REF TO zcl_trm_package.
+      lo_package TYPE REF TO zcl_trm_package,
+      lo_obj_dispacher TYPE REF TO zcl_trm_object_dispacher.
