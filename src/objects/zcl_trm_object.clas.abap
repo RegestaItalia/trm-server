@@ -7,13 +7,20 @@ CLASS zcl_trm_object DEFINITION
 
     TYPES: tyt_senvi TYPE STANDARD TABLE OF senvi.
 
-    DATA: key TYPE ztrm_object READ-ONLY,
+    DATA: key   TYPE ztrm_object READ-ONLY,
           senvi TYPE tyt_senvi READ-ONLY.
 
     METHODS constructor
       IMPORTING key TYPE ztrm_object.
 
   PROTECTED SECTION.
+    METHODS get_tadir_dependency
+      IMPORTING pgmid             TYPE pgmid
+                object            TYPE trobjtype
+                obj_name          TYPE any
+      RETURNING VALUE(dependency) TYPE ztrm_object_dependency
+      RAISING
+                zcx_trm_exception.
   PRIVATE SECTION.
 
     METHODS parse_senvi
@@ -74,7 +81,8 @@ CLASS zcl_trm_object IMPLEMENTATION.
     DATA: lt_tadir_objects  TYPE zcl_trm_utility=>tyt_ko100,
           ls_tadir_object   LIKE LINE OF lt_tadir_objects,
           lv_tadir_object   TYPE trobjtype,
-          lv_tadir_obj_name TYPE sobj_name.
+          lv_tadir_obj_name TYPE sobj_name,
+          ls_dependency     TYPE ztrm_object_dependency.
     FIELD-SYMBOLS <fs_dep> TYPE ztrm_object_dependency.
     TRY.
         zcl_trm_singleton=>get( )->get_supported_object_types(
@@ -85,36 +93,74 @@ CLASS zcl_trm_object IMPLEMENTATION.
         lv_tadir_obj_name = is_senvi-object.
         READ TABLE lt_tadir_objects INTO ls_tadir_object WITH KEY pgmid = 'R3TR' object = lv_tadir_object.
         IF sy-subrc EQ 0.
-          APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-          <fs_dep>-tabname = 'TADIR'.
-          CONCATENATE 'R3TR' lv_tadir_object lv_tadir_obj_name INTO <fs_dep>-tabkey.
+          APPEND get_tadir_dependency(
+            pgmid    = 'R3TR'
+            object   = lv_tadir_object
+            obj_name = lv_tadir_obj_name
+          ) TO et_dependencies.
           RETURN.
         ENDIF.
+        " if we get here, type is a non-tadir type and should be parsed
+        CASE is_senvi-type.
+          WHEN 'INCL'.
+            " used in object specific implementation
+          WHEN 'OM'.
+            APPEND get_tadir_dependency(
+              pgmid    = 'R3TR'
+              object   = 'CLAS'
+              obj_name = is_senvi-encl_obj
+            ) TO et_dependencies.
+          WHEN 'FUNC'.
+            ls_dependency = get_tadir_dependency(
+              pgmid    = 'R3TR'
+              object   = 'FUGR'
+              obj_name = is_senvi-encl_obj
+            ).
+            APPEND ls_dependency TO et_dependencies.
+            APPEND ls_dependency TO et_dependencies ASSIGNING <fs_dep>.
+            <fs_dep>-tabname = 'TFDIR'.
+            <fs_dep>-tabkey = is_senvi-object.
+          WHEN 'DGT'.
+            APPEND get_tadir_dependency(
+              pgmid    = 'R3TR'
+              object   = 'TYPE'
+              obj_name = is_senvi-encl_obj
+            ) TO et_dependencies.
+          WHEN 'STRU'.
+            APPEND get_tadir_dependency(
+              pgmid    = 'R3TR'
+              object   = 'TABL'
+              obj_name = is_senvi-object
+            ) TO et_dependencies.
+        ENDCASE.
       CATCH zcx_trm_exception.
     ENDTRY.
-    CASE is_senvi-type.
-      WHEN 'INCL'.
-        " used in object specific implementation
-      WHEN 'OM'.
-        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-        <fs_dep>-tabname = 'TADIR'.
-        CONCATENATE 'R3TR' 'CLAS' is_senvi-encl_obj INTO <fs_dep>-tabkey.
-      WHEN 'FUNC'.
-        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-        <fs_dep>-tabname = 'TFDIR'.
-        <fs_dep>-tabkey = is_senvi-object.
-        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-        <fs_dep>-tabname = 'TADIR'.
-        CONCATENATE 'R3TR' 'FUGR' is_senvi-encl_obj INTO <fs_dep>-tabkey.
-      WHEN 'DGT'.
-        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-        <fs_dep>-tabname = 'TADIR'.
-        CONCATENATE 'R3TR' 'TYPE' is_senvi-encl_obj INTO <fs_dep>-tabkey.
-      WHEN 'STRU'.
-        APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dep>.
-        <fs_dep>-tabname = 'TADIR'.
-        CONCATENATE 'R3TR' 'TABL' is_senvi-object INTO <fs_dep>-tabkey.
-    ENDCASE.
+  ENDMETHOD.
+
+  METHOD get_tadir_dependency.
+    DATA: lv_message      TYPE string,
+          lv_devclass     TYPE devclass,
+          lt_trm_packages TYPE zcl_trm_core=>tyt_trm_package,
+          ls_trm_package  LIKE LINE OF lt_trm_packages.
+    lt_trm_packages = zcl_trm_singleton=>get( )->get_installed_packages( ).
+    SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid = pgmid AND object = object AND obj_name = obj_name.
+    IF lv_devclass IS NOT INITIAL.
+      dependency-tabname = 'TADIR'.
+      dependency-devclass = lv_devclass.
+      CONCATENATE pgmid object obj_name INTO dependency-tabkey.
+      LOOP AT lt_trm_packages INTO ls_trm_package.
+        READ TABLE ls_trm_package-tdevc TRANSPORTING NO FIELDS WITH KEY devclass = lv_devclass.
+        CHECK sy-subrc EQ 0.
+        dependency-trm_package_name = ls_trm_package-name.
+        dependency-trm_package_registry = ls_trm_package-registry.
+        EXIT.
+      ENDLOOP.
+    ELSE.
+      zcx_trm_exception=>raise(
+        iv_reason  = zcx_trm_exception=>c_reason-generic
+        iv_message = pgmid && ' ' && object && ' ' && obj_name && ' is not in TADIR'
+      ).
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.

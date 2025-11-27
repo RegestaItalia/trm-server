@@ -247,9 +247,15 @@ CLASS zcl_trm_abap IMPLEMENTATION.
     LOOP AT lt_nrob INTO ls_nrob.
       READ TABLE ct_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = ls_nrob.
       CHECK sy-subrc <> 0.
-      APPEND INITIAL LINE TO ct_dependencies ASSIGNING <fs_dep>.
-      <fs_dep>-tabname = 'TADIR'.
-      <fs_dep>-tabkey = ls_nrob.
+      TRY.
+          APPEND get_tadir_dependency(
+            EXPORTING
+              pgmid      = ls_nrob-pgmid
+              object     = ls_nrob-object
+              obj_name   = ls_nrob-obj_name
+          ) TO ct_dependencies.
+        CATCH zcx_trm_exception.
+      ENDTRY.
     ENDLOOP.
   ENDMETHOD.
 
