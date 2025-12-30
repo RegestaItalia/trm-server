@@ -250,7 +250,6 @@ CLASS zcl_trm_abap IMPLEMENTATION.
       TRY.
           APPEND get_tadir_dependency(
             EXPORTING
-              pgmid      = ls_nrob-pgmid
               object     = ls_nrob-object
               obj_name   = ls_nrob-obj_name
           ) TO ct_dependencies.

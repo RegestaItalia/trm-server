@@ -7,7 +7,7 @@ CLASS zcl_trm_object_dispacher DEFINITION
     INTERFACES if_oo_adt_classrun.
 
     METHODS constructor
-      IMPORTING devclass TYPE devclass.
+      IMPORTING devclass TYPE devclass OPTIONAL.
 
     METHODS get_objects_dependencies
       IMPORTING incl_sub            TYPE flag
@@ -78,6 +78,10 @@ CLASS zcl_trm_object_dispacher IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD if_oo_adt_classrun~main.
+    zcl_trm_object_dispacher=>get(
+      EXPORTING
+        key         = VALUE #( object = 'CLAS' obj_name = 'CB_DEVIATION_SHOW_COMMAND_POC' )
+    )->get_dependencies( ).
 *    SELECT SINGLE * FROM tadir INTO @DATA(ls_tadir) WHERE object EQ 'DEVC' AND obj_name EQ 'ZTEST'.
 *    CHECK sy-subrc EQ 0.
 *    zcl_trm_object_dispacher=>get( CORRESPONDING #( ls_tadir ) )->get_dependencies(
