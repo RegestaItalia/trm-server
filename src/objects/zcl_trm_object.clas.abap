@@ -32,9 +32,9 @@ CLASS zcl_trm_object IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_trm_object~get_dependencies.
-    DATA: lv_obj_type         TYPE seu_obj,
-          lv_obj_name         TYPE sobj_name,
-          ls_senvi            TYPE senvi.
+    DATA: lv_obj_type TYPE seu_obj,
+          lv_obj_name TYPE sobj_name,
+          ls_senvi    TYPE senvi.
     lv_obj_type = key-object.
     lv_obj_name = key-obj_name.
     CALL FUNCTION 'REPOSITORY_ENVIRONMENT_ALL'
@@ -57,16 +57,28 @@ CLASS zcl_trm_object IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_tadir_dependency.
-    DATA: lv_message      TYPE string,
-          lv_devclass     TYPE devclass,
-          lt_trm_packages TYPE zcl_trm_core=>tyt_trm_package,
-          ls_trm_package  LIKE LINE OF lt_trm_packages.
+    DATA: lv_tabname                 TYPE tabname,
+          lv_tabkey                  TYPE string,
+          ls_dispatcher_dependencies TYPE ztrm_object_dependencies,
+          lt_trm_packages            TYPE zcl_trm_core=>tyt_trm_package,
+          lv_devclass                TYPE devclass,
+          ls_trm_package             LIKE LINE OF lt_trm_packages.
+
+    lv_tabname = 'TADIR'.
+    CONCATENATE 'R3TR' object obj_name INTO lv_tabkey.
+
+    LOOP AT zcl_trm_object_dispacher=>dependencies INTO ls_dispatcher_dependencies.
+      READ TABLE ls_dispatcher_dependencies-dependencies INTO dependency WITH KEY tabname = lv_tabname tabkey = lv_tabkey.
+      CHECK sy-subrc EQ 0.
+      RETURN.
+    ENDLOOP.
+
     lt_trm_packages = zcl_trm_singleton=>get( )->get_installed_packages( ).
     SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid = 'R3TR' AND object = object AND obj_name = obj_name.
     IF sy-subrc EQ 0.
-      dependency-tabname = 'TADIR'.
+      dependency-tabname = lv_tabname.
+      dependency-tabkey = lv_tabkey.
       dependency-devclass = lv_devclass.
-      CONCATENATE 'R3TR' object obj_name INTO dependency-tabkey.
       CHECK lv_devclass IS NOT INITIAL.
       LOOP AT lt_trm_packages INTO ls_trm_package.
         READ TABLE ls_trm_package-tdevc TRANSPORTING NO FIELDS WITH KEY devclass = lv_devclass.

@@ -14,12 +14,10 @@ FUNCTION ztrm_get_dependencies.
   PERFORM check_auth.
 
   TRY.
-      CREATE OBJECT lo_obj_dispacher EXPORTING devclass = iv_devclass.
-      lo_obj_dispacher->get_objects_dependencies(
+      et_dependencies = zcl_trm_object_dispacher=>get_package_dependencies(
         EXPORTING
+          package      = iv_devclass
           incl_sub     = iv_incl_sub
-        RECEIVING
-          dependencies = et_dependencies[]
       ).
     CATCH zcx_trm_exception INTO lo_exc.
       PERFORM handle_exception.
