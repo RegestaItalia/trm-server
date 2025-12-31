@@ -1,14 +1,10 @@
 CLASS zcl_trm_object_ddlx DEFINITION
   PUBLIC
-  FINAL
+  INHERITING FROM zcl_trm_object
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    INTERFACES zif_trm_object .
-    DATA: key TYPE ztrm_object READ-ONLY.
-
-    METHODS constructor
-      IMPORTING key TYPE ztrm_object.
+    METHODS zif_trm_object~get_dependencies REDEFINITION.
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -17,21 +13,15 @@ ENDCLASS.
 
 CLASS zcl_trm_object_ddlx IMPLEMENTATION.
 
-  METHOD constructor.
-    me->key = key.
-  ENDMETHOD.
-
   METHOD zif_trm_object~get_dependencies.
     DATA: lo_provider   TYPE REF TO object,
           lt_queries    TYPE REF TO data,
-          lt_ddlx_names TYPE REF TO data,
-          lv_tabkey     TYPE string.
+          lt_ddlx_names TYPE REF TO data.
     FIELD-SYMBOLS: <fs_queries>    TYPE STANDARD TABLE,
                    <fs_query>      TYPE any,
                    <fs_entity>     TYPE any,
                    <fs_ddlx_names> TYPE STANDARD TABLE,
-                   <fs_row>        TYPE any,
-                   <fs_dependency> TYPE ztrm_object_dependency.
+                   <fs_row>        TYPE any.
 
     TRY.
         CREATE OBJECT lo_provider TYPE ('CL_DDLX_METADATA_PROVIDER').
@@ -58,15 +48,16 @@ CLASS zcl_trm_object_ddlx IMPLEMENTATION.
 
     LOOP AT <fs_ddlx_names> ASSIGNING <fs_row>.
       UNASSIGN <fs_entity>.
-      CLEAR lv_tabkey.
       ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_row> TO <fs_entity>.
       CHECK <fs_entity> IS ASSIGNED.
-      CONCATENATE 'R3TR' 'DDLS' <fs_entity> INTO lv_tabkey.
-      READ TABLE et_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = lv_tabkey.
-      CHECK sy-subrc <> 0.
-      APPEND INITIAL LINE TO et_dependencies ASSIGNING <fs_dependency>.
-      <fs_dependency>-tabname = 'TADIR'.
-      <fs_dependency>-tabkey = lv_tabkey.
+      TRY.
+          APPEND get_tadir_dependency(
+            EXPORTING
+              object     = 'DDLS'
+              obj_name   = <fs_entity>
+          ) TO et_dependencies.
+        CATCH zcx_trm_exception.
+      ENDTRY.
     ENDLOOP.
   ENDMETHOD.
 
