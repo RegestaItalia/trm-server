@@ -5,7 +5,6 @@ CLASS zcl_trm_object_dispacher DEFINITION
   GLOBAL FRIENDS zcl_trm_object.
 
   PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
 
     CLASS-METHODS get_package_dependencies
       IMPORTING package             TYPE devclass
@@ -16,6 +15,7 @@ CLASS zcl_trm_object_dispacher DEFINITION
     CLASS-METHODS get
       IMPORTING key                TYPE ztrm_object
       RETURNING VALUE(ro_instance) TYPE REF TO zif_trm_object.
+
   PROTECTED SECTION.
     CLASS-DATA dependencies TYPE ztrm_object_dependencies_t.
   PRIVATE SECTION.
@@ -74,15 +74,6 @@ CLASS zcl_trm_object_dispacher IMPLEMENTATION.
           EXPORTING
             key = key.
     ENDTRY.
-  ENDMETHOD.
-
-  METHOD if_oo_adt_classrun~main.
-    DATA(lt_dependencies) = zcl_trm_object_dispacher=>get_package_dependencies(
-      EXPORTING
-        package      = 'ZTRM'
-        incl_sub     = 'X'
-      ).
-    CHECK 1 EQ 1.
   ENDMETHOD.
 
 ENDCLASS.
