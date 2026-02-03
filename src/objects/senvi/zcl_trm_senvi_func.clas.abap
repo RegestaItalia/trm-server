@@ -31,9 +31,9 @@ CLASS zcl_trm_senvi_func IMPLEMENTATION.
       obj_name = obj_name
     ) TO dependencies.
     IF object EQ 'FUGR'.
-      APPEND INITIAL LINE TO dependencies ASSIGNING <fs_tfdir>.
-      <fs_tfdir>-tabname = 'TFDIR'.
-      <fs_tfdir>-tabkey = sanitize_object_name( raw_name = senvi-object max_length = 30 ).
+      APPEND zcl_trm_object=>get_tfdir_dependency(
+        funcname = sanitize_object_name( raw_name = senvi-object max_length = 30 )
+      ) TO dependencies.
     ENDIF.
   ENDMETHOD.
 
