@@ -63,7 +63,8 @@ CLASS zcl_trm_object_dispacher IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get.
-    DATA lv_class_name TYPE string.
+    DATA: lv_class_name TYPE string,
+          lo_badi       TYPE REF TO ztrm_badi_objects_handler.
     CONCATENATE 'ZCL_TRM_OBJECT_' key-object INTO lv_class_name.
     TRANSLATE lv_class_name TO UPPER CASE.
     TRY.
@@ -73,6 +74,15 @@ CLASS zcl_trm_object_dispacher IMPLEMENTATION.
         CREATE OBJECT ro_instance TYPE zcl_trm_object
           EXPORTING
             key = key.
+    ENDTRY.
+    TRY.
+        GET BADI lo_badi.
+        CALL BADI lo_badi->change_object_handler
+          EXPORTING
+            key     = key
+          CHANGING
+            handler = ro_instance.
+      CATCH cx_badi_not_implemented cx_badi_initial_reference.
     ENDTRY.
   ENDMETHOD.
 
