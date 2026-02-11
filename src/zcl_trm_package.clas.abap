@@ -13,6 +13,9 @@ CLASS zcl_trm_package DEFINITION
       RETURNING VALUE(ro_package) TYPE REF TO zcl_trm_package
       RAISING   zcx_trm_exception.
 
+    METHODS get_subpackages
+      RETURNING VALUE(rt_subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
+
     METHODS get_objects
       IMPORTING iv_incl_sub TYPE flag DEFAULT ' '
       EXPORTING et_tadir    TYPE scts_tadir
@@ -124,11 +127,16 @@ CLASS zcl_trm_package IMPLEMENTATION.
 
 
   METHOD get_objects.
-    DATA: lt_devclass TYPE STANDARD TABLE OF devclass,
-          lv_devclass TYPE devclass,
-          lt_tadir    LIKE et_tadir.
+    DATA: lt_devclass    TYPE STANDARD TABLE OF devclass,
+          lt_subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
+          ls_subpackage  LIKE LINE OF lt_subpackages,
+          lv_devclass    TYPE devclass,
+          lt_tadir       LIKE et_tadir.
     IF iv_incl_sub EQ 'X'.
-      SELECT devclass FROM tdevc INTO TABLE lt_devclass WHERE parentcl EQ gv_devclass.
+      lt_subpackages = get_subpackages( ).
+      LOOP AT lt_subpackages INTO ls_subpackage.
+        APPEND ls_subpackage-package TO lt_devclass.
+      ENDLOOP.
     ENDIF.
     APPEND gv_devclass TO lt_devclass.
     LOOP AT lt_devclass INTO lv_devclass.
@@ -321,4 +329,23 @@ CLASS zcl_trm_package IMPLEMENTATION.
       CLEAR ls_cr.
     ENDIF.
   ENDMETHOD.
+
+  METHOD get_subpackages.
+    cl_pak_package_queries=>get_all_subpackages(
+      EXPORTING
+        im_package                    = gv_devclass
+        im_also_local_packages        = 'X'
+      IMPORTING
+        et_subpackages                = rt_subpackages
+      EXCEPTIONS
+        no_package_specified          = 1
+        package_has_no_tdevc_record   = 2
+        package_has_no_tadir_record   = 3
+        package_does_not_exist        = 4
+        invalid_superpackage          = 5
+        no_output_parameter_requested = 6
+        OTHERS                        = 7
+    ).
+  ENDMETHOD.
+
 ENDCLASS.

@@ -90,6 +90,10 @@ CLASS zcl_trm_core IMPLEMENTATION.
           ls_trkorr_package        LIKE LINE OF lt_trkorr_package,
           lo_package               TYPE REF TO lcl_trm_package,
           lv_tabix                 TYPE syst_tabix,
+          lo_devclass              TYPE REF TO zcl_trm_package,
+          lt_subpackages           TYPE cl_pak_package_queries=>tt_subpackage_info,
+          ls_subpackage            LIKE LINE OF lt_subpackages,
+          lt_devclass              TYPE STANDARD TABLE OF devclass,
           ls_trm_server            LIKE LINE OF rt_packages,
           ls_trm_rest              LIKE LINE OF rt_packages,
           lv_devclass              TYPE devclass,
@@ -262,7 +266,17 @@ CLASS zcl_trm_core IMPLEMENTATION.
     ENDIF.
     SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ 'ZIF_TRM'.
     IF lv_devclass IS NOT INITIAL.
-      SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc WHERE devclass EQ lv_devclass.
+      CLEAR lo_devclass.
+      CLEAR lt_devclass[].
+      CLEAR lt_subpackages[].
+      CLEAR ls_subpackage.
+      CREATE OBJECT lo_devclass EXPORTING iv_devclass = lv_devclass.
+      lt_subpackages = lo_devclass->get_subpackages( ).
+      LOOP AT lt_subpackages INTO ls_subpackage.
+        APPEND ls_subpackage-package TO lt_devclass.
+      ENDLOOP.
+      APPEND lv_devclass TO lt_devclass.
+      SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
     ENDIF.
     INSERT ls_trm_server INTO rt_packages INDEX 1.
 
@@ -300,7 +314,17 @@ CLASS zcl_trm_core IMPLEMENTATION.
       ENDIF.
       SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ 'ZIF_TRM_REST'.
       IF lv_devclass IS NOT INITIAL.
-        SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_rest-tdevc WHERE devclass EQ lv_devclass.
+        CLEAR lo_devclass.
+        CLEAR lt_devclass[].
+        CLEAR lt_subpackages[].
+        CLEAR ls_subpackage.
+        CREATE OBJECT lo_devclass EXPORTING iv_devclass = lv_devclass.
+        lt_subpackages = lo_devclass->get_subpackages( ).
+        LOOP AT lt_subpackages INTO ls_subpackage.
+          APPEND ls_subpackage-package TO lt_devclass.
+        ENDLOOP.
+        APPEND lv_devclass TO lt_devclass.
+        SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
       ENDIF.
       INSERT ls_trm_rest INTO rt_packages INDEX 2.
     ENDIF.
