@@ -324,7 +324,7 @@ CLASS zcl_trm_core IMPLEMENTATION.
           APPEND ls_subpackage-package TO lt_devclass.
         ENDLOOP.
         APPEND lv_devclass TO lt_devclass.
-        SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
+        SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_rest-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
       ENDIF.
       INSERT ls_trm_rest INTO rt_packages INDEX 2.
     ENDIF.
