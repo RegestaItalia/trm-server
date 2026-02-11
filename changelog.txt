@@ -9,6 +9,12 @@ Legend
 - : removed
 
 
+2026-11-02 v5.1.0
+-------------------
+
+! dependency detection
+* subpackages
+
 2025-08-27 v5.0.1
 -------------------
 
