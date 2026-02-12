@@ -17,9 +17,8 @@ CLASS zcl_trm_singleton DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-
     CLASS-DATA: go_singleton TYPE REF TO zcl_trm_singleton.
-    DATA: gt_packages TYPE zcl_trm_core=>tyt_trm_package,
+    DATA: gt_packages    TYPE zcl_trm_core=>tyt_trm_package,
           gt_object_text TYPE zcl_trm_utility=>tyt_ko100.
 
 ENDCLASS.
