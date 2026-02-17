@@ -13,8 +13,12 @@ CLASS zcl_trm_package DEFINITION
       RETURNING VALUE(ro_package) TYPE REF TO zcl_trm_package
       RAISING   zcx_trm_exception.
 
+    METHODS get_subpackages
+      RETURNING VALUE(rt_subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
+
     METHODS get_objects
-      EXPORTING et_tadir TYPE scts_tadir
+      IMPORTING iv_incl_sub TYPE flag DEFAULT ' '
+      EXPORTING et_tadir    TYPE scts_tadir
       RAISING   zcx_trm_exception.
 
     METHODS interface
@@ -36,7 +40,7 @@ ENDCLASS.
 
 
 
-CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
+CLASS zcl_trm_package IMPLEMENTATION.
 
 
   METHOD constructor.
@@ -123,17 +127,33 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
 
 
   METHOD get_objects.
-    CALL FUNCTION 'TRINT_SELECT_OBJECTS'
-      EXPORTING
-        iv_devclass      = gv_devclass
-        iv_via_selscreen = ' '
-      IMPORTING
-        et_objects_tadir = et_tadir
-      EXCEPTIONS
-        OTHERS           = 1.
-    IF sy-subrc <> 0.
-      zcx_trm_exception=>raise( ).
+    DATA: lt_devclass    TYPE STANDARD TABLE OF devclass,
+          lt_subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
+          ls_subpackage  LIKE LINE OF lt_subpackages,
+          lv_devclass    TYPE devclass,
+          lt_tadir       LIKE et_tadir.
+    IF iv_incl_sub EQ 'X'.
+      lt_subpackages = get_subpackages( ).
+      LOOP AT lt_subpackages INTO ls_subpackage.
+        APPEND ls_subpackage-package TO lt_devclass.
+      ENDLOOP.
     ENDIF.
+    APPEND gv_devclass TO lt_devclass.
+    LOOP AT lt_devclass INTO lv_devclass.
+      CLEAR lt_tadir[].
+      CALL FUNCTION 'TRINT_SELECT_OBJECTS'
+        EXPORTING
+          iv_devclass      = lv_devclass
+          iv_via_selscreen = ' '
+        IMPORTING
+          et_objects_tadir = lt_tadir
+        EXCEPTIONS
+          OTHERS           = 1.
+      IF sy-subrc <> 0.
+        zcx_trm_exception=>raise( ).
+      ENDIF.
+      APPEND LINES OF lt_tadir TO et_tadir.
+    ENDLOOP.
   ENDMETHOD.
 
 
@@ -186,7 +206,7 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
           i_suppress_dialog            = 'D'
           i_suppress_access_permission = 'X'
         EXCEPTIONS
-          OTHERS            = 0.
+          OTHERS                       = 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
 
@@ -218,8 +238,8 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
         i_suppress_dialog            = 'D'
         i_suppress_access_permission = 'X'
       EXCEPTIONS
-        object_already_unlocked = 0                       "ignore
-        OTHERS                  = 1.
+        object_already_unlocked      = 0                       "ignore
+        OTHERS                       = 1.
 
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
@@ -309,4 +329,23 @@ CLASS ZCL_TRM_PACKAGE IMPLEMENTATION.
       CLEAR ls_cr.
     ENDIF.
   ENDMETHOD.
+
+  METHOD get_subpackages.
+    cl_pak_package_queries=>get_all_subpackages(
+      EXPORTING
+        im_package                    = gv_devclass
+        im_also_local_packages        = 'X'
+      IMPORTING
+        et_subpackages                = rt_subpackages
+      EXCEPTIONS
+        no_package_specified          = 1
+        package_has_no_tdevc_record   = 2
+        package_has_no_tadir_record   = 3
+        package_does_not_exist        = 4
+        invalid_superpackage          = 5
+        no_output_parameter_requested = 6
+        OTHERS                        = 7
+    ).
+  ENDMETHOD.
+
 ENDCLASS.
