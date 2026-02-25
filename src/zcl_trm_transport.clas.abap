@@ -310,7 +310,9 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_objects.
-    DATA lt_e071 LIKE it_e071.
+    DATA: lt_e071    LIKE it_e071,
+          ls_log     LIKE LINE OF et_log,
+          lv_message TYPE string.
     MOVE it_e071[] TO lt_e071[].
     CALL FUNCTION 'TRINT_REQUEST_CHOICE'
       EXPORTING
@@ -334,6 +336,18 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         OTHERS               = 7.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
+    ENDIF.
+    READ TABLE et_log INTO ls_log WITH KEY severity = 'E'.
+    IF sy-subrc <> 0.
+      READ TABLE et_log INTO ls_log WITH KEY severity = 'A'.
+    ENDIF.
+    IF ls_log IS NOT INITIAL.
+      IF ls_log-ag IS NOT INITIAL.
+        MESSAGE ID ls_log-ag TYPE 'I' NUMBER ls_log-msgnr WITH ls_log-var1 ls_log-var2 ls_log-var3 ls_log-var4 INTO lv_message.
+        zcx_trm_exception=>raise( iv_message = lv_message ).
+      ELSE.
+        zcx_trm_exception=>raise( iv_message = 'Unknown error, check logs.' ).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
