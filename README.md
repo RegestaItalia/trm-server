@@ -5,13 +5,15 @@
 [![TRM Latest version](https://img.shields.io/endpoint?url=https://trmregistry.com/public/shieldio/version?package=trm-server)](https://trmregistry.com/#/package/trm-server)
 [![TRM Installs](https://img.shields.io/endpoint?url=https://trmregistry.com/public/shieldio/downloads?package=trm-server)](https://trmregistry.com/#/package/trm-server)
 
-TRM Server is the essential component for operations between TRM Client and your development SAP system.
+**trm-server** is the server-side component of TRM.
+
+It acts as the secure bridge between the **SAP application server** and the **TRM client**.
+
+It exposes the APIs that allow TRM to import/export transports, and, as a consequence, it must be installed **only** on source and target systems, as its not required on any other system in the landscape.
 
 <p align="center">
   <img src="https://docs.trmregistry.com/_media/schema.png" />
 </p>
-
-> This package should only be installed on your development systems!
 
 # Basic usage
 
