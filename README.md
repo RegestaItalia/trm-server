@@ -5,6 +5,11 @@
 [![TRM Latest version](https://img.shields.io/endpoint?url=https://trmregistry.com/public/shieldio/version/trm-server)](https://trmregistry.com/#/package/trm-server)
 [![TRM Installs](https://img.shields.io/endpoint?url=https://trmregistry.com/public/shieldio/downloads/trm-server)](https://trmregistry.com/#/package/trm-server)
 
+| 🚀 This project is funded and maintained by 🏦 | 🔗                                                             |
+|-------------------------------------------------|----------------------------------------------------------------|
+| Regesta S.p.A.                                  | [https://www.regestaitalia.eu/](https://www.regestaitalia.eu/) |
+| Clarex S.r.l.                                   | [https://www.clarex.it/](https://www.clarex.it/)               |
+
 **trm-server** is the server-side component of TRM.
 
 It acts as the secure bridge between the **SAP application server** and the **TRM client**.
