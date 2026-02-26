@@ -2,7 +2,7 @@
 
 **trm-server** is the server-side component of TRM.
 
-It acts as the secure bridge between the **SAP application server** and the **TRM client**, exposing the RFC-enabled APIs required to manage transport operations.
+It acts as the secure bridge between the **SAP application server** and the **TRM client**.
 
 It exposes the APIs that allow TRM to import/export transports, and, as a consequence, it must be installed **only** on source and target systems, as its not required on any other system in the landscape.
 
