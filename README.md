@@ -33,7 +33,6 @@ It exposes the APIs that allow TRM to import/export transports, and, as a conseq
                             ▼
               ┌──────────────────────────┐
               │        SAP System        │
-              │ (Source or Target)       │
               └──────────────────────────┘
 ```
 
