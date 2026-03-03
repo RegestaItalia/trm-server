@@ -938,6 +938,7 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         iv_reason = zcx_trm_exception=>c_reason-not_found
       ).
     ENDIF.
+    SORT lt_stats BY timestamp DESCENDING.
     es_stat = lt_stats[ 1 ].
   ENDMETHOD.
 
