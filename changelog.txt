@@ -9,6 +9,12 @@ Legend
 - : removed
 
 
+2026-03-03 v5.2.0
+-------------------
+
+! moved abap class source extraction for badi usage
++ transport import status api
+
 2026-11-02 v5.1.0
 -------------------
 

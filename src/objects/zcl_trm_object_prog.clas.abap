@@ -1,7 +1,6 @@
 CLASS zcl_trm_object_prog DEFINITION
   PUBLIC
   INHERITING FROM zcl_trm_abap
-  FINAL
   CREATE PUBLIC .
 
   PUBLIC SECTION.

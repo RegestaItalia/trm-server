@@ -4,17 +4,18 @@ CLASS zcl_trm_abap DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPES: ty_program        TYPE c LENGTH 180,
+           ty_program_src    TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+           ty_src_tokens     TYPE TABLE OF stoken WITH DEFAULT KEY,
+           ty_src_statements TYPE TABLE OF sstmnt WITH DEFAULT KEY.
+    TYPES: BEGIN OF ty_source_code,
+             program     TYPE ty_program,
+             source_code TYPE ty_program_src,
+             tokens      TYPE ty_src_tokens,
+             statements  TYPE ty_src_statements,
+           END OF ty_source_code,
+           tyt_source_code TYPE STANDARD TABLE OF ty_source_code WITH DEFAULT KEY.
 
-    DATA: object TYPE trobjtype READ-ONLY.
-
-    METHODS constructor
-      IMPORTING object TYPE trobjtype
-                key    TYPE ztrm_object.
-
-    METHODS zif_trm_object~get_dependencies REDEFINITION.
-
-  PROTECTED SECTION.
-  PRIVATE SECTION.
     TYPES: BEGIN OF ty_param,
              name  TYPE string,
              value TYPE string,
@@ -28,13 +29,23 @@ CLASS zcl_trm_abap DEFINITION
              changing  TYPE tyt_param,
            END OF ty_function_module,
            tyt_function_module TYPE STANDARD TABLE OF ty_function_module WITH DEFAULT KEY.
-    TYPES: ty_program     TYPE c LENGTH 180,
-           tyt_programs   TYPE STANDARD TABLE OF ty_program WITH DEFAULT KEY,
+
+    DATA: object           TYPE trobjtype READ-ONLY,
+          source_code      TYPE tyt_source_code READ-ONLY,
+          function_modules TYPE tyt_function_module READ-ONLY.
+
+    METHODS constructor
+      IMPORTING object TYPE trobjtype
+                key    TYPE ztrm_object.
+
+    METHODS zif_trm_object~get_dependencies REDEFINITION.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+    TYPES: tyt_programs   TYPE STANDARD TABLE OF ty_program WITH DEFAULT KEY,
            tyt_tokens     TYPE TABLE OF stoken,
            tyt_statements TYPE TABLE OF sstmnt.
-
-    DATA: function_modules TYPE tyt_function_module.
-
+    DATA: programs TYPE tyt_programs.
     METHODS get_clas_programs
       RETURNING VALUE(rt_programs) TYPE tyt_programs.
     METHODS get_fugr_programs
@@ -54,47 +65,47 @@ ENDCLASS.
 CLASS zcl_trm_abap IMPLEMENTATION.
 
   METHOD constructor.
+    DATA: lv_program        LIKE LINE OF me->programs,
+          lt_program_src    TYPE ty_program_src,
+          lt_src_tokens     TYPE ty_src_tokens,
+          lt_src_statements TYPE ty_src_statements.
+    FIELD-SYMBOLS <fs_source_code> TYPE ty_source_code.
     super->constructor( key = key ).
     me->object = object.
-  ENDMETHOD.
-
-  METHOD zif_trm_object~get_dependencies.
-    DATA: lt_programs       TYPE tyt_programs,
-          lv_program        LIKE LINE OF lt_programs,
-          lt_program_src    TYPE STANDARD TABLE OF string,
-          lt_src_tokens     TYPE TABLE OF stoken,
-          lt_src_statements TYPE TABLE OF sstmnt.
-
-    super->zif_trm_object~get_dependencies(
-      IMPORTING
-        et_dependencies = et_dependencies
-    ).
-
     CASE object.
       WHEN 'CLAS'.
-        lt_programs = get_clas_programs( ).
+        me->programs = get_clas_programs( ).
       WHEN 'FUGR'.
-        lt_programs = get_fugr_programs( ).
+        me->programs = get_fugr_programs( ).
       WHEN 'PROG'.
-        lt_programs = get_prog_programs( ).
+        me->programs = get_prog_programs( ).
     ENDCASE.
-
-    CHECK lt_programs[] IS NOT INITIAL.
-
-    LOOP AT lt_programs INTO lv_program.
+    LOOP AT me->programs INTO lv_program.
       CLEAR lt_program_src[].
       CLEAR lt_src_tokens[].
       CLEAR lt_src_statements[].
+      UNASSIGN <fs_source_code>.
+      APPEND INITIAL LINE TO me->source_code ASSIGNING <fs_source_code>.
       READ REPORT lv_program INTO lt_program_src.
       SCAN ABAP-SOURCE lt_program_src
         TOKENS INTO    lt_src_tokens
         STATEMENTS INTO lt_src_statements.
+      <fs_source_code>-program = lv_program.
+      <fs_source_code>-source_code = lt_program_src.
+      <fs_source_code>-statements = lt_src_statements.
+      <fs_source_code>-tokens = lt_src_tokens.
       extract_function_modules(
         it_tokens     = lt_src_tokens
         it_statements = lt_src_statements
       ).
     ENDLOOP.
+  ENDMETHOD.
 
+  METHOD zif_trm_object~get_dependencies.
+    super->zif_trm_object~get_dependencies(
+      IMPORTING
+        et_dependencies = et_dependencies
+    ).
     add_nrob( CHANGING ct_dependencies = et_dependencies ).
   ENDMETHOD.
 

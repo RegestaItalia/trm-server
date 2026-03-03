@@ -1,103 +1,132 @@
 # trm-server Setup
 
-> The server-side component of TRM is identified as trm-server
+**trm-server** is the server-side component of TRM.
 
-## First install
+It acts as the secure bridge between the **SAP application server** and the **TRM client**.
 
-The first install must be performed using [abapGit](https://abapgit.org/).
+It exposes the APIs that allow TRM to import/export transports, and, as a consequence, it must be installed **only** on source and target systems, as its not required on any other system in the landscape.
 
-AbapGit is an open source git client for ABAP.
+## First Installation
 
-If you haven't installed it already, follow the official guide at [this link](https://docs.abapgit.org/user-guide/getting-started/install.html).
+The first installation must be performed using [abapGit](https://abapgit.org/).
 
-The minimum installation of abapGit requires the [standalone version](https://docs.abapgit.org/user-guide/getting-started/install.html#install-standalone-version).
+If you have not installed it yet, follow the official guide:\
+https://docs.abapgit.org/user-guide/getting-started/install.html
 
-Once abapGit installed, you can either install trm-server as an online or offline repository.
+The minimum required installation is the **Standalone Version**:\
+https://docs.abapgit.org/user-guide/getting-started/install.html#install-standalone-version
 
-> If your system has [connection to Github](https://docs.abapgit.org/user-guide/setup/ssl-setup.html), it's recommended to install it as an online repository.
+Once abapGit is installed, you can install `trm-server` either as an **online** or **offline** repository.
 
-### Online repo
+## Online Repository Installation
 
-1. Run abapGit (standalone/developer)
-2. On the repository list page, select "New Online"
-3. Enter `https://github.com/RegestaItalia/trm-server` for the URL
-4. Enter package name `$TRM`
-5. Select "Clone Online Repo"
-6. Select "Pull"
+1.  Run **abapGit** (standalone or developer version)
 
-### Offline repo
+2.  On the repository list page, select **"New Online"**
 
-First download the latest release source code from
-1. Direct link [https://github.com/RegestaItalia/trm-server/archive/refs/heads/main.zip](https://github.com/RegestaItalia/trm-server/archive/refs/heads/main.zip)
-2. Open the [Github repo page](https://github.com/RegestaItalia/trm-server)
-   1. Press the button "<> Code"
-   2. Press "Download ZIP"
+3.  Enter the repository URL:
 
-With the source code zip file saved on your computer
-1. Run abapGit (standalone/developer)
-2. On the repository list page, select "New Offline"
-3. Enter repo name `trm-server` and package name `$TRM`
-1. Select "Create Offline Repo"
-1. Select "Import <sup>zip</sup>"
-1. Select the _trm-server-main.zip_ file
-1. Select "Pull <sup>zip</sup>"
+    `https://github.com/RegestaItalia/trm-server`
 
-## User authorization maintenance
+4.  Enter package name:
 
-This package exposes RFC enabled function modules.
+    `$TRM`
 
-In order to make it safer, all users are, by default, not authorized to call most of the RFC functions.
+5.  Select **"Clone Online Repo"**
 
-Before using trm-server, maintenance of the authorized users must be performed.
+6.  Select **"Pull"**
 
-First, run transaction `SM30` and maintain table `ZTRM_USERS`.
+## Offline Repository Installation
+
+### Download Source Code
+
+Download the latest release source code:
+
+-   Direct link:\
+    https://github.com/RegestaItalia/trm-server/archive/refs/heads/main.zip
+
+OR
+
+-   Open the GitHub repository page:\
+    https://github.com/RegestaItalia/trm-server
+    1.  Click **"\<\> Code"**\
+    2.  Click **"Download ZIP"**
+
+Save the ZIP file locally (usually named `trm-server-main.zip`).
+
+### Import Using abapGit
+
+1.  Run **abapGit**
+2.  On the repository list page, select **"New Offline"**
+3.  Enter:
+    -   Repository name: `trm-server`
+    -   Package name: `$TRM`
+4.  Select **"Create Offline Repo"**
+5.  Select **"Import ZIP"**
+6.  Select the file `trm-server-main.zip`
+7.  Select **"Pull ZIP"**
+
+## User Authorization Maintenance
+
+This package exposes **RFC-enabled function modules**.
+
+For security reasons, all users are **not authorized by default** to execute most RFC functions.
+
+Before using `trm-server`, authorized users must be maintained.
+
+### Maintain Authorized Users
+
+1.  Execute transaction `SE16`
+2.  Create a new record in table `ZTRM_USERS`
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-server/main/docs/images/sm30_ztrm_users1.png" alt="SM30">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-server/main/docs/images/se16_1.png" alt="SE16">
 </p>
 
-Press on **New Entries**.
+After adding the user, press **SAVE**.
 
 <p align="center">
-    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-server/main/docs/images/sm30_ztrm_users2.png" alt="SM30">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-server/main/docs/images/se16_2.png" alt="SE16">
 </p>
 
-Enter the names of the users allowed to run TRM RFC functions.
-
-<p align="center">
-    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-server/main/docs/images/sm30_ztrm_users3.png" alt="SM30">
-</p>
+> For security reasons, by default, TRM does not allow any user to execute RFC functions unless explicitly authorized.
 
 ## Update
 
-With trm-server already installed on your system, there are two ways to keep it up to date:
+With `trm-server` already installed, there are two ways to keep it up to date.
 
-1. You may keep using [abapGit](https://abapgit.org/)
-   - If it's an online repo, simply pull from the "main" branch
-   - If it's an offline repo, download the "main" branch source code as "zip" from Github and import
-2. You may use TRM Client and get from the Public Registry the latest release.
-   
-   In this case, simply run the command:
-   
-   `trm update trm-server`
+### Using TRM Client
 
-Both methods will assure you the latest version installed on your system.
+Run:
 
-## Check installation
+`trm update trm-server`
 
-To verify trm-server is installed properly:
-1. Open transaction "SE80"
-2. Open package "ZTRM"
-3. Right click on the root package and press "Check > Package Check > Package Objects (Including Subpackages)"
+### Using abapGit
 
-This check should not give any errors.
+-   **Online repository** → Pull from branch `main`
+-   **Offline repository** → Download latest `main` ZIP from GitHub and
+    import again
+
+## Package Consistency Check
+
+1.  Open transaction `SE80`
+
+2.  Open package `ZTRM`
+
+3.  Right-click the root package
+
+4.  Select:
+
+    `Check → Package Check → Package Objects (Including Subpackages)`
+
+The check should not return any errors.
 
 ### Verify RFC Authorization
 
-To verify a user has access to RFC functions exposed by trm-server, log into your system as the user you want to test and execute the function module `ZTRM_PING`.
+To verify that a user has access to RFC functions:
 
-If the user is authorized, it shouldn't give any errors.
+1.  Log into the system as the user you want to test
+2.  Execute function module `ZTRM_PING`
 
-> Remember that, for security reasons, TRM doesn't allow any user to execute RFC functions.
-
-> You can maintain allowed RFC function users in table ZTRM_USERS
+If the user is authorized, no errors should occur. If not authorized,
+access will be denied.

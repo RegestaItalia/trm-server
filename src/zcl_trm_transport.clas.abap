@@ -196,6 +196,15 @@ CLASS zcl_trm_transport DEFINITION
       IMPORTING iv_user TYPE tr_as4user
       RAISING   zcx_trm_exception.
 
+    "! Get import status
+    "! @parameter es_stat         | Status
+    "! @parameter iv_system       | Target system name
+    "! @raising zcx_trm_exception | Raised if status is not found
+    METHODS get_import_status
+      IMPORTING iv_system      TYPE tmssysnam
+      RETURNING VALUE(es_stat) TYPE tpstat
+      RAISING   zcx_trm_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS create
@@ -310,7 +319,9 @@ CLASS zcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_objects.
-    DATA lt_e071 LIKE it_e071.
+    DATA: lt_e071    LIKE it_e071,
+          ls_log     LIKE LINE OF et_log,
+          lv_message TYPE string.
     MOVE it_e071[] TO lt_e071[].
     CALL FUNCTION 'TRINT_REQUEST_CHOICE'
       EXPORTING
@@ -334,6 +345,18 @@ CLASS zcl_trm_transport IMPLEMENTATION.
         OTHERS               = 7.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
+    ENDIF.
+    READ TABLE et_log INTO ls_log WITH KEY severity = 'E'.
+    IF sy-subrc <> 0.
+      READ TABLE et_log INTO ls_log WITH KEY severity = 'A'.
+    ENDIF.
+    IF ls_log IS NOT INITIAL.
+      IF ls_log-ag IS NOT INITIAL.
+        MESSAGE ID ls_log-ag TYPE 'I' NUMBER ls_log-msgnr WITH ls_log-var1 ls_log-var2 ls_log-var3 ls_log-var4 INTO lv_message.
+        zcx_trm_exception=>raise( iv_message = lv_message ).
+      ELSE.
+        zcx_trm_exception=>raise( iv_message = 'Unknown error, check logs.' ).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
@@ -889,6 +912,34 @@ CLASS zcl_trm_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       zcx_trm_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_import_status.
+    DATA: ls_tmsbuffer TYPE tmsbuffer,
+          lt_stats     TYPE tpstats.
+
+    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ iv_system AND trkorr EQ gv_trkorr.
+    CHECK sy-subrc EQ 0.
+    CALL FUNCTION 'TMS_IMU_FILTER_TPSTAT'
+      EXPORTING
+        iv_system   = ls_tmsbuffer-sysnam
+        iv_domain   = ls_tmsbuffer-domnam
+        iv_request  = ls_tmsbuffer-trkorr
+        iv_project  = ls_tmsbuffer-project
+        iv_tarcli   = ls_tmsbuffer-tarcli
+        iv_tpstatid = ls_tmsbuffer-tpstatid
+        iv_jobid    = ls_tmsbuffer-jobid
+        iv_verbose  = 'X'
+      IMPORTING
+        et_tpstat   = lt_stats.
+    IF lt_stats[] IS INITIAL.
+      zcx_trm_exception=>raise(
+        iv_message = 'No import status found for this transport in the target system'
+        iv_reason = zcx_trm_exception=>c_reason-not_found
+      ).
+    ENDIF.
+    SORT lt_stats BY timestamp DESCENDING.
+    es_stat = lt_stats[ 1 ].
   ENDMETHOD.
 
 ENDCLASS.
