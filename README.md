@@ -12,6 +12,9 @@
 
 **trm-server** is the server-side component of TRM.
 
+> [!NOTE]
+> If you're looking for the REST implementation of **trm-server**, head over to [**trm-rest**](https://github.com/RegestaItalia/trm-rest)
+
 It acts as the secure bridge between the **SAP application server** and the **TRM client**.
 
 It exposes the APIs that allow TRM to import/export transports, and, as a consequence, it must be installed **only** on source and target systems, as its not required on any other system in the landscape.
