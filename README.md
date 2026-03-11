@@ -12,6 +12,14 @@
 
 **trm-server** is the server-side component of TRM.
 
+🚚 **TRM (Transport Request Manager)** is a package manager inspired solution built leveraging CTS that simplifies SAP ABAP transports.
+
+<p align="center">
+  <img src="https://docs.trmregistry.com/logo.png" alt="TRM Logo" />
+</p>
+
+TRM introduces **package-based software delivery** to the SAP ecosystem, bringing with it semantic versioning, dependency management, and automated deployment activities.
+
 > [!NOTE]
 > If you're looking for the REST implementation of **trm-server**, head over to [**trm-rest**](https://github.com/RegestaItalia/trm-rest)
 
