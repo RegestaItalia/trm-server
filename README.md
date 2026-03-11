@@ -45,13 +45,13 @@ In a typical scenario, TRM Client connects to a SAP system through a **System Co
 After checking that **trm-server** is installed on the system, the client uses its APIs to perform secure and controlled transport export and import operations.  
 If not installed, the client can still communicate directly with the SAP system, but with limited capabilities and without extended TRM features.
 
-# Documentation <!-- {docsify-remove} -->
+# Documentation
 
 Full documentation can be seen at [https://docs.trmregistry.com](https://docs.trmregistry.com).
 
 To install **trm-server** on your system, [follow the this guide](/docs/setup.md).
 
-# Contributing <!-- {docsify-remove} -->
+# Contributing
 
 Like every other TRM open-soruce projects, contributions are always welcomed ❤️.
 
