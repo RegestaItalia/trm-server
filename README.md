@@ -10,7 +10,7 @@
 | Regesta S.p.A.                                  | [https://www.regestaitalia.eu/](https://www.regestaitalia.eu/) |
 | Clarex S.r.l.                                   | [https://www.clarex.it/](https://www.clarex.it/)               |
 
-**trm-server** is the server-side component of TRM.
+[trm-server](https://trmregistry.com/package/trm-server) is the server-side component of TRM.
 
 🚚 **TRM (Transport Request Manager)** is a package manager inspired solution built leveraging CTS that simplifies SAP ABAP transports.
 
