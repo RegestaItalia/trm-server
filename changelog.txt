@@ -9,6 +9,11 @@ Legend
 - : removed
 
 
+2026-03-24 v6.0.0
+-------------------
+
+! moved from Z to namespace /ATRM/
+
 2026-03-03 v5.2.0
 -------------------
 
