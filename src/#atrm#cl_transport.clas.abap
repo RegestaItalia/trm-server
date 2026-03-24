@@ -12,7 +12,7 @@ CLASS /atrm/cl_transport DEFINITION
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
     CONSTANTS:
       c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
-      c_migrate_object      TYPE nrobj  VALUE 'ZTRMTRKORR',
+      c_migrate_object      TYPE nrobj  VALUE '/ATRM/TRNR',
       c_migrate_subobj      TYPE nrsobj VALUE space,
       c_migrate_toyear      TYPE nryear VALUE '0000'.
 

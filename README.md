@@ -141,7 +141,7 @@ Before using `trm-server`, authorized users must be maintained.
 ### Maintain Authorized Users
 
 1.  Execute transaction `SE16`
-2.  Create a new record in table `ZTRM_USERS`
+2.  Create a new record in table `/ATRM/USERS`
 
 <p align="center">
     <img src="https://docs.trmregistry.com/server/images/se16_1.png" alt="SE16">
@@ -175,7 +175,7 @@ Run:
 
 1.  Open transaction `SE80`
 
-2.  Open package `ZTRM`
+2.  Open package `$TRM`
 
 3.  Right-click the root package
 
@@ -190,7 +190,7 @@ The check should not return any errors.
 To verify that a user has access to RFC functions:
 
 1.  Log into the system as the user you want to test
-2.  Execute function module `ZTRM_PING`
+2.  Execute function module `/ATRM/PING`
 
 If the user is authorized, no errors should occur. If not authorized,
 access will be denied.

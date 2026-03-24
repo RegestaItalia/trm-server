@@ -178,33 +178,33 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD add_skip_trkorr.
     DATA ls_dummy TYPE /atrm/skiptrkorr.
     ls_dummy-trkorr = trkorr.
-    enqueue( tabname = 'ZTRM_SKIP_TRKORR' ).
+    enqueue( tabname = '/ATRM/SKIPTRKORR' ).
     INSERT /atrm/skiptrkorr FROM ls_dummy.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_SKIP_TRKORR' ).
+    dequeue( tabname = '/ATRM/SKIPTRKORR' ).
   ENDMETHOD.
 
   METHOD remove_skip_trkorr.
-    enqueue( tabname = 'ZTRM_SKIP_TRKORR' ).
+    enqueue( tabname = '/ATRM/SKIPTRKORR' ).
     DELETE FROM /atrm/skiptrkorr WHERE trkorr EQ trkorr.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_SKIP_TRKORR' ).
+    dequeue( tabname = '/ATRM/SKIPTRKORR' ).
   ENDMETHOD.
 
   METHOD add_source_trkorr.
     DATA ls_dummy TYPE /atrm/src_trkorr.
     ls_dummy-trkorr = trkorr.
-    enqueue( tabname = 'ZTRM_SRC_TRKORR' ).
+    enqueue( tabname = '/ATRM/SRC_TRKORR' ).
     INSERT /atrm/src_trkorr FROM ls_dummy.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_SRC_TRKORR' ).
+    dequeue( tabname = '/ATRM/SRC_TRKORR' ).
   ENDMETHOD.
 
   METHOD remove_source_trkorr.
-    enqueue( tabname = 'ZTRM_SRC_TRKORR' ).
+    enqueue( tabname = '/ATRM/SRC_TRKORR' ).
     DELETE FROM /atrm/src_trkorr WHERE trkorr EQ trkorr.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_SRC_TRKORR' ).
+    dequeue( tabname = '/ATRM/SRC_TRKORR' ).
   ENDMETHOD.
 
   METHOD check_functions_authorization.
@@ -323,19 +323,19 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
 
   METHOD add_install_devclass.
     DATA ls_installdevc LIKE LINE OF installdevc.
-    enqueue( tabname = 'ZTRM_INSTALLDEVC' ).
+    enqueue( tabname = '/ATRM/INSTDEVC' ).
     LOOP AT installdevc INTO ls_installdevc.
       MODIFY /atrm/instdevc FROM ls_installdevc.
     ENDLOOP.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_INSTALLDEVC' ).
+    dequeue( tabname = '/ATRM/INSTDEVC' ).
   ENDMETHOD.
 
   METHOD add_package_integrity.
-    enqueue( tabname = 'ZTRM_INTEGRITY' ).
+    enqueue( tabname = '/ATRM/INTEGRITY' ).
     MODIFY /atrm/integrity FROM integrity.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_INTEGRITY' ).
+    dequeue( tabname = '/ATRM/INTEGRITY' ).
   ENDMETHOD.
 
   METHOD tadir_interface.
@@ -413,31 +413,31 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_migration_tmsbuffer.
-    enqueue( tabname = 'ZTRM_TMSBUFFER' ).
+    enqueue( tabname = '/ATRM/TMSBUFFER' ).
     MODIFY /atrm/tmsbuffer FROM TABLE data.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_TMSBUFFER' ).
+    dequeue( tabname = '/ATRM/TMSBUFFER' ).
   ENDMETHOD.
 
   METHOD add_migration_doktl.
-    enqueue( tabname = 'ZTRM_DOKTL' ).
+    enqueue( tabname = '/ATRM/DOKTL' ).
     MODIFY /atrm/doktl FROM TABLE data.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_DOKTL' ).
+    dequeue( tabname = '/ATRM/DOKTL' ).
   ENDMETHOD.
 
   METHOD add_migration_e071.
-    enqueue( tabname = 'ZTRM_E071' ).
+    enqueue( tabname = '/ATRM/E071' ).
     MODIFY /atrm/e071 FROM TABLE data.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_E071' ).
+    dequeue( tabname = '/ATRM/E071' ).
   ENDMETHOD.
 
   METHOD add_migration_e070.
-    enqueue( tabname = 'ZTRM_E070' ).
+    enqueue( tabname = '/ATRM/E070' ).
     MODIFY /atrm/e070 FROM TABLE data.
     COMMIT WORK AND WAIT.
-    dequeue( tabname = 'ZTRM_E070' ).
+    dequeue( tabname = '/ATRM/E070' ).
   ENDMETHOD.
 
   METHOD append_messages_from_memory.
