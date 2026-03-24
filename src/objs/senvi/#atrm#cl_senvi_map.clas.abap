@@ -42,7 +42,7 @@ CLASS /atrm/cl_senvi_map IMPLEMENTATION.
 
   METHOD get.
     DATA lv_class_name TYPE string.
-    CONCATENATE 'ZCL_TRM_SENVI_' senvi-type INTO lv_class_name.
+    CONCATENATE '/ATRM/CL_SENVI_' senvi-type INTO lv_class_name.
     TRANSLATE lv_class_name TO UPPER CASE.
     TRY.
         CREATE OBJECT map TYPE (lv_class_name)
