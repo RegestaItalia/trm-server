@@ -43,19 +43,6 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
-    "! Find the transport that currently locks the specified object
-    "! @parameter pgmid | Program ID
-    "! @parameter object | Object type
-    "! @parameter obj_name | Object name
-    "! @parameter transport | Transport containing the object lock
-    "! @raising /atrm/cx_exception | Raised if lookup fails
-    CLASS-METHODS find_object_lock
-      IMPORTING pgmid            TYPE pgmid
-                object           TYPE trobjtype
-                obj_name         TYPE trobj_name
-      RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
-      RAISING   /atrm/cx_exception.
-
     "! Read the TMS import queue for a system
     "! @parameter target | Target system name
     "! @parameter requests | Returned queue requests
@@ -503,28 +490,6 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       syst-msgv3 = ls_exception-msgv3.
       syst-msgv4 = ls_exception-msgv4.
       /atrm/cx_exception=>raise( it_log = lt_log ).
-    ENDIF.
-  ENDMETHOD.
-
-  METHOD find_object_lock.
-    DATA: ls_e070   TYPE e070,
-          lv_trkorr TYPE trkorr.
-    SELECT SINGLE e070~trkorr e070~strkorr
-    FROM e071
-    INNER JOIN e070 ON e070~trkorr = e071~trkorr
-    INTO CORRESPONDING FIELDS OF ls_e070
-    WHERE e071~pgmid EQ pgmid AND e071~object EQ object AND e071~obj_name EQ obj_name
-          AND ( e070~trfunction EQ 'K' OR e070~trfunction EQ 'S' OR e070~trfunction EQ 'R' )
-          AND e070~trstatus EQ 'D'.
-
-    IF ls_e070-strkorr IS NOT INITIAL.
-      lv_trkorr = ls_e070-strkorr.
-    ELSE.
-      lv_trkorr = ls_e070-trkorr.
-    ENDIF.
-
-    IF lv_trkorr IS NOT INITIAL.
-      CREATE OBJECT transport EXPORTING trkorr = lv_trkorr.
     ENDIF.
   ENDMETHOD.
 

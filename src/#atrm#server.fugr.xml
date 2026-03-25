@@ -1367,27 +1367,19 @@
      </DOCUMENTATION>
     </item>
     <item>
-     <FUNCNAME>/ATRM/GET_OBJ_LOCK_TR</FUNCNAME>
+     <FUNCNAME>/ATRM/GET_PACKAGE_OBJ_LOCKS</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
-     <SHORT_TEXT>Find lock on object</SHORT_TEXT>
+     <SHORT_TEXT>Get package objects locks</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
-       <PARAMETER>PGMID</PARAMETER>
-       <TYP>PGMID</TYP>
-      </RSIMP>
-      <RSIMP>
-       <PARAMETER>OBJECT</PARAMETER>
-       <TYP>TROBJTYPE</TYP>
-      </RSIMP>
-      <RSIMP>
-       <PARAMETER>OBJ_NAME</PARAMETER>
-       <TYP>TROBJ_NAME</TYP>
+       <PARAMETER>DEVCLASS</PARAMETER>
+       <TYP>DEVCLASS</TYP>
       </RSIMP>
      </IMPORT>
      <EXPORT>
       <RSEXP>
-       <PARAMETER>TRKORR</PARAMETER>
-       <TYP>TRKORR</TYP>
+       <PARAMETER>LOCKS</PARAMETER>
+       <TYP>/ATRM/OBJECT_LOCK_T</TYP>
       </RSEXP>
      </EXPORT>
      <EXCEPTION>
@@ -1403,19 +1395,11 @@
      </EXCEPTION>
      <DOCUMENTATION>
       <RSFDO>
-       <PARAMETER>PGMID</PARAMETER>
+       <PARAMETER>DEVCLASS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>OBJECT</PARAMETER>
-       <KIND>P</KIND>
-      </RSFDO>
-      <RSFDO>
-       <PARAMETER>OBJ_NAME</PARAMETER>
-       <KIND>P</KIND>
-      </RSFDO>
-      <RSFDO>
-       <PARAMETER>TRKORR</PARAMETER>
+       <PARAMETER>LOCKS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
