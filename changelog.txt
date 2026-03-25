@@ -13,6 +13,7 @@ Legend
 -------------------
 
 ! moved from Z to namespace /ATRM/
+! get objs locks methods
 
 2026-03-03 v5.2.0
 -------------------
