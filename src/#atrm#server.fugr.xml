@@ -10,6 +10,7 @@
    <FUNCTIONS>
     <item>
      <FUNCNAME>/ATRM/ADD_LANG_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add language transport to transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -59,6 +60,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/ADD_NAMESPACE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add namespace</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -116,6 +118,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/ADD_OBJS_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add objects to transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -184,6 +187,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/ADD_SKIP_TRKORR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add to transports ignored by TRM</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -237,6 +241,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/ADD_SRC_TRKORR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add transport to source</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -290,6 +295,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CHANGE_TR_OWNER</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Change transport owner</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -337,6 +343,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CHECK_AUTH</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Check user authorization fo TRM usage</SHORT_TEXT>
      <EXCEPTION>
       <RSEXC>
@@ -352,6 +359,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CREATE_IMPORT_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Create import (workbench) transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -409,6 +417,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CREATE_LOG_POLLING</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Create log polling</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -460,6 +469,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CREATE_PACKAGE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Create SAP Package</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -506,6 +516,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/CREATE_TOC</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Create TOC (Transport of copies)</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -563,6 +574,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/DELETE_LOG_POLLING</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Delete log polling</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -603,6 +615,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/DELETE_TRANSPORT</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Delete transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -642,6 +655,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/DEL_TRANSPORT_TMS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Delete transport from queue</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -689,6 +703,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/DEQUEUE_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Dequeue transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -735,6 +750,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/EXECUTE_POST_ACTIVITY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Execute a post activity</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -810,6 +826,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/FORWARD_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Forward transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -875,6 +892,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_ABAPGIT_SOURCE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get package abapGit source code</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -946,6 +964,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_BINARY_FILE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get a binary file</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -995,6 +1014,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_DEPENDENCIES</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get package dependencies (what-uses list)</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1063,6 +1083,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_DEPENDENCIES_SINGLE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get single object dependencies</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1113,6 +1134,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_DEVCLASS_OBJS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get objects in package</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1162,6 +1184,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_DIR_TRANS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get DIR_TRANS parameter value</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1201,6 +1224,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_DOT_ABAPGIT</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get package .abapGit.xml</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1257,6 +1281,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_FILE_SYS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get file system type</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1303,6 +1328,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_INSTALLED_PACKAGES</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get TRM installed packages</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1342,6 +1368,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_OBJ_LOCK_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Find lock on object</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1407,6 +1434,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_R3TRANS_INFO</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get R3trans info</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1453,6 +1481,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_TRANSPORT_LAYER</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get default transport layer</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1492,6 +1521,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/GET_TR_IMPORT_STATUS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get transport import status</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1549,6 +1579,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/IMPORT_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Import transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1596,6 +1627,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/LIST_OBJECT_TYPES</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>List system object types</SHORT_TEXT>
      <TABLES>
       <RSTBL>
@@ -1635,6 +1667,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/MIGRATE_TRANSPORT</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Migrate transport to TRM (overwriting)</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1699,6 +1732,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/PING</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Pong!</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -1724,6 +1758,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/READ_LOG_POLLING</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Read log (polling)</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1775,6 +1810,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/READ_TMS_QUEUE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Read TMS queue</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1831,6 +1867,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/REFRESH_TR_TMS_TXT</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Refresh transport request description in TMS</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1870,6 +1907,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/RELEASE_TR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Release transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1927,6 +1965,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/REMOVE_SKIP_TRKORR</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Remove transport from skip trkorr list</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -1980,6 +2019,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/REMOVE_TR_COMMENTS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Remove comments from transport request</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2020,6 +2060,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/RENAME_TRANSPORT_REQUEST</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Change transport request description</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2081,6 +2122,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/SET_INSTALL_DEVC</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Update install package table</SHORT_TEXT>
      <TABLES>
       <RSTBL>
@@ -2135,6 +2177,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/SET_INTEGRITY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Set TRM package integrity</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2189,6 +2232,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/SET_TRANSPORT_DOC</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Set transport documentation</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2252,6 +2296,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/TADIR_INTERFACE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>TADIR Interface</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2343,6 +2388,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/TDEVC_INTERFACE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>TDEVC Interface</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2409,6 +2455,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/TR_COPY</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Copy transport objects into another</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
@@ -2464,6 +2511,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/VERSION</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get trm versions</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
@@ -2488,6 +2536,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/WRITE_BINARY_FILE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Write a binary file</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
