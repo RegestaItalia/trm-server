@@ -1425,21 +1425,21 @@
      </DOCUMENTATION>
     </item>
     <item>
-     <FUNCNAME>/ATRM/GET_PACKAGE_OBJ_LOCKS</FUNCNAME>
+     <FUNCNAME>/ATRM/GET_OBJS_LOCKS</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
-     <SHORT_TEXT>Get package objects locks</SHORT_TEXT>
-     <IMPORT>
-      <RSIMP>
-       <PARAMETER>DEVCLASS</PARAMETER>
-       <TYP>DEVCLASS</TYP>
-      </RSIMP>
-     </IMPORT>
+     <SHORT_TEXT>Get locks on objects</SHORT_TEXT>
      <EXPORT>
       <RSEXP>
        <PARAMETER>LOCKS</PARAMETER>
        <TYP>/ATRM/OBJECT_LOCK_T</TYP>
       </RSEXP>
      </EXPORT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>OBJECTS</PARAMETER>
+       <DBSTRUCT>TADIR</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
      <EXCEPTION>
       <RSEXC>
        <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
@@ -1453,11 +1453,11 @@
      </EXCEPTION>
      <DOCUMENTATION>
       <RSFDO>
-       <PARAMETER>DEVCLASS</PARAMETER>
+       <PARAMETER>LOCKS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
-       <PARAMETER>LOCKS</PARAMETER>
+       <PARAMETER>OBJECTS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>

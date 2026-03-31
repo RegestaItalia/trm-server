@@ -6,6 +6,7 @@ CLASS /atrm/cl_utilities DEFINITION
   PUBLIC SECTION.
 
     TYPES: tyt_ko100               TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
+           tyt_tadir               TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY,
            tyt_installdevc         TYPE STANDARD TABLE OF /atrm/instdevc WITH DEFAULT KEY,
            tyt_trnspacett          TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY,
            tyt_migration_tmsbuffer TYPE STANDARD TABLE OF /atrm/tmsbuffer WITH DEFAULT KEY,
@@ -165,6 +166,12 @@ CLASS /atrm/cl_utilities DEFINITION
       CHANGING
         messages TYPE symsg_tab.
 
+    "! Returns for all objects the transport request that locks them, if any
+    "! @parameter objects | TADIR key table to check for locks
+    "! @parameter locks | Table with object keys and corresponding lock
+    CLASS-METHODS get_objs_locks
+      IMPORTING objects      TYPE tyt_tadir
+      RETURNING VALUE(locks) TYPE /atrm/object_lock_t.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -498,6 +505,49 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       READ TABLE messages TRANSPORTING NO FIELDS WITH KEY table_line = ls_message.
       CHECK sy-subrc <> 0.
       APPEND ls_message TO messages.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD get_objs_locks.
+    TYPES: BEGIN OF ty_aux,
+             pgmid    TYPE e071-pgmid,
+             object   TYPE e071-object,
+             obj_name TYPE e071-obj_name,
+             trkorr   TYPE e070-trkorr,
+             strkorr  TYPE e070-strkorr,
+           END OF ty_aux.
+    DATA: ls_object      LIKE LINE OF objects,
+          lt_objects_aux TYPE STANDARD TABLE OF ty_aux,
+          lt_result_aux  TYPE STANDARD TABLE OF ty_aux,
+          ls_result_aux  LIKE LINE OF lt_result_aux.
+    FIELD-SYMBOLS: <fs_object_aux> TYPE ty_aux,
+                   <fs_obj_lock>   TYPE /atrm/object_lock.
+    LOOP AT objects INTO ls_object.
+      UNASSIGN <fs_object_aux>.
+      APPEND INITIAL LINE TO lt_objects_aux ASSIGNING <fs_object_aux>.
+      MOVE-CORRESPONDING ls_object TO <fs_object_aux>.
+    ENDLOOP.
+    SELECT pgmid object obj_name trkorr strkorr
+      FROM /atrm/v_obj_lock
+      INTO CORRESPONDING FIELDS OF TABLE lt_result_aux
+      FOR ALL ENTRIES IN lt_objects_aux
+      WHERE pgmid EQ lt_objects_aux-pgmid
+        AND object EQ lt_objects_aux-object
+        AND obj_name EQ lt_objects_aux-obj_name
+        AND trstatus EQ 'D' OR trstatus EQ 'L'.
+    LOOP AT lt_result_aux INTO ls_result_aux.
+      UNASSIGN <fs_obj_lock>.
+      READ TABLE locks TRANSPORTING NO FIELDS WITH KEY pgmid = ls_result_aux-pgmid object = ls_result_aux-object obj_name = ls_result_aux-obj_name.
+      CHECK sy-subrc <> 0.
+      APPEND INITIAL LINE TO locks ASSIGNING <fs_obj_lock>.
+      <fs_obj_lock>-pgmid = ls_result_aux-pgmid.
+      <fs_obj_lock>-object = ls_result_aux-object.
+      <fs_obj_lock>-obj_name = ls_result_aux-obj_name.
+      IF ls_result_aux-strkorr IS NOT INITIAL.
+        <fs_obj_lock>-trkorr = ls_result_aux-strkorr.
+      ELSE.
+        <fs_obj_lock>-trkorr = ls_result_aux-trkorr.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 

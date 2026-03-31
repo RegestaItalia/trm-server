@@ -1,10 +1,10 @@
-FUNCTION /ATRM/GET_PACKAGE_OBJ_LOCKS.
+FUNCTION /ATRM/GET_OBJS_LOCKS.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
-*"  IMPORTING
-*"     VALUE(DEVCLASS) TYPE  DEVCLASS
 *"  EXPORTING
 *"     VALUE(LOCKS) TYPE  /ATRM/OBJECT_LOCK_T
+*"  TABLES
+*"      OBJECTS STRUCTURE  TADIR
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
@@ -13,12 +13,9 @@ FUNCTION /ATRM/GET_PACKAGE_OBJ_LOCKS.
   PERFORM check_auth.
 
   TRY.
-    CREATE OBJECT go_package EXPORTING devclass = devclass.
-    go_package->get_objs_lock(
+    locks = /ATRM/CL_UTILITIES=>get_objs_locks(
       EXPORTING
-        incl_sub = 'X'
-      RECEIVING
-        obj_lock = locks[]
+        objects = objects[]
     ).
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.

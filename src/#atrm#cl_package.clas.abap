@@ -27,11 +27,6 @@ CLASS /atrm/cl_package DEFINITION
                 devlayer    TYPE devlayer OPTIONAL
       RAISING   /atrm/cx_exception.
 
-    METHODS get_objs_lock
-      IMPORTING incl_sub        TYPE flag DEFAULT ' '
-      RETURNING VALUE(obj_lock) TYPE /atrm/object_lock_t
-      RAISING   /atrm/cx_exception.
-
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA: gv_devclass TYPE devclass.
@@ -351,58 +346,6 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         no_output_parameter_requested = 6
         OTHERS                        = 7
     ).
-  ENDMETHOD.
-
-  METHOD get_objs_lock.
-    TYPES: BEGIN OF ty_aux,
-             pgmid    TYPE e071-pgmid,
-             object   TYPE e071-object,
-             obj_name TYPE e071-obj_name,
-             trkorr   TYPE e070-trkorr,
-             strkorr  TYPE e070-strkorr,
-           END OF ty_aux.
-    DATA: lt_objects     TYPE scts_tadir,
-          ls_object      LIKE LINE OF lt_objects,
-          lt_objects_aux TYPE STANDARD TABLE OF ty_aux,
-          lt_result_aux  TYPE STANDARD TABLE OF ty_aux,
-          ls_result_aux  LIKE LINE OF lt_result_aux.
-    FIELD-SYMBOLS: <fs_object_aux> TYPE ty_aux,
-                   <fs_obj_lock>   TYPE /atrm/object_lock.
-    get_objects(
-      EXPORTING
-        incl_sub = incl_sub
-      IMPORTING
-        tadir    = lt_objects
-    ).
-    DELETE lt_objects WHERE pgmid EQ 'R3TR' AND object EQ 'DEVC'.
-    CHECK lt_objects[] IS NOT INITIAL.
-    LOOP AT lt_objects INTO ls_object.
-      UNASSIGN <fs_object_aux>.
-      APPEND INITIAL LINE TO lt_objects_aux ASSIGNING <fs_object_aux>.
-      MOVE-CORRESPONDING ls_object TO <fs_object_aux>.
-    ENDLOOP.
-    SELECT pgmid object obj_name trkorr strkorr
-      FROM /atrm/v_obj_lock
-      INTO CORRESPONDING FIELDS OF TABLE lt_result_aux
-      FOR ALL ENTRIES IN lt_objects_aux
-      WHERE pgmid EQ lt_objects_aux-pgmid
-        AND object EQ lt_objects_aux-object
-        AND obj_name EQ lt_objects_aux-obj_name
-        AND trstatus EQ 'D' OR trstatus EQ 'L'.
-    LOOP AT lt_result_aux INTO ls_result_aux.
-      UNASSIGN <fs_obj_lock>.
-      READ TABLE obj_lock TRANSPORTING NO FIELDS WITH KEY pgmid = ls_result_aux-pgmid object = ls_result_aux-object obj_name = ls_result_aux-obj_name.
-      CHECK sy-subrc <> 0.
-      APPEND INITIAL LINE TO obj_lock ASSIGNING <fs_obj_lock>.
-      <fs_obj_lock>-pgmid = ls_result_aux-pgmid.
-      <fs_obj_lock>-object = ls_result_aux-object.
-      <fs_obj_lock>-obj_name = ls_result_aux-obj_name.
-      IF ls_result_aux-strkorr IS NOT INITIAL.
-        <fs_obj_lock>-trkorr = ls_result_aux-strkorr.
-      ELSE.
-        <fs_obj_lock>-trkorr = ls_result_aux-trkorr.
-      ENDIF.
-    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
