@@ -696,6 +696,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           ls_e070          LIKE LINE OF lt_e070,
           lt_trm_e070      TYPE /atrm/cl_utilities=>tyt_migration_e070,
           ls_trm_e070      LIKE LINE OF lt_trm_e070,
+          lt_e07t          TYPE STANDARD TABLE OF e07t,
+          ls_e07t          LIKE LINE OF lt_e07t,
+          lt_trm_e07t      TYPE /atrm/cl_utilities=>tyt_migration_e07t,
+          ls_trm_e07t      LIKE LINE OF lt_trm_e07t,
           ls_skip_trkorr   TYPE /atrm/skiptrkorr,
           ls_src_trkorr    TYPE /atrm/src_trkorr.
 
@@ -771,6 +775,18 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDLOOP.
     IF lt_trm_e070[] IS NOT INITIAL.
       /atrm/cl_utilities=>add_migration_e070( data = lt_trm_e070 ).
+    ENDIF.
+
+    " copy e07t
+    SELECT * FROM e07t INTO TABLE lt_e07t WHERE trkorr EQ gv_trkorr.
+    LOOP AT lt_e07t INTO ls_e07t.
+      CLEAR ls_trm_e07t.
+      MOVE-CORRESPONDING ls_e07t TO ls_trm_e07t.
+      ls_trm_e07t-trm_trokrr = lv_trm_trkorr.
+      APPEND ls_trm_e07t TO lt_trm_e07t.
+    ENDLOOP.
+    IF lt_trm_e07t[] IS NOT INITIAL.
+      /atrm/cl_utilities=>add_migration_e07t( data = lt_trm_e07t ).
     ENDIF.
 
     " move skip trkorr (if exists)

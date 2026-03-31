@@ -11,7 +11,8 @@ CLASS /atrm/cl_utilities DEFINITION
            tyt_migration_tmsbuffer TYPE STANDARD TABLE OF /atrm/tmsbuffer WITH DEFAULT KEY,
            tyt_migration_doktl     TYPE STANDARD TABLE OF /atrm/doktl WITH DEFAULT KEY,
            tyt_migration_e071      TYPE STANDARD TABLE OF /atrm/e071 WITH DEFAULT KEY,
-           tyt_migration_e070      TYPE STANDARD TABLE OF /atrm/e070 WITH DEFAULT KEY.
+           tyt_migration_e070      TYPE STANDARD TABLE OF /atrm/e070 WITH DEFAULT KEY,
+           tyt_migration_e07t      TYPE STANDARD TABLE OF /atrm/e07t WITH DEFAULT KEY.
 
     "! Check if current user is authorized to execute TRM functions
     "! @parameter authorized | 'X' if authorized
@@ -150,6 +151,12 @@ CLASS /atrm/cl_utilities DEFINITION
     "! @parameter data | Data
     CLASS-METHODS add_migration_e070
       IMPORTING data TYPE tyt_migration_e070
+      RAISING   /atrm/cx_exception.
+
+    "! Add E07T data to migration tables
+    "! @parameter data | Data
+    CLASS-METHODS add_migration_e07t
+      IMPORTING data TYPE tyt_migration_e07t
       RAISING   /atrm/cx_exception.
 
     "! Reads messages from memory (e.g., after SUBMIT) and appends them to the provided message table
@@ -438,6 +445,13 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     MODIFY /atrm/e070 FROM TABLE data.
     COMMIT WORK AND WAIT.
     dequeue( tabname = '/ATRM/E070' ).
+  ENDMETHOD.
+
+  METHOD add_migration_e07t.
+    enqueue( tabname = '/ATRM/E07T' ).
+    MODIFY /atrm/e07t FROM TABLE data.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/E07T' ).
   ENDMETHOD.
 
   METHOD append_messages_from_memory.
