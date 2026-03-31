@@ -32,6 +32,17 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
+    "! Create a new customizing request
+    "! @parameter text | Description of the transport
+    "! @parameter target | Target system
+    "! @parameter transport | Created transport object
+    "! @raising /atrm/cx_exception | Raised if creation fails
+    CLASS-METHODS create_customizing
+      IMPORTING text             TYPE as4text
+                target           TYPE tr_target
+      RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
+      RAISING   /atrm/cx_exception.
+
     "! Create a transport of copies
     "! @parameter text | Description of the transport
     "! @parameter target | Target system
@@ -390,6 +401,17 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         text      = text
         target    = target
         type      = 'K'
+      RECEIVING
+        transport = transport
+    ).
+  ENDMETHOD.
+
+  METHOD create_customizing.
+    create(
+      EXPORTING
+        text      = text
+        target    = target
+        type      = 'W'
       RECEIVING
         transport = transport
     ).
