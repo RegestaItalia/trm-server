@@ -61,7 +61,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
 
     TRY.
-        CALL METHOD ('CL_PACKAGE_FACTORY')=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
+        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
           EXPORTING
             i_reuse_deleted_object = 'X'
             i_suppress_dialog      = 'X'
@@ -78,24 +78,22 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    lo_package->save(
+    CALL METHOD lo_package->('SAVE')
       EXPORTING
         i_suppress_dialog      = 'X'
         i_suppress_corr_insert = 'X'
       EXCEPTIONS
-        OTHERS                 = 1
-    ).
+        OTHERS                 = 1.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    lo_package->set_changeable(
+    CALL METHOD lo_package->('SET_CHANGEABLE')
       EXPORTING
         i_changeable      = ' '
         i_suppress_dialog = 'X'
       EXCEPTIONS
-        OTHERS            = 1
-    ).
+        OTHERS            = 1.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
