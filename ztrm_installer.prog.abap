@@ -32,6 +32,12 @@ REPORT ztrm_installer.
 *                                                                 *
 *******************************************************************
 
+TYPES: BEGIN OF ty_vscan_f4,
+         profile TYPE vscan_prof-profile,
+         text    TYPE vscan_proft-text,
+       END OF ty_vscan_f4.
+DATA vscan     TYPE STANDARD TABLE OF ty_vscan_f4.
+
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
   SELECTION-SCREEN SKIP.
   SELECTION-SCREEN COMMENT 1(77) sc_txt1.
@@ -59,7 +65,9 @@ END OF BLOCK psel.
 SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
   SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
     PARAMETERS:
-      p_id TYPE strustssl-applic DEFAULT 'ANONYM'.
+      p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
+      p_vscan  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND vscan,
+      p_vscanp TYPE vscan_profile DEFAULT '/SIHTTP/HTTP_DOWNLOAD'.
   SELECTION-SCREEN END OF BLOCK sc_serv.
 
   SELECTION-SCREEN SKIP.
@@ -431,6 +439,7 @@ CLASS lcl_report IMPLEMENTATION.
              checksum      TYPE string,
            END OF release.
     DATA:
+      vscan_check     TYPE http_content_check,
       code            TYPE i,
       client          TYPE REF TO if_http_client,
       reason          TYPE string,
@@ -440,6 +449,11 @@ CLASS lcl_report IMPLEMENTATION.
       release         TYPE release,
       file            TYPE xstring.
 
+    IF p_vscan EQ 'X'.
+      vscan_check = 'A'.
+    ELSE.
+      vscan_check = 'N'.
+    ENDIF.
     cl_progress_indicator=>progress_indicate(
         i_text = 'Checking connection to TRM Registry...'
         i_output_immediately = 'X' ).
@@ -551,8 +565,8 @@ CLASS lcl_report IMPLEMENTATION.
       RETURN.
     ENDIF.
     file = client->response->get_data(
-*             virus_scan_profile = '/SIHTTP/HTTP_UPLOAD'
-*             vscan_scan_always  = if_http_entity=>co_content_check_profile
+      virus_scan_profile = p_vscanp
+      vscan_scan_always  = vscan_check
     ).
     handle_release(
       EXPORTING
@@ -615,8 +629,8 @@ CLASS lcl_report IMPLEMENTATION.
         RETURN.
       ENDIF.
       file = client->response->get_data(
-*             virus_scan_profile = '/SIHTTP/HTTP_UPLOAD'
-*             vscan_scan_always  = if_http_entity=>co_content_check_profile
+        virus_scan_profile = p_vscanp
+        vscan_scan_always  = vscan_check
       ).
       handle_release(
         EXPORTING
@@ -1306,17 +1320,30 @@ AT SELECTION-SCREEN.
   ENDCASE.
 
 AT SELECTION-SCREEN OUTPUT.
-  %_p_id_%_app_%-text    = 'SSL Client Identity'.
-  %_p_proxy_%_app_%-text = 'Hostname/IP'.
-  %_p_pport_%_app_%-text = 'Port'.
-  %_p_puser_%_app_%-text = 'Username'.
-  %_p_ppwd_%_app_%-text  = 'Password'.
+  %_p_id_%_app_%-text     = 'SSL Client Identity'.
+  %_p_vscan_%_app_%-text  = 'Use virus scan'.
+  %_p_vscanp_%_app_%-text = 'Virus scan profile'.
+  %_p_proxy_%_app_%-text  = 'Hostname/IP'.
+  %_p_pport_%_app_%-text  = 'Port'.
+  %_p_puser_%_app_%-text  = 'Username'.
+  %_p_ppwd_%_app_%-text   = 'Password'.
   %_p_lserv_%_app_%-text  = 'trm-server package'.
   %_p_lrest_%_app_%-text  = 'trm-rest package'.
   LOOP AT SCREEN.
     IF screen-name EQ 'P_PPWD'.
       screen-invisible = 1.
       MODIFY SCREEN.
+    ENDIF.
+    IF p_vscan EQ 'X'.
+      IF screen-name EQ 'P_VSCANP'.
+        screen-active = 1.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSE.
+      IF screen-name EQ 'P_VSCANP'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
     ENDIF.
     IF p_rest EQ 'X'.
       IF screen-name EQ 'P_LREST'.
@@ -1347,6 +1374,31 @@ AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_lserv.
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_lrest.
   PERFORM choose_file CHANGING p_lrest.
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_vscanp.
+  DATA lt_return TYPE STANDARD TABLE OF ddshretval.
+  IF vscan[] IS INITIAL.
+    SELECT vscan_prof~profile vscan_proft~text
+      FROM vscan_prof
+      LEFT OUTER JOIN vscan_proft ON vscan_proft~profile = vscan_prof~profile
+                                 AND vscan_proft~spras = sy-langu
+      INTO TABLE vscan.
+  ENDIF.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield   = 'PROFILE'
+      value_org  = 'S'
+      dynpprog   = sy-repid
+      dynpnr     = sy-dynnr
+    TABLES
+      value_tab  = vscan
+      return_tab = lt_return.
+
+  IF lt_return IS NOT INITIAL  .
+    p_vscanp = lt_return[ 1 ]-fieldval.
+  ENDIF.
 
 FORM choose_file CHANGING file TYPE rlgrap-filename.
   DATA: lt_filetable TYPE filetable,
