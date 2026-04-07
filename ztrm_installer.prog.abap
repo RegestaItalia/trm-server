@@ -93,8 +93,8 @@ CLASS lcl_report DEFINITION.
 
   PUBLIC SECTION.
     CONSTANTS: base_url      TYPE string VALUE 'https://trmregistry.com/registry',
-               server_trkorr TYPE trkorr VALUE 'A4HK900115',
-               rest_trkorr   TYPE trkorr VALUE 'A4HK900115'.
+               server_trkorr TYPE trkorr VALUE 'A4HK999999',
+               rest_trkorr   TYPE trkorr VALUE 'A4HK9A0002'.
     METHODS run.
     CLASS-METHODS get_versions
       EXPORTING server TYPE string
