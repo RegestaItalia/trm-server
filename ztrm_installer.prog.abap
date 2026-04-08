@@ -1263,8 +1263,8 @@ INITIALIZATION.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
   %_p_rest_%_app_%-text  = 'Install trm-rest'.
-  online                 = 'Online install'.
-  offline                = 'Offline install'.
+  online                 = '@Y4@ Online install'.
+  offline                = '@FP@ Offline install'.
 
   psel-prog      = sy-repid.
   psel-dynnr     = 100.
