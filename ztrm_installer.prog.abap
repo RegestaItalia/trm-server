@@ -925,10 +925,7 @@ CLASS lcl_report IMPLEMENTATION.
       node                  LIKE LINE OF hierarchy,
       sap_package           TYPE scompkdtln,
       sap_package_instance  TYPE REF TO if_package.
-    IF subrc <> 0.
-      display_error( 'Error getting default transport layer' ).
-      RETURN.
-    ENDIF.
+
     get_file_sys(
       IMPORTING
         file_sys = filesys
