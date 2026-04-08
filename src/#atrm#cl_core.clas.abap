@@ -20,10 +20,16 @@ CLASS /atrm/cl_core DEFINITION
              transport TYPE ty_trm_transport,
              trkorr    TYPE trkorr,
              timestamp TYPE timestamp,
-           END OF ty_trm_package.
+           END OF ty_trm_package,
+           BEGIN OF ty_trm_package2,
+             tdevc    TYPE tyt_tdevc,
+             manifest TYPE xstring,
+             trkorr   TYPE trkorr,
+           END OF ty_trm_package2.
     TYPES: tyt_trkorr           TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
            tyt_migration_trkorr TYPE STANDARD TABLE OF /atrm/trkorr WITH DEFAULT KEY,
-           tyt_trm_package      TYPE STANDARD TABLE OF ty_trm_package WITH DEFAULT KEY.
+           tyt_trm_package      TYPE STANDARD TABLE OF ty_trm_package WITH DEFAULT KEY,
+           tyt_trm_package2     TYPE STANDARD TABLE OF ty_trm_package2 WITH DEFAULT KEY.
 
     CLASS-METHODS get_source_trkorr
       RETURNING VALUE(trkorr) TYPE tyt_trkorr.
@@ -32,6 +38,8 @@ CLASS /atrm/cl_core DEFINITION
 
     CLASS-METHODS get_installed_packages
       RETURNING VALUE(packages) TYPE tyt_trm_package.
+    CLASS-METHODS get_installed_packages_v2
+      RETURNING VALUE(packages) TYPE tyt_trm_package2.
 
     CLASS-METHODS get_lockfile
       IMPORTING package_name     TYPE /atrm/package_name
@@ -376,6 +384,17 @@ CLASS /atrm/cl_core IMPLEMENTATION.
 
   METHOD get_lockfile.
     " TODO
+  ENDMETHOD.
+
+  METHOD get_installed_packages_v2.
+    DATA: packages_data TYPE STANDARD TABLE OF /atrm/packages,
+          package_data  LIKE LINE OF packages_data,
+          data          TYPE /atrm/if_core=>trm_package_data.
+    SELECT data FROM /atrm/packages INTO CORRESPONDING FIELDS OF TABLE packages_data.
+    LOOP AT packages_data INTO package_data.
+      CLEAR data.
+      CALL TRANSFORMATION id SOURCE XML package_data-data RESULT data = data.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
