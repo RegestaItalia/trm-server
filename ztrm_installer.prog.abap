@@ -122,13 +122,23 @@ CLASS lcl_report DEFINITION.
     METHODS display_messages
       IMPORTING
         iv_response TYPE string.
-    METHODS run_offline.
-    METHODS run_online.
+    METHODS run_offline
+      EXPORTING
+        ok_server TYPE flag
+        ok_rest   TYPE flag.
+    METHODS run_online
+      EXPORTING
+        ok_server TYPE flag
+        ok_rest   TYPE flag.
     METHODS handle_release
       IMPORTING
-        release  TYPE xstring
-        trkorr   TYPE trkorr
-        checksum TYPE string OPTIONAL.
+        release   TYPE xstring
+        trkorr    TYPE trkorr
+        checksum  TYPE string OPTIONAL
+      EXPORTING
+        installed TYPE flag
+        integrity TYPE string
+        manifest  TYPE xstring.
 
     CLASS-METHODS get_dir_trans
       EXPORTING dir_trans TYPE pfevalue.
@@ -168,6 +178,12 @@ CLASS lcl_report DEFINITION.
         it_packages      TYPE ty_package_tab
       RETURNING
         VALUE(rv_parent) TYPE string.
+    CLASS-METHODS update_packages_table
+      IMPORTING
+        name      TYPE string
+        manifest  TYPE xstring
+        integrity TYPE string
+        devclass  TYPE devclass.
 ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
@@ -228,7 +244,9 @@ CLASS lcl_report IMPLEMENTATION.
       confirm_answer   TYPE c,
       server_version   TYPE string,
       rest_version     TYPE string,
-      install_versions TYPE string.
+      install_versions TYPE string,
+      ok_server        TYPE flag,
+      ok_rest          TYPE flag.
     SELECT COUNT( * ) FROM e070 WHERE trkorr EQ server_trkorr.
     IF sy-subrc EQ 0.
       CONCATENATE 'Transport' server_trkorr '(trm-server transport number)' 'already exists in' sy-sysid 'Do you want to overwrite?' INTO confirm_message SEPARATED BY space.
@@ -268,18 +286,26 @@ CLASS lcl_report IMPLEMENTATION.
       ENDIF.
     ENDIF.
     IF psel-activetab EQ 'TAB1'.
-      run_online( ).
+      run_online(
+        IMPORTING
+          ok_server = ok_server
+          ok_rest   = ok_rest
+      ).
     ENDIF.
     IF psel-activetab EQ 'TAB2'.
-      run_offline( ).
+      run_offline(
+        IMPORTING
+          ok_server = ok_server
+          ok_rest   = ok_rest
+      ).
     ENDIF.
     get_versions( IMPORTING server = server_version rest = rest_version ).
-    IF server_version IS NOT INITIAL OR rest_version IS NOT INITIAL.
+    IF ok_server EQ 'X' OR ok_rest EQ 'X'.
       install_versions = 'Successfully installed'.
-      IF server_version IS NOT INITIAL.
+      IF ok_server EQ 'X'.
         CONCATENATE install_versions 'trm-server' server_version INTO install_versions SEPARATED BY space.
       ENDIF.
-      IF p_rest EQ 'X' AND rest_version IS NOT INITIAL.
+      IF p_rest EQ 'X' AND ok_rest EQ 'X'.
         CONCATENATE install_versions 'trm-rest' rest_version INTO install_versions SEPARATED BY space.
       ENDIF.
       MESSAGE install_versions TYPE 'I'.
@@ -309,10 +335,12 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run_offline.
-    DATA: filename TYPE string,
-          bin      TYPE STANDARD TABLE OF x255,
-          filelen  TYPE i,
-          file     TYPE xstring.
+    DATA: filename  TYPE string,
+          bin       TYPE STANDARD TABLE OF x255,
+          filelen   TYPE i,
+          file      TYPE xstring,
+          manifest  TYPE xstring,
+          integrity TYPE string.
 
     IF p_lserv IS INITIAL.
       MESSAGE 'Missing trm-server release file!' TYPE 'E'.
@@ -371,9 +399,21 @@ CLASS lcl_report IMPLEMENTATION.
     WRITE / 'Starting installation of trm-server...'.
     handle_release(
       EXPORTING
-        release  = file
-        trkorr   = server_trkorr
+        release   = file
+        trkorr    = server_trkorr
+      IMPORTING
+        installed = ok_server
+        manifest  = manifest
+        integrity = integrity
     ).
+    IF ok_server EQ 'X'.
+      update_packages_table(
+        name      = 'trm-server'
+        manifest  = manifest
+        integrity = integrity
+        devclass  = '$TRM'
+      ).
+    ENDIF.
 
     IF p_rest EQ 'X'.
       filename = p_lrest.
@@ -427,9 +467,21 @@ CLASS lcl_report IMPLEMENTATION.
       WRITE / 'Starting installation of trm-rest...'.
       handle_release(
         EXPORTING
-          release  = file
-          trkorr   = rest_trkorr
+          release   = file
+          trkorr    = rest_trkorr
+        IMPORTING
+          installed = ok_rest
+          manifest  = manifest
+          integrity = integrity
       ).
+      IF ok_rest EQ 'X'.
+        update_packages_table(
+          name      = 'trm-rest'
+          manifest  = manifest
+          integrity = integrity
+          devclass  = '$TRM_REST'
+        ).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
@@ -447,7 +499,9 @@ CLASS lcl_report IMPLEMENTATION.
       confirm_message TYPE string,
       confirm_answer  TYPE c,
       release         TYPE release,
-      file            TYPE xstring.
+      file            TYPE xstring,
+      manifest        TYPE xstring,
+      integrity       TYPE string.
 
     IF p_vscan EQ 'X'.
       vscan_check = 'A'.
@@ -573,7 +627,19 @@ CLASS lcl_report IMPLEMENTATION.
         release  = file
         trkorr   = server_trkorr
         checksum = release-checksum
+      IMPORTING
+        installed = ok_server
+          manifest  = manifest
+          integrity = integrity
     ).
+    IF ok_server EQ 'X'.
+      update_packages_table(
+        name      = 'trm-server'
+        manifest  = manifest
+        integrity = integrity
+        devclass  = '$TRM'
+      ).
+    ENDIF.
 
     IF p_rest EQ 'X'.
       WRITE / 'Starting installation of trm-rest...'.
@@ -637,7 +703,17 @@ CLASS lcl_report IMPLEMENTATION.
           release  = file
           trkorr   = rest_trkorr
           checksum = release-checksum
+        IMPORTING
+          installed = ok_rest
       ).
+      IF ok_rest EQ 'X'.
+        update_packages_table(
+          name      = 'trm-rest'
+          manifest  = manifest
+          integrity = integrity
+          devclass  = '$TRM_REST'
+        ).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
@@ -887,6 +963,57 @@ CLASS lcl_report IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
+  METHOD update_packages_table.
+    DATA: package TYPE REF TO data,
+          data    TYPE REF TO data.
+    FIELD-SYMBOLS: <package>   TYPE any,
+                   <data>      TYPE any,
+                   <name>      TYPE any,
+                   <timestamp> TYPE any,
+                   <devclass>  TYPE any,
+                   <manifest>  TYPE any,
+                   <trkorr>    TYPE any,
+                   <data_fld>  TYPE any.
+
+    CREATE DATA package TYPE ('/ATRM/PACKAGES').
+    ASSIGN package->* TO <package>.
+    CREATE DATA data TYPE ('/ATRM/IF_CORE=>TRM_PACKAGE_DATA').
+    ASSIGN data->* TO <data>.
+
+    ASSIGN COMPONENT 'PACKAGE_NAME' OF STRUCTURE <package> TO <name>.
+    IF sy-subrc EQ 0.
+      <name> = name.
+    ENDIF.
+    ASSIGN COMPONENT 'TIMESTAMP' OF STRUCTURE <package> TO <timestamp>.
+    IF sy-subrc = 0.
+      GET TIME STAMP FIELD <timestamp>.
+    ENDIF.
+    ASSIGN COMPONENT 'DEVCLASS' OF STRUCTURE <package> TO <devclass>.
+    IF sy-subrc EQ 0.
+      <devclass> = devclass.
+    ENDIF.
+    ASSIGN COMPONENT 'MANIFEST' OF STRUCTURE <data> TO <manifest>.
+    IF sy-subrc = 0.
+      <manifest> = manifest.
+    ENDIF.
+    ASSIGN COMPONENT 'TRKORR' OF STRUCTURE <data> TO <trkorr>.
+    IF sy-subrc = 0.
+      IF name EQ 'trm-server'.
+        <trkorr> = server_trkorr.
+      ELSE.
+        <trkorr> = rest_trkorr.
+      ENDIF.
+    ENDIF.
+    ASSIGN COMPONENT 'DATA' OF STRUCTURE <package> TO <data_fld>.
+    IF sy-subrc = 0.
+      CALL TRANSFORMATION id
+      SOURCE data = <data>
+      RESULT XML <data_fld>.
+    ENDIF.
+
+    INSERT ('/ATRM/PACKAGES') FROM <package>.
+    COMMIT WORK.
+  ENDMETHOD.
 
   METHOD handle_release.
     TYPES: BEGIN OF manifest,
@@ -903,7 +1030,6 @@ CLASS lcl_report IMPLEMENTATION.
       header_file_path      TYPE string,
       data_file             TYPE xstring,
       header_file           TYPE xstring,
-      file_hash             TYPE string,
       zip                   TYPE REF TO cl_abap_zip,
       transport_files       TYPE xstring,
       filesys               TYPE filesys,
@@ -946,21 +1072,21 @@ CLASS lcl_report IMPLEMENTATION.
     data_file_path = dirtrans && file_path_separator && 'data' && file_path_separator && data_file_name.
     header_file_path =  dirtrans && file_path_separator && 'cofiles' && file_path_separator && header_file_name.
     WRITE: /, 'Release data: ', data_file_name, ' Release header: ', header_file_name.
+    TRY.
+        cl_abap_message_digest=>calculate_hash_for_raw(
+          EXPORTING
+            if_algorithm     = 'SHA512'
+            if_data          = release
+          IMPORTING
+            ef_hashb64string = integrity
+        ).
+      CATCH cx_abap_message_digest.
+        display_error( 'Error in release checksum' ).
+        RETURN.
+    ENDTRY.
     IF checksum IS NOT INITIAL.
       WRITE: /, 'Verifying release integrity, to match', / checksum.
-      TRY.
-          cl_abap_message_digest=>calculate_hash_for_raw(
-            EXPORTING
-              if_algorithm     = 'SHA512'
-              if_data          = release
-            IMPORTING
-              ef_hashb64string = file_hash
-          ).
-        CATCH cx_abap_message_digest.
-          display_error( 'Error in release checksum' ).
-          RETURN.
-      ENDTRY.
-      IF file_hash <> checksum.
+      IF integrity <> checksum.
         display_error( 'Release checksum does not match!' ).
         RETURN.
       ENDIF.
@@ -1059,6 +1185,20 @@ CLASS lcl_report IMPLEMENTATION.
     ).
     IF data_file IS INITIAL OR sy-subrc <> 0.
       display_error( 'Error in release content: data file not found' ).
+      RETURN.
+    ENDIF.
+    zip->get(
+      EXPORTING
+        name = 'manifest.json'
+      IMPORTING
+        content = manifest
+      EXCEPTIONS
+        zip_decompression_error = 1
+        zip_index_error         = 2
+        OTHERS                  = 3
+    ).
+    IF manifest IS INITIAL OR sy-subrc <> 0.
+      display_error( 'Error in release content: manifest file not found' ).
       RETURN.
     ENDIF.
     tmssysnam = sy-sysid.
@@ -1246,6 +1386,7 @@ CLASS lcl_report IMPLEMENTATION.
             OTHERS             = 1.
       ENDLOOP.
     ENDIF.
+    installed = 'X'.
   ENDMETHOD.
 
 ENDCLASS.
@@ -1263,8 +1404,8 @@ INITIALIZATION.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
   %_p_rest_%_app_%-text  = 'Install trm-rest'.
-  online                 = '@Y4@ Online install'.
-  offline                = '@FP@ Offline install'.
+  online                 = 'Online install'.
+  offline                = 'Offline install'.
 
   psel-prog      = sy-repid.
   psel-dynnr     = 100.
