@@ -108,6 +108,12 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING objects      TYPE tyt_tadir
       RETURNING VALUE(locks) TYPE /atrm/object_lock_t.
 
+    "! Update a TRM package
+    "! @parameter package               | Package data
+    CLASS-METHODS update_package
+      IMPORTING package TYPE /atrm/packages
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -411,6 +417,13 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
         <fs_obj_lock>-trkorr = ls_result_aux-trkorr.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+  METHOD update_package.
+    enqueue( tabname = '/ATRM/PACKAGES' ).
+    MODIFY /atrm/packages FROM package.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/PACKAGES' ).
   ENDMETHOD.
 
 ENDCLASS.
