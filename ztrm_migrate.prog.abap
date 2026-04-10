@@ -51,7 +51,7 @@ CLASS lcl_report DEFINITION.
 ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
-METHOD find_root_devclass.
+  METHOD find_root_devclass.
     DATA: ls_tdevc      TYPE tdevc,
           lv_root       TYPE devclass,
           lv_first_root TYPE devclass.
@@ -110,9 +110,9 @@ METHOD find_root_devclass.
       READ TABLE it_tdevc INTO ls_current
         WITH KEY devclass = ls_current-parentcl.
 
-      " Parent not found in provided table -> no root found
+      " Parent not found in provided table, return current
       IF sy-subrc <> 0.
-        CLEAR rv_devclass.
+        rv_devclass = ls_current-devclass.
         RETURN.
       ENDIF.
     ENDDO.
@@ -123,7 +123,6 @@ METHOD find_root_devclass.
       confirm_message           TYPE string,
       confirm_answer            TYPE c,
       package                   TYPE /atrm/packages,
-      package_data              TYPE /atrm/if_core=>trm_package_data,
       legacy_packages           TYPE /atrm/cl_core=>tyt_trm_package_legacy,
       legacy_packages_aux       TYPE STANDARD TABLE OF ztrm_integrity,
       legacy_packages_integrity TYPE STANDARD TABLE OF ztrm_integrity,
@@ -166,18 +165,18 @@ METHOD find_root_devclass.
       WHERE package_name EQ legacy_packages_aux-package_name AND package_registry EQ legacy_packages_aux-package_registry.
     LOOP AT legacy_packages INTO legacy_package WHERE NOT ( name EQ 'trm-server' AND registry IS INITIAL ) AND NOT ( name EQ 'trm-rest' AND registry IS INITIAL ).
       CLEAR package.
-      CLEAR package_data.
       CLEAR legacy_package_integrity.
       package-package_name = legacy_package-name.
-      package-package_registry = legacy_package-registry.
+      IF legacy_package-registry IS INITIAL.
+        package-package_registry = 'public'.
+      ELSE.
+        package-package_registry = legacy_package-registry.
+      ENDIF.
       package-timestamp = legacy_package-timestamp.
-      package_data-trkorr = legacy_package-transport-trkorr.
-      package_data-manifest = legacy_package-xmanifest.
+      package-trkorr = legacy_package-transport-trkorr.
+      package-manifest = legacy_package-xmanifest.
       package-devclass = find_root_devclass( legacy_package-tdevc ).
-      CALL TRANSFORMATION id
-      SOURCE data = package_data
-      RESULT XML package-data.
-      READ TABLE legacy_packages_integrity INTO legacy_package_integrity WITH KEY package_name = legacy_package-name package_registry = legacy_package-registry.
+      READ TABLE legacy_packages_integrity INTO legacy_package_integrity WITH KEY package_name = package-package_name package_registry = package-package_registry.
       IF sy-subrc EQ 0.
         package-integrity = legacy_package_integrity-integrity.
       ENDIF.
