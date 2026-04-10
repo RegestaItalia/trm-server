@@ -967,18 +967,15 @@ CLASS lcl_report IMPLEMENTATION.
     DATA: package TYPE REF TO data,
           data    TYPE REF TO data.
     FIELD-SYMBOLS: <package>   TYPE any,
-                   <data>      TYPE any,
                    <name>      TYPE any,
                    <timestamp> TYPE any,
                    <devclass>  TYPE any,
                    <manifest>  TYPE any,
                    <trkorr>    TYPE any,
-                   <data_fld>  TYPE any.
+                   <integrity> tYPE any.
 
     CREATE DATA package TYPE ('/ATRM/PACKAGES').
     ASSIGN package->* TO <package>.
-    CREATE DATA data TYPE ('/ATRM/IF_CORE=>TRM_PACKAGE_DATA').
-    ASSIGN data->* TO <data>.
 
     ASSIGN COMPONENT 'PACKAGE_NAME' OF STRUCTURE <package> TO <name>.
     IF sy-subrc EQ 0.
@@ -992,11 +989,11 @@ CLASS lcl_report IMPLEMENTATION.
     IF sy-subrc EQ 0.
       <devclass> = devclass.
     ENDIF.
-    ASSIGN COMPONENT 'MANIFEST' OF STRUCTURE <data> TO <manifest>.
+    ASSIGN COMPONENT 'MANIFEST' OF STRUCTURE <package> TO <manifest>.
     IF sy-subrc = 0.
       <manifest> = manifest.
     ENDIF.
-    ASSIGN COMPONENT 'TRKORR' OF STRUCTURE <data> TO <trkorr>.
+    ASSIGN COMPONENT 'TRKORR' OF STRUCTURE <package> TO <trkorr>.
     IF sy-subrc = 0.
       IF name EQ 'trm-server'.
         <trkorr> = server_trkorr.
@@ -1004,11 +1001,9 @@ CLASS lcl_report IMPLEMENTATION.
         <trkorr> = rest_trkorr.
       ENDIF.
     ENDIF.
-    ASSIGN COMPONENT 'DATA' OF STRUCTURE <package> TO <data_fld>.
+    ASSIGN COMPONENT 'INTEGRITY' OF STRUCTURE <package> TO <integrity>.
     IF sy-subrc = 0.
-      CALL TRANSFORMATION id
-      SOURCE data = <data>
-      RESULT XML <data_fld>.
+      <integrity> = integrity.
     ENDIF.
 
     INSERT ('/ATRM/PACKAGES') FROM <package>.
