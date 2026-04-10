@@ -11,8 +11,7 @@ CLASS /atrm/cl_log_polling DEFINITION
     CLASS-METHODS create
       IMPORTING event      TYPE /atrm/polling_event
       RETURNING VALUE(log) TYPE REF TO /atrm/cl_log_polling
-      RAISING   /atrm/cx_exception
-                cx_uuid_error.
+      RAISING   /atrm/cx_exception.
     METHODS delete.
     METHODS update_message
       IMPORTING message TYPE /atrm/polling_last_msg.
@@ -35,14 +34,18 @@ CLASS /atrm/cl_log_polling IMPLEMENTATION.
   METHOD create.
     DATA polling TYPE /atrm/polling.
     polling-mandt = sy-mandt.
-    polling-polling_id = cl_system_uuid=>create_uuid_x16_static( ).
-    polling-polling_event = event.
-    polling-last_update_user = sy-uname.
-    polling-last_update_time = sy-uzeit.
-    polling-last_update_date = sy-datum.
-    INSERT /atrm/polling FROM polling.
-    COMMIT WORK AND WAIT.
-    CREATE OBJECT log EXPORTING id = polling-polling_id.
+    TRY.
+        polling-polling_id = cl_system_uuid=>create_uuid_x16_static( ).
+        polling-polling_event = event.
+        polling-last_update_user = sy-uname.
+        polling-last_update_time = sy-uzeit.
+        polling-last_update_date = sy-datum.
+        INSERT /atrm/polling FROM polling.
+        COMMIT WORK AND WAIT.
+        CREATE OBJECT log EXPORTING id = polling-polling_id.
+      CATCH cx_uuid_error.
+      /atrm/cx_exception=>raise( ).
+    ENDTRY.
   ENDMETHOD.
 
   METHOD update_message.

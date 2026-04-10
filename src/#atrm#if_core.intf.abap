@@ -14,9 +14,9 @@ INTERFACE /atrm/if_core
            dependencies TYPE tyt_dependency,
          END OF ty_manifest.
 
-  TYPES: t_e071 TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
+  TYPES: t_e071  TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
          BEGIN OF trm_package_data,
            manifest TYPE xstring,
-           e071 TYPE t_e071,
+           trkorr   TYPE trkorr,
          END OF trm_package_data.
 ENDINTERFACE.

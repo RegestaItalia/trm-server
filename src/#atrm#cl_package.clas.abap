@@ -4,6 +4,7 @@ CLASS /atrm/cl_package DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPES: tyt_devclass TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY.
 
     METHODS constructor
       IMPORTING devclass TYPE devclass.
@@ -15,6 +16,9 @@ CLASS /atrm/cl_package DEFINITION
 
     METHODS get_subpackages
       RETURNING VALUE(subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
+
+    METHODS get_all_packages
+      RETURNING VALUE(packages) TYPE tyt_devclass.
 
     METHODS get_objects
       IMPORTING incl_sub TYPE flag DEFAULT ' '
@@ -130,13 +134,10 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           ls_subpackage  LIKE LINE OF lt_subpackages,
           lv_devclass    TYPE devclass,
           lt_tadir       LIKE tadir.
-    IF incl_sub EQ 'X'.
-      lt_subpackages = get_subpackages( ).
-      LOOP AT lt_subpackages INTO ls_subpackage.
-        APPEND ls_subpackage-package TO lt_devclass.
-      ENDLOOP.
+    lt_devclass = get_all_packages( ).
+    IF incl_sub <> 'X'.
+      DELETE lt_devclass WHERE table_line <> gv_devclass.
     ENDIF.
-    APPEND gv_devclass TO lt_devclass.
     LOOP AT lt_devclass INTO lv_devclass.
       CLEAR lt_tadir[].
       CALL FUNCTION 'TRINT_SELECT_OBJECTS'
@@ -344,6 +345,16 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         no_output_parameter_requested = 6
         OTHERS                        = 7
     ).
+  ENDMETHOD.
+
+  METHOD get_all_packages.
+    DATA: subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
+          subpackage  LIKE LINE OF subpackages.
+    subpackages = get_subpackages( ).
+    APPEND gv_devclass TO packages.
+    LOOP AT subpackages INTO subpackage.
+      APPEND subpackage-package TO subpackages.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

@@ -5,44 +5,15 @@ CLASS /atrm/cl_utilities DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_ko100               TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
-           tyt_tadir               TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY,
-           tyt_installdevc         TYPE STANDARD TABLE OF /atrm/instdevc WITH DEFAULT KEY,
-           tyt_trnspacett          TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY,
-           tyt_migration_tmsbuffer TYPE STANDARD TABLE OF /atrm/tmsbuffer WITH DEFAULT KEY,
-           tyt_migration_doktl     TYPE STANDARD TABLE OF /atrm/doktl WITH DEFAULT KEY,
-           tyt_migration_e071      TYPE STANDARD TABLE OF /atrm/e071 WITH DEFAULT KEY,
-           tyt_migration_e070      TYPE STANDARD TABLE OF /atrm/e070 WITH DEFAULT KEY,
-           tyt_migration_e07t      TYPE STANDARD TABLE OF /atrm/e07t WITH DEFAULT KEY.
+    TYPES: tyt_ko100       TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
+           tyt_tadir       TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY,
+           tyt_installdevc TYPE STANDARD TABLE OF /atrm/instdevc WITH DEFAULT KEY,
+           tyt_trnspacett  TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY.
 
     "! Check if current user is authorized to execute TRM functions
     "! @parameter authorized | 'X' if authorized
     CLASS-METHODS check_functions_authorization
       RETURNING VALUE(authorized) TYPE flag.
-
-    "! Add a transport to the TRM skip list
-    "! @parameter trkorr | Transport request to skip
-    CLASS-METHODS add_skip_trkorr
-      IMPORTING trkorr TYPE trkorr
-      RAISING   /atrm/cx_exception.
-
-    "! Remove a transport from the TRM skip list
-    "! @parameter trkorr | Transport request to remove from skip list
-    CLASS-METHODS remove_skip_trkorr
-      IMPORTING trkorr TYPE trkorr
-      RAISING   /atrm/cx_exception.
-
-    "! Add transport to the TRM source list
-    "! @parameter trkorr | Transport request to add to source list
-    CLASS-METHODS add_source_trkorr
-      IMPORTING trkorr TYPE trkorr
-      RAISING   /atrm/cx_exception.
-
-    "! Remove a transport from the TRM source list
-    "! @parameter trkorr | Transport request to remove from source list
-    CLASS-METHODS remove_source_trkorr
-      IMPORTING trkorr TYPE trkorr
-      RAISING   /atrm/cx_exception.
 
     "! Get a binary file from the application server
     "! @parameter file_path | Absolute path to the binary file
@@ -90,12 +61,6 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING installdevc TYPE tyt_installdevc
       RAISING   /atrm/cx_exception.
 
-    "! Add package integrity
-    "! @parameter integrity | Integrity
-    CLASS-METHODS add_package_integrity
-      IMPORTING integrity TYPE /atrm/integrity
-      RAISING   /atrm/cx_exception.
-
     "! Wrapper for TR_TADIR_INTERFACE to register objects in the TADIR table
     "! @parameter pgmid     | Program ID
     "! @parameter object    | Object type
@@ -130,36 +95,6 @@ CLASS /atrm/cl_utilities DEFINITION
       RETURNING VALUE(r3trans) TYPE string
       RAISING   /atrm/cx_exception.
 
-    "! Add TMS buffer data to migration tables
-    "! @parameter data | Data
-    CLASS-METHODS add_migration_tmsbuffer
-      IMPORTING data TYPE tyt_migration_tmsbuffer
-      RAISING   /atrm/cx_exception.
-
-    "! Add documentation data to migration tables
-    "! @parameter data | Data
-    CLASS-METHODS add_migration_doktl
-      IMPORTING data TYPE tyt_migration_doktl
-      RAISING   /atrm/cx_exception.
-
-    "! Add E071 data to migration tables
-    "! @parameter data | Data
-    CLASS-METHODS add_migration_e071
-      IMPORTING data TYPE tyt_migration_e071
-      RAISING   /atrm/cx_exception.
-
-    "! Add E070 data to migration tables
-    "! @parameter data | Data
-    CLASS-METHODS add_migration_e070
-      IMPORTING data TYPE tyt_migration_e070
-      RAISING   /atrm/cx_exception.
-
-    "! Add E07T data to migration tables
-    "! @parameter data | Data
-    CLASS-METHODS add_migration_e07t
-      IMPORTING data TYPE tyt_migration_e07t
-      RAISING   /atrm/cx_exception.
-
     "! Reads messages from memory (e.g., after SUBMIT) and appends them to the provided message table
     "! @parameter messages | Message table to append entries from memory
     CLASS-METHODS append_messages_from_memory
@@ -167,8 +102,8 @@ CLASS /atrm/cl_utilities DEFINITION
         messages TYPE symsg_tab.
 
     "! Returns for all objects the transport request that locks them, if any
-    "! @parameter objects | TADIR key table to check for locks
-    "! @parameter locks | Table with object keys and corresponding lock
+    "! @parameter objects               | TADIR key table to check for locks
+    "! @parameter locks                 | Table with object keys and corresponding lock
     CLASS-METHODS get_objs_locks
       IMPORTING objects      TYPE tyt_tadir
       RETURNING VALUE(locks) TYPE /atrm/object_lock_t.
@@ -188,38 +123,6 @@ ENDCLASS.
 
 
 CLASS /atrm/cl_utilities IMPLEMENTATION.
-
-  METHOD add_skip_trkorr.
-    DATA ls_dummy TYPE /atrm/skiptrkorr.
-    ls_dummy-trkorr = trkorr.
-    enqueue( tabname = '/ATRM/SKIPTRKORR' ).
-    INSERT /atrm/skiptrkorr FROM ls_dummy.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/SKIPTRKORR' ).
-  ENDMETHOD.
-
-  METHOD remove_skip_trkorr.
-    enqueue( tabname = '/ATRM/SKIPTRKORR' ).
-    DELETE FROM /atrm/skiptrkorr WHERE trkorr EQ trkorr.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/SKIPTRKORR' ).
-  ENDMETHOD.
-
-  METHOD add_source_trkorr.
-    DATA ls_dummy TYPE /atrm/src_trkorr.
-    ls_dummy-trkorr = trkorr.
-    enqueue( tabname = '/ATRM/SRC_TRKORR' ).
-    INSERT /atrm/src_trkorr FROM ls_dummy.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/SRC_TRKORR' ).
-  ENDMETHOD.
-
-  METHOD remove_source_trkorr.
-    enqueue( tabname = '/ATRM/SRC_TRKORR' ).
-    DELETE FROM /atrm/src_trkorr WHERE trkorr EQ trkorr.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/SRC_TRKORR' ).
-  ENDMETHOD.
 
   METHOD check_functions_authorization.
     CLEAR authorized.
@@ -345,13 +248,6 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     dequeue( tabname = '/ATRM/INSTDEVC' ).
   ENDMETHOD.
 
-  METHOD add_package_integrity.
-    enqueue( tabname = '/ATRM/INTEGRITY' ).
-    MODIFY /atrm/integrity FROM integrity.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/INTEGRITY' ).
-  ENDMETHOD.
-
   METHOD tadir_interface.
     CALL FUNCTION 'TR_TADIR_INTERFACE'
       EXPORTING
@@ -426,41 +322,6 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     CONCATENATE LINES OF result INTO r3trans SEPARATED BY cl_abap_char_utilities=>newline.
   ENDMETHOD.
 
-  METHOD add_migration_tmsbuffer.
-    enqueue( tabname = '/ATRM/TMSBUFFER' ).
-    MODIFY /atrm/tmsbuffer FROM TABLE data.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/TMSBUFFER' ).
-  ENDMETHOD.
-
-  METHOD add_migration_doktl.
-    enqueue( tabname = '/ATRM/DOKTL' ).
-    MODIFY /atrm/doktl FROM TABLE data.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/DOKTL' ).
-  ENDMETHOD.
-
-  METHOD add_migration_e071.
-    enqueue( tabname = '/ATRM/E071' ).
-    MODIFY /atrm/e071 FROM TABLE data.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/E071' ).
-  ENDMETHOD.
-
-  METHOD add_migration_e070.
-    enqueue( tabname = '/ATRM/E070' ).
-    MODIFY /atrm/e070 FROM TABLE data.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/E070' ).
-  ENDMETHOD.
-
-  METHOD add_migration_e07t.
-    enqueue( tabname = '/ATRM/E07T' ).
-    MODIFY /atrm/e07t FROM TABLE data.
-    COMMIT WORK AND WAIT.
-    dequeue( tabname = '/ATRM/E07T' ).
-  ENDMETHOD.
-
   METHOD append_messages_from_memory.
     DATA: lt_list_tab  TYPE TABLE OF abaplist,
           lt_ascii_tab TYPE soli_tab,
@@ -527,6 +388,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       APPEND INITIAL LINE TO lt_objects_aux ASSIGNING <fs_object_aux>.
       MOVE-CORRESPONDING ls_object TO <fs_object_aux>.
     ENDLOOP.
+    CHECK lt_objects_aux[] IS NOT INITIAL.
     SELECT pgmid object obj_name trkorr strkorr
       FROM /atrm/v_obj_lock
       INTO CORRESPONDING FIELDS OF TABLE lt_result_aux
@@ -534,7 +396,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       WHERE pgmid EQ lt_objects_aux-pgmid
         AND object EQ lt_objects_aux-object
         AND obj_name EQ lt_objects_aux-obj_name
-        AND trstatus EQ 'D' OR trstatus EQ 'L'.
+        AND ( trstatus EQ 'D' OR trstatus EQ 'L' ).
     LOOP AT lt_result_aux INTO ls_result_aux.
       UNASSIGN <fs_obj_lock>.
       READ TABLE locks TRANSPORTING NO FIELDS WITH KEY pgmid = ls_result_aux-pgmid object = ls_result_aux-object obj_name = ls_result_aux-obj_name.

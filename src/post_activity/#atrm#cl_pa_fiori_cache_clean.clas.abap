@@ -24,9 +24,9 @@ CLASS /atrm/cl_pa_fiori_cache_clean DEFINITION
 
     TYPES: ty_ui5_repository_ui   TYPE c LENGTH 30.
 
-    "! @parameter ui5_repository | (Optional) UI5 repository name to restrict calculation to
-    "! @parameter messages       | Message table returned from cleanup steps
-    "! @raising zcx_trm_exception | Raised if any report fails or invalid selections are detected
+    "! @parameter ui5_repository   | (Optional) UI5 repository name to restrict calculation to
+    "! @parameter messages         | Message table returned from cleanup steps
+    "! @raising /atrm/cx_exception | Raised if any report fails or invalid selections are detected
     CLASS-METHODS execute
       IMPORTING
         !ui5_repository TYPE ty_ui5_repository_ui OPTIONAL

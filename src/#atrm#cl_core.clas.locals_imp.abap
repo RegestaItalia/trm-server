@@ -113,6 +113,10 @@ CLASS lcl_trm_transport DEFINITION.
       IMPORTING it_transports       TYPE tyt_transport
       RETURNING VALUE(ro_transport) TYPE REF TO lcl_trm_transport.
 
+    CLASS-METHODS get_tdevc_from_e071
+      IMPORTING it_e071         TYPE /atrm/if_core=>t_e071
+      RETURNING VALUE(rt_tdevc) TYPE tyt_tdevc.
+
     DATA: trkorr    TYPE trkorr,
           migration TYPE flag.
 
@@ -156,22 +160,14 @@ CLASS lcl_trm_transport IMPLEMENTATION.
 
   METHOD get_e071.
     IF gt_e071[] IS INITIAL.
-      IF migration <> 'X'.
-        SELECT pgmid object obj_name FROM e071 INTO CORRESPONDING FIELDS OF TABLE gt_e071 WHERE trkorr EQ trkorr.
-      ELSE.
-        SELECT pgmid object obj_name FROM /atrm/e071 INTO CORRESPONDING FIELDS OF TABLE gt_e071 WHERE trkorr EQ trkorr.
-      ENDIF.
+      SELECT pgmid object obj_name FROM e071 INTO CORRESPONDING FIELDS OF TABLE gt_e071 WHERE trkorr EQ trkorr.
     ENDIF.
     rt_e071[] = gt_e071[].
   ENDMETHOD.
 
   METHOD get_e070.
     IF gs_e070 IS INITIAL.
-      IF migration <> 'X'.
-        SELECT SINGLE trkorr trfunction trstatus as4date as4time FROM e070 INTO CORRESPONDING FIELDS OF gs_e070 WHERE trkorr EQ trkorr.
-      ELSE.
-        SELECT SINGLE trkorr trfunction trstatus as4date as4time FROM /atrm/e070 INTO CORRESPONDING FIELDS OF gs_e070 WHERE trkorr EQ trkorr.
-      ENDIF.
+      SELECT SINGLE trkorr trfunction trstatus as4date as4time FROM e070 INTO CORRESPONDING FIELDS OF gs_e070 WHERE trkorr EQ trkorr.
     ENDIF.
     rs_e070 = gs_e070.
   ENDMETHOD.
@@ -181,6 +177,8 @@ CLASS lcl_trm_transport IMPLEMENTATION.
           lv_has_name    TYPE flag,
           lv_has_version TYPE flag.
     DATA(lt_e071) = get_e071( ).
+    READ TABLE lt_e071 TRANSPORTING NO FIELDS WITH KEY pgmid = 'R3TR'.
+    CHECK sy-subrc EQ 0. " make it work
     DELETE lt_e071 WHERE NOT ( pgmid EQ '*' AND object EQ 'ZTRM' ).
     LOOP AT lt_e071 INTO ls_e071.
       IF ls_e071-obj_name CP 'name=*'.
@@ -216,11 +214,7 @@ CLASS lcl_trm_transport IMPLEMENTATION.
       FIELD-SYMBOLS: <fs_trkorr_doktl>      TYPE ty_doktl,
                      <fs_trkorr_doktl_line> TYPE ty_doktl_line,
                      <fs_doc>               TYPE ty_documentation.
-      IF migration <> 'X'.
-        SELECT langu dokversion line doktext FROM doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE id EQ 'TA' AND object EQ trkorr.
-      ELSE.
-        SELECT langu dokversion line doktext FROM /atrm/doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE trm_trokrr EQ trkorr.
-      ENDIF.
+      SELECT langu dokversion line doktext FROM doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE id EQ 'TA' AND object EQ trkorr.
       LOOP AT lt_doktl INTO ls_doktl.
         UNASSIGN <fs_trkorr_doktl>.
         UNASSIGN <fs_trkorr_doktl_line>.
@@ -302,25 +296,40 @@ CLASS lcl_trm_transport IMPLEMENTATION.
     FIELD-SYMBOLS <fs_tadir_conv> TYPE tadir.
     IF gt_tdevc[] IS INITIAL.
       lt_e071 = get_e071( ).
-      LOOP AT lt_e071 INTO ls_e071 WHERE pgmid EQ 'R3TR'.
-        UNASSIGN <fs_tadir_conv>.
-        IF ls_e071-object EQ 'DEVC'.
-          APPEND ls_e071-obj_name TO lt_devclass.
-        ENDIF.
-        APPEND INITIAL LINE TO lt_tadir_conv ASSIGNING <fs_tadir_conv>.
-        <fs_tadir_conv>-pgmid = ls_e071-pgmid.
-        <fs_tadir_conv>-object = ls_e071-object.
-        <fs_tadir_conv>-obj_name = ls_e071-obj_name.
-      ENDLOOP.
-      IF lt_tadir_conv[] IS NOT INITIAL.
-        SELECT devclass FROM tadir
-        INTO CORRESPONDING FIELDS OF TABLE lt_tadir
-        FOR ALL ENTRIES IN lt_tadir_conv
-        WHERE pgmid EQ lt_tadir_conv-pgmid AND object EQ lt_tadir_conv-object AND obj_name EQ lt_tadir_conv-obj_name.
-        LOOP AT lt_tadir INTO ls_tadir.
-          APPEND ls_tadir-devclass TO lt_devclass.
-        ENDLOOP.
+      gt_tdevc = get_tdevc_from_e071( lt_e071 ).
+    ENDIF.
+    rt_tdevc[] = gt_tdevc[].
+  ENDMETHOD.
+
+  METHOD get_tdevc_from_e071.
+    DATA: lt_devclass   TYPE STANDARD TABLE OF devclass,
+          lv_devclass   LIKE LINE OF lt_devclass,
+          lv_parentcl   TYPE parentcl,
+          ls_e071       LIKE LINE OF it_e071,
+          lt_tadir_conv TYPE STANDARD TABLE OF tadir,
+          lt_tadir      TYPE STANDARD TABLE OF tadir,
+          ls_tadir      LIKE LINE OF lt_tadir,
+          lt_tdevc      TYPE STANDARD TABLE OF tdevc.
+    FIELD-SYMBOLS <fs_tadir_conv> TYPE tadir.
+    LOOP AT it_e071 INTO ls_e071 WHERE pgmid EQ 'R3TR'.
+      UNASSIGN <fs_tadir_conv>.
+      IF ls_e071-object EQ 'DEVC'.
+        APPEND ls_e071-obj_name TO lt_devclass.
       ENDIF.
+      APPEND INITIAL LINE TO lt_tadir_conv ASSIGNING <fs_tadir_conv>.
+      <fs_tadir_conv>-pgmid = ls_e071-pgmid.
+      <fs_tadir_conv>-object = ls_e071-object.
+      <fs_tadir_conv>-obj_name = ls_e071-obj_name.
+    ENDLOOP.
+    IF lt_tadir_conv[] IS NOT INITIAL.
+      SELECT devclass FROM tadir
+      INTO CORRESPONDING FIELDS OF TABLE lt_tadir
+      FOR ALL ENTRIES IN lt_tadir_conv
+      WHERE pgmid EQ lt_tadir_conv-pgmid AND object EQ lt_tadir_conv-object AND obj_name EQ lt_tadir_conv-obj_name.
+      LOOP AT lt_tadir INTO ls_tadir.
+        APPEND ls_tadir-devclass TO lt_devclass.
+      ENDLOOP.
+    ENDIF.
 *      Issue #143 trm-core
 *      LOOP AT lt_devclass INTO lv_devclass.
 *        CLEAR lv_parentcl.
@@ -331,16 +340,14 @@ CLASS lcl_trm_transport IMPLEMENTATION.
 *          APPEND lv_parentcl TO lt_devclass.
 *        ENDWHILE.
 *      ENDLOOP.
-      SORT lt_devclass.
-      DELETE ADJACENT DUPLICATES FROM lt_devclass.
-      IF lt_devclass[] IS NOT INITIAL.
-        SELECT * FROM tdevc
-        INTO CORRESPONDING FIELDS OF TABLE gt_tdevc
-        FOR ALL ENTRIES IN lt_devclass
-        WHERE devclass EQ lt_devclass-table_line.
-      ENDIF.
+    SORT lt_devclass.
+    DELETE ADJACENT DUPLICATES FROM lt_devclass.
+    IF lt_devclass[] IS NOT INITIAL.
+      SELECT * FROM tdevc
+      INTO CORRESPONDING FIELDS OF TABLE rt_tdevc
+      FOR ALL ENTRIES IN lt_devclass
+      WHERE devclass EQ lt_devclass-table_line.
     ENDIF.
-    rt_tdevc[] = gt_tdevc[].
   ENDMETHOD.
 
 ENDCLASS.

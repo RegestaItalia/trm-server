@@ -5,41 +5,40 @@ CLASS /atrm/cl_core DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_tdevc TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+    TYPES: tyt_tdevc    TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+           tyt_packages TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY,
            BEGIN OF ty_trm_transport,
              trkorr    TYPE trkorr,
              migration TYPE flag,
            END OF ty_trm_transport,
-           BEGIN OF ty_trm_package,
-             name      TYPE string,
+           BEGIN OF ty_trm_package_legacy,
+             name      TYPE /atrm/package_name,
              version   TYPE string,
-             registry  TYPE string,
+             registry  TYPE /atrm/package_registry,
              tdevc     TYPE tyt_tdevc,
              manifest  TYPE /atrm/if_core=>ty_manifest,
              xmanifest TYPE xstring,
              transport TYPE ty_trm_transport,
              trkorr    TYPE trkorr,
              timestamp TYPE timestamp,
-           END OF ty_trm_package,
-           BEGIN OF ty_trm_package2,
-             tdevc    TYPE tyt_tdevc,
+           END OF ty_trm_package_legacy,
+           BEGIN OF ty_trm_package,
+             name     TYPE /atrm/package_name,
+             registry TYPE /atrm/package_registry,
              manifest TYPE xstring,
              trkorr   TYPE trkorr,
-           END OF ty_trm_package2.
-    TYPES: tyt_trkorr           TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
-           tyt_migration_trkorr TYPE STANDARD TABLE OF /atrm/trkorr WITH DEFAULT KEY,
-           tyt_trm_package      TYPE STANDARD TABLE OF ty_trm_package WITH DEFAULT KEY,
-           tyt_trm_package2     TYPE STANDARD TABLE OF ty_trm_package2 WITH DEFAULT KEY.
+             devclass TYPE devclass,
+             packages TYPE tyt_packages,
+           END OF ty_trm_package.
+    TYPES: tyt_trkorr             TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
+           tyt_migration_trkorr   TYPE STANDARD TABLE OF /atrm/trkorr WITH DEFAULT KEY,
+           tyt_trm_package_legacy TYPE STANDARD TABLE OF ty_trm_package_legacy WITH DEFAULT KEY,
+           tyt_trm_package        TYPE STANDARD TABLE OF ty_trm_package WITH DEFAULT KEY.
 
-    CLASS-METHODS get_source_trkorr
-      RETURNING VALUE(trkorr) TYPE tyt_trkorr.
-    CLASS-METHODS get_ignored_trkorr
-      RETURNING VALUE(trkorr) TYPE tyt_trkorr.
-
+    CLASS-METHODS get_installed_packages_legacy
+      RETURNING VALUE(packages) TYPE tyt_trm_package_legacy.
     CLASS-METHODS get_installed_packages
       RETURNING VALUE(packages) TYPE tyt_trm_package.
-    CLASS-METHODS get_installed_packages_v2
-      RETURNING VALUE(packages) TYPE tyt_trm_package2.
 
     CLASS-METHODS get_lockfile
       IMPORTING package_name     TYPE /atrm/package_name
@@ -54,13 +53,7 @@ ENDCLASS.
 
 CLASS /atrm/cl_core IMPLEMENTATION.
 
-
-  METHOD get_ignored_trkorr.
-    SELECT trkorr FROM /atrm/skiptrkorr INTO TABLE trkorr.
-  ENDMETHOD.
-
-
-  METHOD get_installed_packages.
+  METHOD get_installed_packages_legacy.
     TYPES: BEGIN OF ty_all_trkorr,
              trkorr    TYPE trkorr,
              migration TYPE flag,
@@ -105,7 +98,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
           ls_trm_server            LIKE LINE OF packages,
           ls_trm_rest              LIKE LINE OF packages,
           lv_devclass              TYPE devclass,
-          ls_trm_package           TYPE ty_trm_package,
+          ls_trm_package           TYPE ty_trm_package_legacy,
           lt_wb_trkorr_name        TYPE STANDARD TABLE OF trobj_name,
           lt_wb_trkorr_package     TYPE STANDARD TABLE OF ty_wb_trkorr_package,
           lt_package_wb_transports TYPE STANDARD TABLE OF ty_package_wb_transport,
@@ -113,17 +106,14 @@ CLASS /atrm/cl_core IMPLEMENTATION.
           lo_wb_transport          TYPE REF TO lcl_trm_transport.
     FIELD-SYMBOLS: <fs_trkorr>               TYPE ty_all_trkorr,
                    <fs_trkorr_package>       TYPE ty_trkorr_package,
-                   <fs_package>              TYPE ty_trm_package,
+                   <fs_package>              TYPE ty_trm_package_legacy,
                    <fs_trm_rest_version>     TYPE string,
                    <fs_dependency>           TYPE /atrm/if_core=>ty_dependency,
                    <fs_wb_trkorr_name>       TYPE trobj_name,
                    <fs_wb_trkorr_package>    TYPE ty_wb_trkorr_package,
                    <fs_package_wb_transport> TYPE ty_package_wb_transport.
 
-    lt_source_trkorr = get_source_trkorr( ).
-    lt_ignored_trkorr = get_ignored_trkorr( ).
     SELECT DISTINCT trkorr FROM e071 INTO TABLE lt_actual_trkorr WHERE pgmid EQ '*' AND object EQ 'ZTRM'.
-    SELECT trm_trokrr FROM /atrm/e070 INTO TABLE lt_migration_trkorr.
     LOOP AT lt_actual_trkorr INTO lv_actual_trkorr.
       CLEAR ls_trkorr.
       ls_trkorr-trkorr = lv_actual_trkorr.
@@ -148,8 +138,6 @@ CLASS /atrm/cl_core IMPLEMENTATION.
     DELETE lt_trkorr_copy WHERE table_line IS INITIAL.
     IF lt_trkorr_copy[] IS NOT INITIAL.
       DATA: lt_y_migration     LIKE lt_trkorr_copy,
-            lt_tms_y_migration TYPE STANDARD TABLE OF /atrm/tmsbuffer,
-            ls_tms_y_migration LIKE LINE OF lt_tms_y_migration,
             lt_n_migration     LIKE lt_trkorr_copy,
             lt_tms_n_migration TYPE STANDARD TABLE OF tmsbuffer,
             ls_tms_n_migration LIKE LINE OF lt_tms_n_migration,
@@ -162,12 +150,6 @@ CLASS /atrm/cl_core IMPLEMENTATION.
         APPEND ls_trkorr TO lt_n_migration.
       ENDLOOP.
       CLEAR ls_trkorr.
-      IF lt_y_migration[] IS NOT INITIAL.
-        SELECT trkorr maxrc FROM /atrm/tmsbuffer
-        INTO CORRESPONDING FIELDS OF TABLE lt_tms_y_migration
-        FOR ALL ENTRIES IN lt_y_migration
-        WHERE sysnam EQ sy-sysid AND trkorr EQ lt_y_migration-trkorr AND impsing <> 'X'.
-      ENDIF.
       IF lt_n_migration[] IS NOT INITIAL.
         SELECT trkorr maxrc FROM tmsbuffer
         INTO CORRESPONDING FIELDS OF TABLE lt_tms_n_migration
@@ -175,31 +157,17 @@ CLASS /atrm/cl_core IMPLEMENTATION.
         WHERE sysnam EQ sy-sysid AND trkorr EQ lt_n_migration-trkorr AND impsing <> 'X'.
       ENDIF.
       LOOP AT lt_trkorr_copy INTO ls_trkorr.
-        IF ls_trkorr-migration EQ 'X'.
-          LOOP AT lt_tms_y_migration INTO ls_tms_y_migration WHERE trkorr EQ ls_trkorr-trkorr.
-            CLEAR lv_maxrc.
-            lv_maxrc = ls_tms_y_migration-maxrc.
-            IF lv_maxrc LT 0.
-              APPEND ls_trkorr TO lt_ignored_trkorr.
-            ENDIF.
-          ENDLOOP.
-          IF sy-subrc <> 0.
+        LOOP AT lt_tms_n_migration INTO ls_tms_n_migration WHERE trkorr EQ ls_trkorr-trkorr.
+          CLEAR lv_maxrc.
+          lv_maxrc = ls_tms_n_migration-maxrc.
+          IF lv_maxrc LT 0.
             APPEND ls_trkorr TO lt_ignored_trkorr.
           ENDIF.
-          CLEAR ls_tms_y_migration.
-        ELSE.
-          LOOP AT lt_tms_n_migration INTO ls_tms_n_migration WHERE trkorr EQ ls_trkorr-trkorr.
-            CLEAR lv_maxrc.
-            lv_maxrc = ls_tms_n_migration-maxrc.
-            IF lv_maxrc LT 0.
-              APPEND ls_trkorr TO lt_ignored_trkorr.
-            ENDIF.
-          ENDLOOP.
-          IF sy-subrc <> 0.
-            APPEND ls_trkorr TO lt_ignored_trkorr.
-          ENDIF.
-          CLEAR ls_tms_n_migration.
+        ENDLOOP.
+        IF sy-subrc <> 0.
+          APPEND ls_trkorr TO lt_ignored_trkorr.
         ENDIF.
+        CLEAR ls_tms_n_migration.
       ENDLOOP.
       CLEAR ls_trkorr.
     ENDIF.
@@ -378,22 +346,35 @@ CLASS /atrm/cl_core IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD get_source_trkorr.
-    SELECT trkorr FROM /atrm/src_trkorr INTO TABLE trkorr.
-  ENDMETHOD.
-
   METHOD get_lockfile.
     " TODO
   ENDMETHOD.
 
-  METHOD get_installed_packages_v2.
+  METHOD get_installed_packages.
     DATA: packages_data TYPE STANDARD TABLE OF /atrm/packages,
           package_data  LIKE LINE OF packages_data,
-          data          TYPE /atrm/if_core=>trm_package_data.
-    SELECT data FROM /atrm/packages INTO CORRESPONDING FIELDS OF TABLE packages_data.
+          e071_to_tadir TYPE STANDARD TABLE OF tadir,
+          aux_e071      TYPE e071,
+          data          TYPE /atrm/if_core=>trm_package_data,
+          package       TYPE REF TO /atrm/cl_package.
+    FIELD-SYMBOLS: <row>       TYPE ty_trm_package,
+                   <aux_tadir> TYPE tadir.
+    SELECT package_name package_registry data /atrm/packages~devclass
+      FROM /atrm/packages
+      INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
+      INTO CORRESPONDING FIELDS OF TABLE packages_data.
     LOOP AT packages_data INTO package_data.
       CLEAR data.
+      CLEAR package.
       CALL TRANSFORMATION id SOURCE XML package_data-data RESULT data = data.
+      APPEND INITIAL LINE TO packages ASSIGNING <row>.
+      CREATE OBJECT package EXPORTING devclass = package_data-devclass.
+      <row>-name = package_data-package_name.
+      <row>-registry = package_data-package_registry.
+      <row>-devclass = package_data-devclass.
+      <row>-manifest = data-manifest.
+      <row>-trkorr = data-trkorr.
+      <row>-packages = package->get_all_packages( ).
     ENDLOOP.
   ENDMETHOD.
 

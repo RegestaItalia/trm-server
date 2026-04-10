@@ -29,7 +29,7 @@ ENDCLASS.
 
 
 
-CLASS /ATRM/CL_OBJECT IMPLEMENTATION.
+CLASS /atrm/cl_object IMPLEMENTATION.
 
 
   METHOD constructor.
@@ -62,7 +62,7 @@ CLASS /ATRM/CL_OBJECT IMPLEMENTATION.
       dependency-devclass = lv_devclass.
       CHECK lv_devclass IS NOT INITIAL.
       LOOP AT lt_trm_packages INTO ls_trm_package.
-        READ TABLE ls_trm_package-tdevc TRANSPORTING NO FIELDS WITH KEY devclass = lv_devclass.
+        READ TABLE ls_trm_package-packages TRANSPORTING NO FIELDS WITH KEY table_line = lv_devclass.
         CHECK sy-subrc EQ 0.
         dependency-trm_package_name = ls_trm_package-name.
         dependency-trm_package_registry = ls_trm_package-registry.
@@ -105,7 +105,7 @@ CLASS /ATRM/CL_OBJECT IMPLEMENTATION.
       dependency-devclass = lv_devclass.
       CHECK lv_devclass IS NOT INITIAL.
       LOOP AT lt_trm_packages INTO ls_trm_package.
-        READ TABLE ls_trm_package-tdevc TRANSPORTING NO FIELDS WITH KEY devclass = lv_devclass.
+        READ TABLE ls_trm_package-packages TRANSPORTING NO FIELDS WITH KEY table_line = lv_devclass.
         CHECK sy-subrc EQ 0.
         dependency-trm_package_name = ls_trm_package-name.
         dependency-trm_package_registry = ls_trm_package-registry.
