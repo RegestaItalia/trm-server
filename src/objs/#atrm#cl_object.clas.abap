@@ -41,7 +41,7 @@ CLASS /atrm/cl_object IMPLEMENTATION.
     DATA: lv_tabname                 TYPE tabname,
           lv_tabkey                  TYPE string,
           ls_dispatcher_dependencies TYPE /atrm/object_dependencies,
-          lt_trm_packages            TYPE /atrm/cl_core=>tyt_trm_package,
+          lt_trm_packages            TYPE /atrm/packages_t,
           lv_devclass                TYPE devclass,
           ls_trm_package             LIKE LINE OF lt_trm_packages.
 
@@ -64,8 +64,8 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       LOOP AT lt_trm_packages INTO ls_trm_package.
         READ TABLE ls_trm_package-packages TRANSPORTING NO FIELDS WITH KEY table_line = lv_devclass.
         CHECK sy-subrc EQ 0.
-        dependency-trm_package_name = ls_trm_package-name.
-        dependency-trm_package_registry = ls_trm_package-registry.
+        dependency-trm_package_name = ls_trm_package-package_name.
+        dependency-trm_package_registry = ls_trm_package-package_registry.
         EXIT.
       ENDLOOP.
     ELSE.
@@ -81,7 +81,7 @@ CLASS /atrm/cl_object IMPLEMENTATION.
     DATA: lv_tabname                 TYPE tabname,
           lv_tabkey                  TYPE string,
           ls_dispatcher_dependencies TYPE /atrm/object_dependencies,
-          lt_trm_packages            TYPE /atrm/cl_core=>tyt_trm_package,
+          lt_trm_packages            TYPE /atrm/packages_t,
           lv_devclass                TYPE devclass,
           ls_trm_package             LIKE LINE OF lt_trm_packages.
 
@@ -107,8 +107,8 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       LOOP AT lt_trm_packages INTO ls_trm_package.
         READ TABLE ls_trm_package-packages TRANSPORTING NO FIELDS WITH KEY table_line = lv_devclass.
         CHECK sy-subrc EQ 0.
-        dependency-trm_package_name = ls_trm_package-name.
-        dependency-trm_package_registry = ls_trm_package-registry.
+        dependency-trm_package_name = ls_trm_package-package_name.
+        dependency-trm_package_registry = ls_trm_package-package_registry.
         EXIT.
       ENDLOOP.
     ELSE.

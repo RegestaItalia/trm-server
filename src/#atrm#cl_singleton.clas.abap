@@ -9,7 +9,7 @@ CLASS /atrm/cl_singleton DEFINITION
       RETURNING VALUE(singleton) TYPE REF TO /atrm/cl_singleton.
 
     METHODS get_installed_packages
-      RETURNING VALUE(packages) TYPE /atrm/cl_core=>tyt_trm_package.
+      RETURNING VALUE(packages) TYPE /atrm/packages_t.
 
     METHODS get_supported_object_types
       EXPORTING object_text TYPE /atrm/cl_utilities=>tyt_ko100
@@ -18,7 +18,7 @@ CLASS /atrm/cl_singleton DEFINITION
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-DATA: go_singleton TYPE REF TO /atrm/cl_singleton.
-    DATA: gt_packages    TYPE /atrm/cl_core=>tyt_trm_package,
+    DATA: gt_packages    TYPE /atrm/packages_t,
           gt_object_text TYPE /atrm/cl_utilities=>tyt_ko100.
 
 ENDCLASS.

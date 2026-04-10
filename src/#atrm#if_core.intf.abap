@@ -13,10 +13,4 @@ INTERFACE /atrm/if_core
            registry     TYPE string,
            dependencies TYPE tyt_dependency,
          END OF ty_manifest.
-
-  TYPES: t_e071  TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
-         BEGIN OF trm_package_data,
-           manifest TYPE xstring,
-           trkorr   TYPE trkorr,
-         END OF trm_package_data.
 ENDINTERFACE.

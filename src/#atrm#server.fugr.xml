@@ -1283,7 +1283,7 @@
      <EXPORT>
       <RSEXP>
        <PARAMETER>PACKAGES</PARAMETER>
-       <TYP>XSTRING</TYP>
+       <TYP>/ATRM/PACKAGES_T</TYP>
       </RSEXP>
      </EXPORT>
      <EXCEPTION>

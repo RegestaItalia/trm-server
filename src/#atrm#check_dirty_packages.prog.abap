@@ -58,7 +58,7 @@ CLASS lcl_report IMPLEMENTATION.
              object           TYPE trobjtype,
              obj_name         TYPE sobj_name,
            END OF package_object.
-    DATA: packages             TYPE /atrm/cl_core=>tyt_trm_package,
+    DATA: packages             TYPE /atrm/packages_t,
           package              LIKE LINE OF packages,
           tadir                TYPE /atrm/cl_utilities=>tyt_tadir,
           package_objects_flat TYPE STANDARD TABLE OF package_object,
@@ -90,14 +90,14 @@ CLASS lcl_report IMPLEMENTATION.
             <tadir>-object = object-object.
             <tadir>-obj_name = object-obj_name.
             APPEND INITIAL LINE TO package_objects_flat ASSIGNING <package_object_flat>.
-            <package_object_flat>-package_name = package-name.
-            <package_object_flat>-package_registry = package-registry.
+            <package_object_flat>-package_name = package-package_name.
+            <package_object_flat>-package_registry = package-package_registry.
             <package_object_flat>-pgmid = <tadir>-pgmid.
             <package_object_flat>-object = <tadir>-object.
             <package_object_flat>-obj_name = <tadir>-obj_name.
           ENDLOOP.
         CATCH /atrm/cx_exception.
-          WRITE: /, 'Exception on', package-name.
+          WRITE: /, 'Exception on', package-package_name, package-package_registry.
       ENDTRY.
     ENDLOOP.
     IF tadir[] IS NOT INITIAL.

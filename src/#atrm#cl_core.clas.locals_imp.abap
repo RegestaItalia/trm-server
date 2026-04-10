@@ -94,7 +94,8 @@ CLASS lcl_trm_transport DEFINITION.
   PUBLIC SECTION.
 
     TYPES: tyt_transport TYPE STANDARD TABLE OF REF TO lcl_trm_transport WITH DEFAULT KEY,
-           tyt_tdevc     TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY.
+           tyt_tdevc     TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+           tyt_e071      type stANDARD TABLE OF e071 wITH dEFAULT KEY.
 
     METHODS constructor
       IMPORTING iv_trkorr    TYPE trkorr
@@ -114,7 +115,7 @@ CLASS lcl_trm_transport DEFINITION.
       RETURNING VALUE(ro_transport) TYPE REF TO lcl_trm_transport.
 
     CLASS-METHODS get_tdevc_from_e071
-      IMPORTING it_e071         TYPE /atrm/if_core=>t_e071
+      IMPORTING it_e071         TYPE tyt_e071
       RETURNING VALUE(rt_tdevc) TYPE tyt_tdevc.
 
     DATA: trkorr    TYPE trkorr,
@@ -128,8 +129,7 @@ CLASS lcl_trm_transport DEFINITION.
              value   TYPE string,
            END OF ty_documentation.
 
-    TYPES: tyt_e071          TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
-           tyt_documentation TYPE STANDARD TABLE OF ty_documentation WITH DEFAULT KEY.
+    TYPES: tyt_documentation TYPE STANDARD TABLE OF ty_documentation WITH DEFAULT KEY.
 
     DATA: gs_e070           TYPE e070,
           gt_e071           TYPE tyt_e071,

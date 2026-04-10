@@ -4,7 +4,6 @@ CLASS /atrm/cl_package DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    TYPES: tyt_devclass TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY.
 
     METHODS constructor
       IMPORTING devclass TYPE devclass.
@@ -18,7 +17,7 @@ CLASS /atrm/cl_package DEFINITION
       RETURNING VALUE(subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
 
     METHODS get_all_packages
-      RETURNING VALUE(packages) TYPE tyt_devclass.
+      RETURNING VALUE(packages) TYPE /atrm/package_devclass_t.
 
     METHODS get_objects
       IMPORTING incl_sub TYPE flag DEFAULT ' '
@@ -353,7 +352,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     subpackages = get_subpackages( ).
     APPEND gv_devclass TO packages.
     LOOP AT subpackages INTO subpackage.
-      APPEND subpackage-package TO subpackages.
+      APPEND subpackage-package TO packages.
     ENDLOOP.
   ENDMETHOD.
 

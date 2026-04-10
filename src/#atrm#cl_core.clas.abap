@@ -5,8 +5,7 @@ CLASS /atrm/cl_core DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_tdevc    TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
-           tyt_packages TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY,
+    TYPES: tyt_tdevc TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
            BEGIN OF ty_trm_transport,
              trkorr    TYPE trkorr,
              migration TYPE flag,
@@ -21,29 +20,15 @@ CLASS /atrm/cl_core DEFINITION
              transport TYPE ty_trm_transport,
              trkorr    TYPE trkorr,
              timestamp TYPE timestamp,
-           END OF ty_trm_package_legacy,
-           BEGIN OF ty_trm_package,
-             name     TYPE /atrm/package_name,
-             registry TYPE /atrm/package_registry,
-             manifest TYPE xstring,
-             trkorr   TYPE trkorr,
-             devclass TYPE devclass,
-             packages TYPE tyt_packages,
-           END OF ty_trm_package.
+           END OF ty_trm_package_legacy.
     TYPES: tyt_trkorr             TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY,
            tyt_migration_trkorr   TYPE STANDARD TABLE OF /atrm/trkorr WITH DEFAULT KEY,
-           tyt_trm_package_legacy TYPE STANDARD TABLE OF ty_trm_package_legacy WITH DEFAULT KEY,
-           tyt_trm_package        TYPE STANDARD TABLE OF ty_trm_package WITH DEFAULT KEY.
+           tyt_trm_package_legacy TYPE STANDARD TABLE OF ty_trm_package_legacy WITH DEFAULT KEY.
 
     CLASS-METHODS get_installed_packages_legacy
       RETURNING VALUE(packages) TYPE tyt_trm_package_legacy.
     CLASS-METHODS get_installed_packages
-      RETURNING VALUE(packages) TYPE tyt_trm_package.
-
-    CLASS-METHODS get_lockfile
-      IMPORTING package_name     TYPE /atrm/package_name
-                package_registry TYPE /atrm/package_registry OPTIONAL
-      RETURNING VALUE(lockfile)  TYPE string.
+      RETURNING VALUE(packages) TYPE /atrm/packages_t.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -346,34 +331,23 @@ CLASS /atrm/cl_core IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
-  METHOD get_lockfile.
-    " TODO
-  ENDMETHOD.
-
   METHOD get_installed_packages.
     DATA: packages_data TYPE STANDARD TABLE OF /atrm/packages,
           package_data  LIKE LINE OF packages_data,
           e071_to_tadir TYPE STANDARD TABLE OF tadir,
           aux_e071      TYPE e071,
-          data          TYPE /atrm/if_core=>trm_package_data,
           package       TYPE REF TO /atrm/cl_package.
-    FIELD-SYMBOLS: <row>       TYPE ty_trm_package,
+    FIELD-SYMBOLS: <row>       TYPE /atrm/package,
                    <aux_tadir> TYPE tadir.
-    SELECT package_name package_registry data /atrm/packages~devclass
+    SELECT package_name package_registry timestamp manifest trkorr integrity dirty /atrm/packages~devclass
       FROM /atrm/packages
       INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
       INTO CORRESPONDING FIELDS OF TABLE packages_data.
     LOOP AT packages_data INTO package_data.
-      CLEAR data.
       CLEAR package.
-      CALL TRANSFORMATION id SOURCE XML package_data-data RESULT data = data.
       APPEND INITIAL LINE TO packages ASSIGNING <row>.
       CREATE OBJECT package EXPORTING devclass = package_data-devclass.
-      <row>-name = package_data-package_name.
-      <row>-registry = package_data-package_registry.
-      <row>-devclass = package_data-devclass.
-      <row>-manifest = data-manifest.
-      <row>-trkorr = data-trkorr.
+      MOVE-CORRESPONDING package_data TO <row>.
       <row>-packages = package->get_all_packages( ).
     ENDLOOP.
   ENDMETHOD.
