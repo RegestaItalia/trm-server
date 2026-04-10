@@ -1512,6 +1512,46 @@
      </DOCUMENTATION>
     </item>
     <item>
+     <FUNCNAME>/ATRM/GET_TR_TARGETS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get transport targets</SHORT_TEXT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>TARGETS</PARAMETER>
+       <TYP>TARSYSTEMS</TYP>
+      </RSEXP>
+     </EXPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>INVALID_INPUT</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>TARGETS</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>/ATRM/IMPORT_TR</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Import transport request</SHORT_TEXT>

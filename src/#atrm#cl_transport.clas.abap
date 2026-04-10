@@ -63,6 +63,13 @@ CLASS /atrm/cl_transport DEFINITION
       EXPORTING requests TYPE tmsiqreqs
       RAISING   /atrm/cx_exception.
 
+    "! Get transport targets
+    "! @parameter targets  | Transport targets
+    "! @raising /atrm/cx_exception | Raised if not initialized
+    CLASS-METHODS get_targets
+      RETURNING VALUE(targets) TYPE tarsystems
+      RAISING   /atrm/cx_exception.
+
     "! Get the current transport request number
     "! @parameter trkorr | Transport request number
     METHODS get_trkorr
@@ -805,6 +812,39 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDIF.
     SORT lt_stats BY timestamp DESCENDING.
     stat = lt_stats[ 1 ].
+  ENDMETHOD.
+
+  METHOD get_targets.
+    DATA: consolidations LIKE targets,
+          consolidation  LIKE LINE OF consolidations,
+          order          TYPE STANDARD TABLE OF tmscsys,
+          order_line     LIKE LINE OF order.
+    FIELD-SYMBOLS <tarsystem> TYPE tarsystem.
+    CALL FUNCTION 'TR_GET_CONSOLIDATION_TARGETS'
+      IMPORTING
+        et_targets             = consolidations
+      EXCEPTIONS
+        system_not_initialized = 1
+        OTHERS                 = 2.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    CHECK consolidations[] IS NOT INITIAL.
+    SELECT sysnam
+      FROM tmscsys
+      INTO CORRESPONDING FIELDS OF TABLE order
+      FOR ALL ENTRIES IN consolidations
+      WHERE sysnam EQ consolidations-table_line and systyp EQ 'V'.
+    LOOP AT order INTO order_line.
+      APPEND INITIAL LINE TO targets ASSIGNING <tarsystem>.
+      <tarsystem> = order_line-sysnam.
+    ENDLOOP.
+    LOOP AT consolidations INTO consolidation.
+      READ TABLE targets TRANSPORTING NO FIELDS WITH KEY table_line = consolidation.
+      CHECK sy-subrc <> 0.
+      APPEND INITIAL LINE TO targets ASSIGNING <tarsystem>.
+      <tarsystem> = consolidation.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
