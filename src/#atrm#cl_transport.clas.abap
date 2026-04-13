@@ -367,6 +367,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
     CHECK lt_e071[] IS NOT INITIAL.
     LOOP AT lt_e071 INTO ls_e071.
+      CALL FUNCTION 'TR_SORT_AND_COMPRESS_COMM'
+        EXPORTING
+          iv_trkorr                      = ls_e071-trkorr
+          iv_dialog                      = ' '
+        EXCEPTIONS
+          trkorr_not_found               = 1
+          order_released                 = 2
+          error_while_modifying_obj_list = 3
+          tr_enqueue_failed              = 4
+          no_authorization               = 5
+          OTHERS                         = 6.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
       CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
         EXPORTING
           is_e071_delete              = ls_e071
