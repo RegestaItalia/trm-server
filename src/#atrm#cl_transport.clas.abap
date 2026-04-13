@@ -209,6 +209,7 @@ CLASS /atrm/cl_transport DEFINITION
       IMPORTING text             TYPE as4text
                 target           TYPE tr_target
                 type             TYPE trfunction
+                attributes       TYPE scts_attrs OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
@@ -393,6 +394,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         /atrm/cx_exception=>raise( ).
       ENDIF.
     ENDLOOP.
+    COMMIT WORK AND WAIT.
   ENDMETHOD.
 
   METHOD create_workbench.
@@ -407,11 +409,25 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD create_customizing.
+    DATA: attributes TYPE scts_attrs,
+          attribute  LIKE LINE OF attributes.
+
+    CLEAR attribute.
+    attribute-attribute = 'SAP_ATO_TRANSPORT_TYPE'.
+    attribute-value = 'BC'.
+    APPEND attribute TO attributes.
+
+    CLEAR attribute.
+    attribute-attribute = 'SAP_CUS_TRANSPORT_CATEGORY'.
+    attribute-value = 'MANUAL_CUST'.
+    APPEND attribute TO attributes.
+
     create(
       EXPORTING
-        text      = text
-        target    = target
-        type      = 'W'
+        text       = text
+        target     = target
+        type       = 'W'
+        attributes = attributes
       RECEIVING
         transport = transport
     ).
@@ -435,6 +451,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         iv_text           = text
         iv_type           = type
         iv_target         = target
+        it_attributes     = attributes
       IMPORTING
         es_request_header = ls_header
       EXCEPTIONS
@@ -834,7 +851,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       FROM tmscsys
       INTO CORRESPONDING FIELDS OF TABLE order
       FOR ALL ENTRIES IN consolidations
-      WHERE sysnam EQ consolidations-table_line and systyp EQ 'V'.
+      WHERE sysnam EQ consolidations-table_line AND systyp EQ 'V'.
     LOOP AT order INTO order_line.
       APPEND INITIAL LINE TO targets ASSIGNING <tarsystem>.
       <tarsystem> = order_line-sysnam.
