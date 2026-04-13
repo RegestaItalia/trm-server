@@ -363,9 +363,6 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: lt_e071    TYPE STANDARD TABLE OF e071,
           ls_e071    LIKE LINE OF lt_e071,
           ls_request TYPE trwbo_request.
-    ls_request-h-trkorr = gv_trkorr.
-    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
-    CHECK lt_e071[] IS NOT INITIAL.
     CALL FUNCTION 'TR_SORT_AND_COMPRESS_COMM'
       EXPORTING
         iv_trkorr                      = gv_trkorr
@@ -380,6 +377,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+    ls_request-h-trkorr = gv_trkorr.
+    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
+    CHECK lt_e071[] IS NOT INITIAL.
     LOOP AT lt_e071 INTO ls_e071.
       CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
         EXPORTING
