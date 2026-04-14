@@ -402,7 +402,8 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       WHERE pgmid EQ lt_objects_aux-pgmid
         AND object EQ lt_objects_aux-object
         AND obj_name EQ lt_objects_aux-obj_name
-        AND ( trstatus EQ 'D' OR trstatus EQ 'L' ).
+        AND ( trstatus EQ 'D' OR trstatus EQ 'L' )
+        AND ( trfunction EQ 'K' OR trfunction EQ 'S' OR trfunction EQ 'R' ).
     LOOP AT lt_result_aux INTO ls_result_aux.
       UNASSIGN <fs_obj_lock>.
       READ TABLE locks TRANSPORTING NO FIELDS WITH KEY pgmid = ls_result_aux-pgmid object = ls_result_aux-object obj_name = ls_result_aux-obj_name.
