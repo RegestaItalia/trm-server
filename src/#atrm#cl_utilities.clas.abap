@@ -422,6 +422,9 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD update_package.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
+    IF package-dirty IS INITIAL. " <- this check is probably not needed
+      DELETE FROM /atrm/dirty WHERE package_name = package-package_name AND package_registry = package-package_registry.
+    ENDIF.
     COMMIT WORK AND WAIT.
     dequeue( tabname = '/ATRM/PACKAGES' ).
   ENDMETHOD.

@@ -332,24 +332,28 @@ CLASS /atrm/cl_core IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_installed_packages.
-    DATA: packages_data  TYPE STANDARD TABLE OF /atrm/packages,
-          package_data   LIKE LINE OF packages_data,
-          e071_to_tadir  TYPE STANDARD TABLE OF tadir,
+    DATA: e071_to_tadir  TYPE STANDARD TABLE OF tadir,
           aux_e071       TYPE e071,
           package        TYPE REF TO /atrm/cl_package,
           dummy_manifest TYPE /atrm/if_core=>ty_manifest.
     FIELD-SYMBOLS: <row>          TYPE /atrm/package,
                    <aux_tadir>    TYPE tadir,
                    <rest_version> TYPE string.
-    SELECT package_name package_registry timestamp manifest trkorr integrity dirty /atrm/packages~devclass
+    SELECT /atrm/packages~package_name
+           /atrm/packages~package_registry
+           /atrm/packages~manifest
+           /atrm/packages~trkorr
+           /atrm/packages~integrity dirty
+           /atrm/packages~devclass
+           e070~as4date
+           e070~as4time
       FROM /atrm/packages
       INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
-      INTO CORRESPONDING FIELDS OF TABLE packages_data.
-    LOOP AT packages_data INTO package_data.
+      INNER JOIN e070 ON e070~trkorr = /atrm/packages~trkorr
+      INTO CORRESPONDING FIELDS OF TABLE packages.
+    LOOP AT packages ASSIGNING <row>.
       CLEAR package.
-      APPEND INITIAL LINE TO packages ASSIGNING <row>.
-      CREATE OBJECT package EXPORTING devclass = package_data-devclass.
-      MOVE-CORRESPONDING package_data TO <row>.
+      CREATE OBJECT package EXPORTING devclass = <row>-devclass.
       <row>-packages = package->get_all_packages( ).
     ENDLOOP.
     " add trm-server (and trm-rest eventually) if installed via abapgit
@@ -360,7 +364,8 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       APPEND INITIAL LINE TO packages ASSIGNING <row>.
       <row>-package_name = 'trm-server'.
       <row>-package_registry = 'public'.
-      <row>-timestamp = 10000101000000.
+      <row>-as4date = '10000101'.
+      <row>-as4time = '000000'.
       SELECT SINGLE devclass FROM tadir INTO <row>-devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ '/ATRM/IF_SERVER'.
       IF <row>-devclass IS NOT INITIAL.
         CLEAR package.
@@ -382,7 +387,8 @@ CLASS /atrm/cl_core IMPLEMENTATION.
         APPEND INITIAL LINE TO packages ASSIGNING <row>.
         <row>-package_name = 'trm-rest'.
         <row>-package_registry = 'public'.
-        <row>-timestamp = 10000201000000.
+        <row>-as4date = '10000101'.
+        <row>-as4time = '000001'.
         SELECT SINGLE devclass FROM tadir INTO <row>-devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ '/ATRM/IF_REST'.
         IF <row>-devclass IS NOT INITIAL.
           CLEAR package.
