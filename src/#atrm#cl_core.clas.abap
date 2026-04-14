@@ -332,13 +332,15 @@ CLASS /atrm/cl_core IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_installed_packages.
-    DATA: packages_data TYPE STANDARD TABLE OF /atrm/packages,
-          package_data  LIKE LINE OF packages_data,
-          e071_to_tadir TYPE STANDARD TABLE OF tadir,
-          aux_e071      TYPE e071,
-          package       TYPE REF TO /atrm/cl_package.
-    FIELD-SYMBOLS: <row>       TYPE /atrm/package,
-                   <aux_tadir> TYPE tadir.
+    DATA: packages_data  TYPE STANDARD TABLE OF /atrm/packages,
+          package_data   LIKE LINE OF packages_data,
+          e071_to_tadir  TYPE STANDARD TABLE OF tadir,
+          aux_e071       TYPE e071,
+          package        TYPE REF TO /atrm/cl_package,
+          dummy_manifest TYPE /atrm/if_core=>ty_manifest.
+    FIELD-SYMBOLS: <row>          TYPE /atrm/package,
+                   <aux_tadir>    TYPE tadir,
+                   <rest_version> TYPE string.
     SELECT package_name package_registry timestamp manifest trkorr integrity dirty /atrm/packages~devclass
       FROM /atrm/packages
       INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
@@ -350,6 +352,50 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       MOVE-CORRESPONDING package_data TO <row>.
       <row>-packages = package->get_all_packages( ).
     ENDLOOP.
+    " add trm-server (and trm-rest eventually) if installed via abapgit
+    READ TABLE packages TRANSPORTING NO FIELDS WITH KEY package_name = 'trm-server' package_registry = 'public'.
+    IF sy-subrc <> 0.
+      UNASSIGN <row>.
+      CLEAR dummy_manifest.
+      APPEND INITIAL LINE TO packages ASSIGNING <row>.
+      <row>-package_name = 'trm-server'.
+      <row>-package_registry = 'public'.
+      <row>-timestamp = 10000101000000.
+      SELECT SINGLE devclass FROM tadir INTO <row>-devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ '/ATRM/IF_SERVER'.
+      IF <row>-devclass IS NOT INITIAL.
+        CLEAR package.
+        CREATE OBJECT package EXPORTING devclass = <row>-devclass.
+        <row>-packages = package->get_all_packages( ).
+      ENDIF.
+      dummy_manifest-name = <row>-package_name.
+      dummy_manifest-version = /atrm/if_server=>version.
+      CALL TRANSFORMATION id
+       SOURCE trm_manifest = dummy_manifest
+       RESULT XML <row>-manifest.
+    ENDIF.
+    READ TABLE packages TRANSPORTING NO FIELDS WITH KEY package_name = 'trm-rest' package_registry = 'public'.
+    IF sy-subrc <> 0.
+      ASSIGN ('/ATRM/IF_REST')=>('VERSION') TO <rest_version>.
+      IF sy-subrc EQ 0.
+        UNASSIGN <row>.
+        CLEAR dummy_manifest.
+        APPEND INITIAL LINE TO packages ASSIGNING <row>.
+        <row>-package_name = 'trm-rest'.
+        <row>-package_registry = 'public'.
+        <row>-timestamp = 10000201000000.
+        SELECT SINGLE devclass FROM tadir INTO <row>-devclass WHERE pgmid EQ 'R3TR' AND object EQ 'INTF' AND obj_name EQ '/ATRM/IF_REST'.
+        IF <row>-devclass IS NOT INITIAL.
+          CLEAR package.
+          CREATE OBJECT package EXPORTING devclass = <row>-devclass.
+          <row>-packages = package->get_all_packages( ).
+        ENDIF.
+        dummy_manifest-name = <row>-package_name.
+        dummy_manifest-version = <rest_version>.
+        CALL TRANSFORMATION id
+         SOURCE trm_manifest = dummy_manifest
+         RESULT XML <row>-manifest.
+      ENDIF.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
