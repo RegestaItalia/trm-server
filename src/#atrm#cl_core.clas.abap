@@ -343,7 +343,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
            /atrm/packages~package_registry
            /atrm/packages~manifest
            /atrm/packages~trkorr
-           /atrm/packages~integrity dirty
+           /atrm/packages~integrity
            /atrm/packages~devclass
            e070~as4date
            e070~as4time
@@ -355,6 +355,13 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       CLEAR package.
       CREATE OBJECT package EXPORTING devclass = <row>-devclass.
       <row>-packages = package->get_all_packages( ).
+      TRY.
+          <row>-dirty = package->get_dirty_entries(
+            from_date = <row>-as4date
+            from_time = <row>-as4time
+          ).
+        CATCH /atrm/cx_exception.
+      ENDTRY.
     ENDLOOP.
     " add trm-server (and trm-rest eventually) if installed via abapgit
     READ TABLE packages TRANSPORTING NO FIELDS WITH KEY package_name = 'trm-server' package_registry = 'public'.

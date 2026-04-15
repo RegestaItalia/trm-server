@@ -30,6 +30,12 @@ CLASS /atrm/cl_package DEFINITION
                 devlayer    TYPE devlayer OPTIONAL
       RAISING   /atrm/cx_exception.
 
+    METHODS get_dirty_entries
+      IMPORTING from_date    TYPE as4date
+                from_time    TYPE as4time
+      RETURNING VALUE(dirty) TYPE /atrm/dirty_t
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA: gv_devclass TYPE devclass.
@@ -353,6 +359,63 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     APPEND gv_devclass TO packages.
     LOOP AT subpackages INTO subpackage.
       APPEND subpackage-package TO packages.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD get_dirty_entries.
+    TYPES: BEGIN OF dirty_transport,
+             trkorr   TYPE trkorr,
+             strkorr  TYPE strkorr,
+             pgmid    TYPE pgmid,
+             object   TYPE trobjtype,
+             obj_name TYPE trobj_name,
+           END OF dirty_transport.
+    DATA: tadir           TYPE scts_tadir,
+          tadir_line      LIKE LINE OF tadir,
+          e071            TYPE STANDARD TABLE OF e071,
+          e071_line       LIKE LINE OF e071,
+          e071_dirty      TYPE STANDARD TABLE OF dirty_transport,
+          e071_dirty_line LIKE LINE OF e071_dirty,
+          dirty_line      LIKE LINE OF dirty.
+    get_objects(
+      EXPORTING
+        incl_sub = 'X'
+      IMPORTING
+        tadir    = tadir
+    ).
+    LOOP AT tadir INTO tadir_line.
+      CLEAR e071_line.
+      e071_line-pgmid = tadir_line-pgmid.
+      e071_line-object = tadir_line-object.
+      e071_line-obj_name = tadir_line-obj_name.
+      APPEND e071_line TO e071.
+    ENDLOOP.
+
+    CHECK e071[] IS NOT INITIAL.
+    SELECT e070~trkorr e070~strkorr e071~pgmid e071~object e071~obj_name
+      FROM e070
+      INNER JOIN e071 ON e071~trkorr = e070~trkorr
+      INTO CORRESPONDING FIELDS OF TABLE e071_dirty
+      FOR ALL ENTRIES IN e071
+      WHERE ( e070~trfunction EQ 'K' OR e070~trfunction EQ 'S' OR e070~trfunction EQ 'R' )
+        AND e071~pgmid EQ e071-pgmid
+        AND e071~object EQ e071-object
+        AND e071~obj_name EQ e071-obj_name
+        AND ( e070~as4date GT from_date OR (
+              e070~as4date EQ from_date AND
+              e070~as4time GT from_time
+             ) ).
+    SORT e071_dirty BY trkorr DESCENDING.
+    LOOP AT e071_dirty INTO e071_dirty_line.
+      " only write header transports
+      READ TABLE e071_dirty TRANSPORTING NO FIELDS WITH KEY trkorr = e071_dirty_line-strkorr pgmid = e071_dirty_line-pgmid object = e071_dirty_line-object obj_name = e071_dirty_line-obj_name.
+      CHECK sy-subrc NE 0.
+      CLEAR dirty_line.
+      dirty_line-trkorr = e071_dirty_line-trkorr.
+      dirty_line-pgmid = e071_dirty_line-pgmid.
+      dirty_line-object = e071_dirty_line-object.
+      dirty_line-obj_name = e071_dirty_line-obj_name.
+      APPEND dirty_line TO dirty.
     ENDLOOP.
   ENDMETHOD.
 
