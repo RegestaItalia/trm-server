@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_BINARY_FILE.
+FUNCTION /atrm/get_binary_file.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -13,7 +13,7 @@ FUNCTION /ATRM/GET_BINARY_FILE.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>get_binary_file(
+    /atrm/cl_utilities=>get_binary_file(
       EXPORTING
         file_path = file_path
       IMPORTING

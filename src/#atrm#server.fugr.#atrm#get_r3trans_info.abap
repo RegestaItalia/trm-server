@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_R3TRANS_INFO.
+FUNCTION /atrm/get_r3trans_info.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -12,7 +12,7 @@ FUNCTION /ATRM/GET_R3TRANS_INFO.
   PERFORM check_auth.
 
   TRY.
-      log = /ATRM/CL_UTILITIES=>get_r3trans_info( ).
+      log = /atrm/cl_utilities=>get_r3trans_info( ).
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

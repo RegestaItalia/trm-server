@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_TRANSPORT_LAYER.
+FUNCTION /atrm/get_transport_layer.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -11,7 +11,7 @@ FUNCTION /ATRM/GET_TRANSPORT_LAYER.
   PERFORM check_auth.
 
   TRY.
-      /ATRM/CL_UTILITIES=>get_default_transport_layer(
+      /atrm/cl_utilities=>get_default_transport_layer(
         IMPORTING
           layer = layer
       ).

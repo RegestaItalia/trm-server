@@ -1,4 +1,4 @@
-FUNCTION /ATRM/CREATE_LOG_POLLING.
+FUNCTION /atrm/create_log_polling.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -13,7 +13,7 @@ FUNCTION /ATRM/CREATE_LOG_POLLING.
   PERFORM check_auth.
 
   TRY.
-      go_log = /ATRM/CL_LOG_POLLING=>create( event ).
+      go_log = /atrm/cl_log_polling=>create( event ).
       id = go_log->id.
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.

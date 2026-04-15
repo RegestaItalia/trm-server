@@ -1,4 +1,4 @@
-FUNCTION /ATRM/WRITE_BINARY_FILE.
+FUNCTION /atrm/write_binary_file.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -12,7 +12,7 @@ FUNCTION /ATRM/WRITE_BINARY_FILE.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>write_binary_file(
+    /atrm/cl_utilities=>write_binary_file(
       EXPORTING
         file_path = file_path
         file      = file

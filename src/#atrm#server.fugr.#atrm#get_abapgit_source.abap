@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_ABAPGIT_SOURCE.
+FUNCTION /atrm/get_abapgit_source.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -16,8 +16,8 @@ FUNCTION /ATRM/GET_ABAPGIT_SOURCE.
   PERFORM check_auth.
 
   TRY.
-      DATA ser_objects TYPE /ATRM/CL_ABAPGIT=>tyt_ser_objs.
-      /ATRM/CL_ABAPGIT=>serialize(
+      DATA ser_objects TYPE /atrm/cl_abapgit=>tyt_ser_objs.
+      /atrm/cl_abapgit=>serialize(
         EXPORTING
           devclass = devclass
         IMPORTING

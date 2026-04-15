@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_OBJS_LOCKS.
+FUNCTION /atrm/get_objs_locks.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -13,7 +13,7 @@ FUNCTION /ATRM/GET_OBJS_LOCKS.
   PERFORM check_auth.
 
   TRY.
-    locks = /ATRM/CL_UTILITIES=>get_objs_locks(
+    locks = /atrm/cl_utilities=>get_objs_locks(
       EXPORTING
         objects = objects[]
     ).

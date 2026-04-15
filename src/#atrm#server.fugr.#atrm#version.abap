@@ -1,4 +1,4 @@
-FUNCTION /ATRM/VERSION.
+FUNCTION /atrm/version.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -9,7 +9,7 @@ FUNCTION /ATRM/VERSION.
   "otherwise clients may not be able to find out if this system has
   "trm-server installed or not
 
-  version = /ATRM/IF_SERVER=>version.
+  version = /atrm/if_server=>version.
 
   "read other versions
   FIELD-SYMBOLS <fs_rest> TYPE string.

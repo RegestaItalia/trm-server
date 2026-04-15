@@ -1,4 +1,4 @@
-FUNCTION /ATRM/SET_INSTALL_DEVC.
+FUNCTION /atrm/set_install_devc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  TABLES
@@ -13,7 +13,7 @@ FUNCTION /ATRM/SET_INSTALL_DEVC.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>add_install_devclass(
+    /atrm/cl_utilities=>add_install_devclass(
       EXPORTING
         installdevc = installdevc[]
     ).

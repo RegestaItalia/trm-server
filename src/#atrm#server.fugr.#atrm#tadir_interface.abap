@@ -1,4 +1,4 @@
-FUNCTION /ATRM/TADIR_INTERFACE.
+FUNCTION /atrm/tadir_interface.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -17,7 +17,7 @@ FUNCTION /ATRM/TADIR_INTERFACE.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>tadir_interface(
+    /atrm/cl_utilities=>tadir_interface(
       EXPORTING
         pgmid     = pgmid
         object    = object

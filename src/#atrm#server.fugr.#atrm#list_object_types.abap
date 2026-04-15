@@ -1,4 +1,4 @@
-FUNCTION /ATRM/LIST_OBJECT_TYPES.
+FUNCTION /atrm/list_object_types.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  TABLES
@@ -11,7 +11,7 @@ FUNCTION /ATRM/LIST_OBJECT_TYPES.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_SINGLETON=>get( )->get_supported_object_types(
+    /atrm/cl_singleton=>get( )->get_supported_object_types(
       IMPORTING
         object_text = object_text[]
     ).

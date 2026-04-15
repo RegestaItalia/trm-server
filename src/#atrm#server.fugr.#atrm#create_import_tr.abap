@@ -14,7 +14,7 @@ FUNCTION /atrm/create_import_tr.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_TRANSPORT=>create_workbench(
+    /atrm/cl_transport=>create_workbench(
       EXPORTING
         text   = text
         target = target

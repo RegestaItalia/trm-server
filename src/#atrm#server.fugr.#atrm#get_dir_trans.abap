@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_DIR_TRANS.
+FUNCTION /atrm/get_dir_trans.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -11,7 +11,7 @@ FUNCTION /ATRM/GET_DIR_TRANS.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>get_dir_trans(
+    /atrm/cl_utilities=>get_dir_trans(
       IMPORTING
         dir_trans = dir_trans
     ).

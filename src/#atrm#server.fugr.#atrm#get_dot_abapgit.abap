@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_DOT_ABAPGIT.
+FUNCTION /atrm/get_dot_abapgit.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,7 +14,7 @@ FUNCTION /ATRM/GET_DOT_ABAPGIT.
   PERFORM check_auth.
 
   TRY.
-      dot_abapgit = /ATRM/CL_ABAPGIT=>get_dot_abapgit(
+      dot_abapgit = /atrm/cl_abapgit=>get_dot_abapgit(
         EXPORTING
           devclass    = devclass
       ).

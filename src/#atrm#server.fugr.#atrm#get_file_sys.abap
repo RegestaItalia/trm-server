@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_FILE_SYS.
+FUNCTION /atrm/get_file_sys.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  EXPORTING
@@ -12,7 +12,7 @@ FUNCTION /ATRM/GET_FILE_SYS.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_UTILITIES=>get_file_sys(
+    /atrm/cl_utilities=>get_file_sys(
       IMPORTING
         file_sys = file_sys
     ).

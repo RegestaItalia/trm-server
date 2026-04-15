@@ -1,4 +1,4 @@
-FUNCTION /ATRM/CREATE_CUST_TR.
+FUNCTION /atrm/create_cust_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,7 +14,7 @@ FUNCTION /ATRM/CREATE_CUST_TR.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_TRANSPORT=>create_customizing(
+    /atrm/cl_transport=>create_customizing(
       EXPORTING
         text   = text
         target = target

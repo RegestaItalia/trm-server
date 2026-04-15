@@ -1,4 +1,4 @@
-FUNCTION /ATRM/CREATE_PACKAGE.
+FUNCTION /atrm/create_package.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -12,7 +12,7 @@ FUNCTION /ATRM/CREATE_PACKAGE.
   PERFORM check_auth.
 
   TRY.
-      /ATRM/CL_PACKAGE=>create(
+      /atrm/cl_package=>create(
         EXPORTING
           data = data
       ).

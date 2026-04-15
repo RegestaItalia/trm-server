@@ -1,4 +1,4 @@
-FUNCTION /ATRM/READ_TMS_QUEUE.
+FUNCTION /atrm/read_tms_queue.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,7 +14,7 @@ FUNCTION /ATRM/READ_TMS_QUEUE.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_TRANSPORT=>read_queue(
+    /atrm/cl_transport=>read_queue(
       EXPORTING
         target   = target
       IMPORTING

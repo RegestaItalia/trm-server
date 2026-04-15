@@ -1,4 +1,4 @@
-FUNCTION /ATRM/CREATE_TOC.
+FUNCTION /atrm/create_toc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,7 +14,7 @@ FUNCTION /ATRM/CREATE_TOC.
   PERFORM check_auth.
 
   TRY.
-    /ATRM/CL_TRANSPORT=>create_transport_of_copies(
+    /atrm/cl_transport=>create_transport_of_copies(
       EXPORTING
         text   = text
         target = target
