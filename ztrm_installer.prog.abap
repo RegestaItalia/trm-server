@@ -1074,7 +1074,7 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
 
     INSERT ('/ATRM/PACKAGES') FROM <package>.
-    COMMIT WORK.
+    COMMIT WORK AND WAIT.
   ENDMETHOD.
 
   METHOD handle_release.
@@ -1425,7 +1425,7 @@ CLASS lcl_report IMPLEMENTATION.
         " direct update to tadir is against best practices but it's the only way to move the objects to the correct package
         UPDATE tadir set devclass = node-package srcsystem = 'TRM' genflag = 'X' WHERE pgmid = tadir_line-pgmid AND object = tadir_line-object AND obj_name = tadir_line-obj_name.
       ENDLOOP.
-      COMMIT WORK.
+      COMMIT WORK AND WAIT.
     ENDIF.
     installed = 'X'.
   ENDMETHOD.
