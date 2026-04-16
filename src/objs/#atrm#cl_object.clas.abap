@@ -140,7 +140,7 @@ CLASS /atrm/cl_object IMPLEMENTATION.
         origin = me
       )->map_dependencies(
         CHANGING
-          dependencies = dependencies
+          deps = dependencies
       ).
     ENDLOOP.
   ENDMETHOD.

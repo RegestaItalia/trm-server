@@ -14,7 +14,7 @@ CLASS /atrm/cl_senvi_map DEFINITION
                 origin     TYPE REF TO /atrm/cl_object
       RETURNING VALUE(map) TYPE REF TO /atrm/cl_senvi_map.
     METHODS map_dependencies
-      CHANGING dependencies TYPE /atrm/object_dependency_t.
+      CHANGING deps TYPE /atrm/object_dependency_t.
   PROTECTED SECTION.
     DATA dependencies TYPE /atrm/object_dependency_t.
     METHODS determine
@@ -67,9 +67,9 @@ CLASS /atrm/cl_senvi_map IMPLEMENTATION.
   METHOD map_dependencies.
     DATA ls_dependency LIKE LINE OF dependencies.
     LOOP AT dependencies INTO ls_dependency.
-      READ TABLE dependencies TRANSPORTING NO FIELDS WITH KEY tabname = ls_dependency-tabname tabkey = ls_dependency-tabkey.
+      READ TABLE deps TRANSPORTING NO FIELDS WITH KEY tabname = ls_dependency-tabname tabkey = ls_dependency-tabkey.
       CHECK sy-subrc <> 0.
-      APPEND ls_dependency TO dependencies.
+      APPEND ls_dependency TO deps.
     ENDLOOP.
   ENDMETHOD.
 
