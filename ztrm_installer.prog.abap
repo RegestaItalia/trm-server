@@ -702,6 +702,7 @@ CLASS lcl_report IMPLEMENTATION.
           checksum = release-checksum
         IMPORTING
           installed = ok_rest
+          integrity = integrity
       ).
       IF ok_rest EQ 'X'.
         update_packages_table(
