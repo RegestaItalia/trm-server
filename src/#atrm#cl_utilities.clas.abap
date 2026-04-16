@@ -421,11 +421,14 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD update_package.
-    DATA lo_badi       TYPE REF TO /atrm/trm_package_data.
+    DATA: subrc   TYPE syst_subrc,
+          lo_badi TYPE REF TO /atrm/trm_package_data.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
     COMMIT WORK AND WAIT.
-    IF sy-subrc EQ 0.
+    subrc = sy-subrc.
+    dequeue( tabname = '/ATRM/PACKAGES' ).
+    IF subrc EQ 0.
       TRY.
           GET BADI lo_badi.
           CALL BADI lo_badi->trm_packages_change
@@ -434,7 +437,6 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
         CATCH cx_badi_not_implemented cx_badi_initial_reference.
       ENDTRY.
     ENDIF.
-    dequeue( tabname = '/ATRM/PACKAGES' ).
   ENDMETHOD.
 
 ENDCLASS.
