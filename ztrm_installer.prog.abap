@@ -1031,7 +1031,7 @@ CLASS lcl_report IMPLEMENTATION.
           data    TYPE REF TO data.
     FIELD-SYMBOLS: <package>   TYPE any,
                    <name>      TYPE any,
-                   <timestamp> TYPE any,
+                   <registry>  TYPE any,
                    <devclass>  TYPE any,
                    <manifest>  TYPE any,
                    <trkorr>    TYPE any,
@@ -1044,9 +1044,9 @@ CLASS lcl_report IMPLEMENTATION.
     IF sy-subrc EQ 0.
       <name> = name.
     ENDIF.
-    ASSIGN COMPONENT 'TIMESTAMP' OF STRUCTURE <package> TO <timestamp>.
+    ASSIGN COMPONENT 'PACKAGE_REGISTRY' OF STRUCTURE <package> TO <registry>.
     IF sy-subrc = 0.
-      GET TIME STAMP FIELD <timestamp>.
+      <registry> = 'public'.
     ENDIF.
     ASSIGN COMPONENT 'DEVCLASS' OF STRUCTURE <package> TO <devclass>.
     IF sy-subrc EQ 0.
@@ -1420,19 +1420,12 @@ CLASS lcl_report IMPLEMENTATION.
         i_output_immediately = 'X' ).
       LOOP AT tadir INTO tadir_line.
         READ TABLE hierarchy INTO node WITH KEY original = tadir_line-devclass.
-        CALL FUNCTION 'TR_TADIR_INTERFACE'
-          EXPORTING
-            wi_test_modus      = ' '
-            wi_tadir_pgmid     = tadir_line-pgmid
-            wi_tadir_object    = tadir_line-object
-            wi_tadir_obj_name  = tadir_line-obj_name
-            wi_tadir_devclass  = node-package
-            wi_tadir_srcsystem = 'TRM'
-            wi_set_genflag     = 'X'
-*           iv_no_pak_check    = 'X'
-          EXCEPTIONS
-            OTHERS             = 1.
+        " use of TR_TADIR_INTERFACE is not possible here
+        " it requires system to have /ATRM/ namespace
+        " direct update to tadir is against best practices but it's the only way to move the objects to the correct package
+        UPDATE tadir set devclass = node-package srcsystem = 'TRM' genflag = 'X' WHERE pgmid = tadir_line-pgmid AND object = tadir_line-object AND obj_name = tadir_line-obj_name.
       ENDLOOP.
+      COMMIT WORK.
     ENDIF.
     installed = 'X'.
   ENDMETHOD.
