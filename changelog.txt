@@ -9,6 +9,13 @@ Legend
 - : removed
 
 
+2026-04-15 v6.0.0
+-------------------
+
+! moved from Z to namespace /ATRM/
+! get objs locks methods
++ new api methods
+
 2026-03-03 v5.2.0
 -------------------
 

@@ -8,7 +8,7 @@
    <IGNORE>
     <item>*.sush.xml</item>
    </IGNORE>
-   <VERSION_CONSTANT>ZIF_TRM=&gt;VERSION</VERSION_CONSTANT>
+   <VERSION_CONSTANT>/ATRM/IF_SERVER=&gt;VERSION</VERSION_CONSTANT>
   </DATA>
  </asx:values>
 </asx:abap>
