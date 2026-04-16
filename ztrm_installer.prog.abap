@@ -137,8 +137,7 @@ CLASS lcl_report DEFINITION.
         checksum  TYPE string OPTIONAL
       EXPORTING
         installed TYPE flag
-        integrity TYPE string
-        manifest  TYPE xstring.
+        integrity TYPE string.
 
     CLASS-METHODS get_dir_trans
       EXPORTING dir_trans TYPE pfevalue.
@@ -178,10 +177,12 @@ CLASS lcl_report DEFINITION.
         it_packages      TYPE ty_package_tab
       RETURNING
         VALUE(rv_parent) TYPE string.
+    CLASS-METHODS get_transport_manifest
+      IMPORTING trkorr          TYPE trkorr
+      RETURNING VALUE(manifest) TYPE xstring.
     CLASS-METHODS update_packages_table
       IMPORTING
         name      TYPE string
-        manifest  TYPE xstring
         integrity TYPE string
         devclass  TYPE devclass.
 ENDCLASS.
@@ -339,7 +340,6 @@ CLASS lcl_report IMPLEMENTATION.
           bin       TYPE STANDARD TABLE OF x255,
           filelen   TYPE i,
           file      TYPE xstring,
-          manifest  TYPE xstring,
           integrity TYPE string.
 
     IF p_lserv IS INITIAL.
@@ -403,16 +403,16 @@ CLASS lcl_report IMPLEMENTATION.
         trkorr    = server_trkorr
       IMPORTING
         installed = ok_server
-        manifest  = manifest
         integrity = integrity
     ).
     IF ok_server EQ 'X'.
       update_packages_table(
         name      = 'trm-server'
-        manifest  = manifest
         integrity = integrity
         devclass  = '$TRM'
       ).
+    ELSE.
+      RETURN.
     ENDIF.
 
     IF p_rest EQ 'X'.
@@ -471,13 +471,11 @@ CLASS lcl_report IMPLEMENTATION.
           trkorr    = rest_trkorr
         IMPORTING
           installed = ok_rest
-          manifest  = manifest
           integrity = integrity
       ).
       IF ok_rest EQ 'X'.
         update_packages_table(
           name      = 'trm-rest'
-          manifest  = manifest
           integrity = integrity
           devclass  = '$TRM_REST'
         ).
@@ -500,7 +498,6 @@ CLASS lcl_report IMPLEMENTATION.
       confirm_answer  TYPE c,
       release         TYPE release,
       file            TYPE xstring,
-      manifest        TYPE xstring,
       integrity       TYPE string.
 
     IF p_vscan EQ 'X'.
@@ -629,16 +626,16 @@ CLASS lcl_report IMPLEMENTATION.
         checksum = release-checksum
       IMPORTING
         installed = ok_server
-          manifest  = manifest
           integrity = integrity
     ).
     IF ok_server EQ 'X'.
       update_packages_table(
         name      = 'trm-server'
-        manifest  = manifest
         integrity = integrity
         devclass  = '$TRM'
       ).
+    ELSE.
+      RETURN.
     ENDIF.
 
     IF p_rest EQ 'X'.
@@ -709,7 +706,6 @@ CLASS lcl_report IMPLEMENTATION.
       IF ok_rest EQ 'X'.
         update_packages_table(
           name      = 'trm-rest'
-          manifest  = manifest
           integrity = integrity
           devclass  = '$TRM_REST'
         ).
@@ -963,6 +959,73 @@ CLASS lcl_report IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
+  METHOD get_transport_manifest.
+    TYPES: BEGIN OF ty_documentation,
+             langu   TYPE doku_langu,
+             version TYPE dokvers,
+             value   TYPE string,
+           END OF ty_documentation.
+    TYPES: BEGIN OF ty_doktl_line,
+             no    TYPE doku_line,
+             value TYPE string,
+           END OF ty_doktl_line,
+           tyt_doktl_line TYPE STANDARD TABLE OF ty_doktl_line WITH DEFAULT KEY,
+           BEGIN OF ty_doktl,
+             langu     TYPE doku_langu,
+             version   TYPE dokvers,
+             doc_lines TYPE tyt_doktl_line,
+           END OF ty_doktl.
+    DATA: docs            TYPE STANDARD TABLE OF ty_documentation,
+          lt_doktl        TYPE STANDARD TABLE OF doktl,
+          ls_doktl        LIKE LINE OF lt_doktl,
+          lt_trkorr_doktl TYPE STANDARD TABLE OF ty_doktl,
+          ls_trkorr_doktl LIKE LINE OF lt_trkorr_doktl,
+          ls_dokt_line    TYPE ty_doktl_line,
+          lt_lines        TYPE STANDARD TABLE OF string.
+    FIELD-SYMBOLS: <fs_trkorr_doktl>      TYPE ty_doktl,
+                   <fs_trkorr_doktl_line> TYPE ty_doktl_line,
+                   <fs_doc>               TYPE ty_documentation.
+    SELECT langu dokversion line doktext FROM doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE id EQ 'TA' AND object EQ trkorr.
+    LOOP AT lt_doktl INTO ls_doktl.
+      UNASSIGN <fs_trkorr_doktl>.
+      UNASSIGN <fs_trkorr_doktl_line>.
+      READ TABLE lt_trkorr_doktl ASSIGNING <fs_trkorr_doktl> WITH KEY langu = ls_doktl-langu version = ls_doktl-dokversion.
+      IF sy-subrc <> 0.
+        APPEND INITIAL LINE TO lt_trkorr_doktl ASSIGNING <fs_trkorr_doktl>.
+        <fs_trkorr_doktl>-langu = ls_doktl-langu.
+        <fs_trkorr_doktl>-version = ls_doktl-dokversion.
+      ENDIF.
+      APPEND INITIAL LINE TO <fs_trkorr_doktl>-doc_lines ASSIGNING <fs_trkorr_doktl_line>.
+      <fs_trkorr_doktl_line>-no = ls_doktl-line.
+      <fs_trkorr_doktl_line>-value = ls_doktl-doktext.
+      SORT <fs_trkorr_doktl>-doc_lines BY no ASCENDING.
+    ENDLOOP.
+    SORT lt_trkorr_doktl BY version ASCENDING.
+    LOOP AT lt_trkorr_doktl INTO ls_trkorr_doktl.
+      UNASSIGN <fs_doc>.
+      CLEAR lt_lines.
+      CLEAR ls_dokt_line.
+      APPEND INITIAL LINE TO docs ASSIGNING <fs_doc>.
+      <fs_doc>-langu = ls_trkorr_doktl-langu.
+      <fs_doc>-version = ls_trkorr_doktl-version.
+      LOOP AT ls_trkorr_doktl-doc_lines INTO ls_dokt_line.
+        APPEND ls_dokt_line-value TO lt_lines.
+      ENDLOOP.
+      CONCATENATE LINES OF lt_lines INTO <fs_doc>-value.
+    ENDLOOP.
+    UNASSIGN <fs_doc>.
+    READ TABLE docs WITH KEY version = '0001' langu = 'EN' ASSIGNING <fs_doc>.
+    ASSERT <fs_doc> IS ASSIGNED.
+    CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
+      EXPORTING
+        text   = <fs_doc>-value
+      IMPORTING
+        buffer = manifest
+      EXCEPTIONS
+        failed = 1
+        OTHERS = 2.
+    ASSERT sy-subrc EQ 0.
+  ENDMETHOD.
   METHOD update_packages_table.
     DATA: package TYPE REF TO data,
           data    TYPE REF TO data.
@@ -972,7 +1035,7 @@ CLASS lcl_report IMPLEMENTATION.
                    <devclass>  TYPE any,
                    <manifest>  TYPE any,
                    <trkorr>    TYPE any,
-                   <integrity> tYPE any.
+                   <integrity> TYPE any.
 
     CREATE DATA package TYPE ('/ATRM/PACKAGES').
     ASSIGN package->* TO <package>.
@@ -989,16 +1052,20 @@ CLASS lcl_report IMPLEMENTATION.
     IF sy-subrc EQ 0.
       <devclass> = devclass.
     ENDIF.
-    ASSIGN COMPONENT 'MANIFEST' OF STRUCTURE <package> TO <manifest>.
-    IF sy-subrc = 0.
-      <manifest> = manifest.
-    ENDIF.
     ASSIGN COMPONENT 'TRKORR' OF STRUCTURE <package> TO <trkorr>.
     IF sy-subrc = 0.
       IF name EQ 'trm-server'.
         <trkorr> = server_trkorr.
       ELSE.
         <trkorr> = rest_trkorr.
+      ENDIF.
+    ENDIF.
+    ASSIGN COMPONENT 'MANIFEST' OF STRUCTURE <package> TO <manifest>.
+    IF sy-subrc = 0.
+      IF name EQ 'trm-server'.
+        <manifest> = get_transport_manifest( server_trkorr ).
+      ELSE.
+        <manifest> = get_transport_manifest( rest_trkorr ).
       ENDIF.
     ENDIF.
     ASSIGN COMPONENT 'INTEGRITY' OF STRUCTURE <package> TO <integrity>.
@@ -1180,20 +1247,6 @@ CLASS lcl_report IMPLEMENTATION.
     ).
     IF data_file IS INITIAL OR sy-subrc <> 0.
       display_error( 'Error in release content: data file not found' ).
-      RETURN.
-    ENDIF.
-    zip->get(
-      EXPORTING
-        name = 'manifest.json'
-      IMPORTING
-        content = manifest
-      EXCEPTIONS
-        zip_decompression_error = 1
-        zip_index_error         = 2
-        OTHERS                  = 3
-    ).
-    IF manifest IS INITIAL OR sy-subrc <> 0.
-      display_error( 'Error in release content: manifest file not found' ).
       RETURN.
     ENDIF.
     tmssysnam = sy-sysid.
