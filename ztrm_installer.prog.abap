@@ -116,9 +116,6 @@ CLASS lcl_report DEFINITION.
           PREFERRED PARAMETER url
       RETURNING
         VALUE(client) TYPE REF TO if_http_client.
-    METHODS display_error
-      IMPORTING
-        iv_text TYPE string.
     METHODS display_messages
       IMPORTING
         iv_response TYPE string.
@@ -132,6 +129,7 @@ CLASS lcl_report DEFINITION.
         ok_rest   TYPE flag.
     METHODS handle_release
       IMPORTING
+        name      TYPE string
         release   TYPE xstring
         trkorr    TYPE trkorr
         checksum  TYPE string OPTIONAL
@@ -139,6 +137,9 @@ CLASS lcl_report DEFINITION.
         installed TYPE flag
         integrity TYPE string.
 
+    CLASS-METHODS display_error
+      IMPORTING
+        iv_text TYPE string.
     CLASS-METHODS get_dir_trans
       EXPORTING dir_trans TYPE pfevalue.
     CLASS-METHODS write_binary_file
@@ -185,6 +186,7 @@ CLASS lcl_report DEFINITION.
         name      TYPE string
         integrity TYPE string
         devclass  TYPE devclass.
+    class-METHODS activate_rest_sicf.
 ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
@@ -399,6 +401,7 @@ CLASS lcl_report IMPLEMENTATION.
     WRITE / 'Starting installation of trm-server...'.
     handle_release(
       EXPORTING
+        name      = 'trm-server'
         release   = file
         trkorr    = server_trkorr
       IMPORTING
@@ -417,7 +420,7 @@ CLASS lcl_report IMPLEMENTATION.
 
     IF p_rest EQ 'X'.
       filename = p_lrest.
-
+      CLEAR: filelen, bin, file.
       CALL FUNCTION 'GUI_UPLOAD'
         EXPORTING
           filename                = filename
@@ -467,6 +470,7 @@ CLASS lcl_report IMPLEMENTATION.
       WRITE / 'Starting installation of trm-rest...'.
       handle_release(
         EXPORTING
+          name      = 'trm-rest'
           release   = file
           trkorr    = rest_trkorr
         IMPORTING
@@ -479,6 +483,7 @@ CLASS lcl_report IMPLEMENTATION.
           integrity = integrity
           devclass  = '$TRM_REST'
         ).
+        activate_rest_sicf( ).
       ENDIF.
     ENDIF.
   ENDMETHOD.
@@ -621,6 +626,7 @@ CLASS lcl_report IMPLEMENTATION.
     ).
     handle_release(
       EXPORTING
+        name     = 'trm-server'
         release  = file
         trkorr   = server_trkorr
         checksum = release-checksum
@@ -697,6 +703,7 @@ CLASS lcl_report IMPLEMENTATION.
       ).
       handle_release(
         EXPORTING
+          name     = 'trm-rest'
           release  = file
           trkorr   = rest_trkorr
           checksum = release-checksum
@@ -710,6 +717,7 @@ CLASS lcl_report IMPLEMENTATION.
           integrity = integrity
           devclass  = '$TRM_REST'
         ).
+        activate_rest_sicf( ).
       ENDIF.
     ENDIF.
   ENDMETHOD.
@@ -872,6 +880,7 @@ CLASS lcl_report IMPLEMENTATION.
       ENDIF.
     ENDIF.
     subrc = 0.
+    CLEAR sy-batch.
   ENDMETHOD.
   METHOD refresh_tms_txt.
     DATA ls_tmsbuftxt TYPE tmsbuftxt.
@@ -1077,6 +1086,24 @@ CLASS lcl_report IMPLEMENTATION.
     INSERT ('/ATRM/PACKAGES') FROM <package>.
     COMMIT WORK AND WAIT.
   ENDMETHOD.
+  METHOD activate_rest_sicf.
+    cl_icf_tree=>activate_node(
+      EXPORTING
+        url                      = '/ztrmserver'
+        hostname                 = 'DEFAULT_HOST'
+      EXCEPTIONS
+        node_not_existing        = 1
+        enqueue_error            = 2
+        no_authority             = 3
+        url_and_nodeguid_space   = 4
+        url_and_nodeguid_fill_in = 5
+        others                   = 6
+    ).
+    IF SY-SUBRC <> 0.
+      display_error( 'REST SICF node is not active!' ).
+      WRITE: /, 'REST SICF node is not active!'.
+    ENDIF.
+  ENDMETHOD.
 
   METHOD handle_release.
     TYPES: BEGIN OF manifest,
@@ -1187,7 +1214,7 @@ CLASS lcl_report IMPLEMENTATION.
       CHANGING
         data             = release_manifest
     ).
-    IF release_manifest-name <> 'trm-server' AND release_manifest-name <> 'trm-rest'.
+    IF release_manifest-name <> name.
       display_error( 'Error in release content: invalid manifest' ).
       WRITE: /, 'Expected manifest name to be trm-server or trm-rest but found', release_manifest-name.
       RETURN.
@@ -1424,7 +1451,7 @@ CLASS lcl_report IMPLEMENTATION.
         " use of TR_TADIR_INTERFACE is not possible here
         " it requires system to have /ATRM/ namespace
         " direct update to tadir is against best practices but it's the only way to move the objects to the correct package
-        UPDATE tadir set devclass = node-package srcsystem = 'TRM' genflag = 'X' WHERE pgmid = tadir_line-pgmid AND object = tadir_line-object AND obj_name = tadir_line-obj_name.
+        UPDATE tadir SET devclass = node-package srcsystem = 'TRM' genflag = 'X' WHERE pgmid = tadir_line-pgmid AND object = tadir_line-object AND obj_name = tadir_line-obj_name.
       ENDLOOP.
       COMMIT WORK AND WAIT.
     ENDIF.
