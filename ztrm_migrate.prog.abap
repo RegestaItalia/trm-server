@@ -172,7 +172,6 @@ CLASS lcl_report IMPLEMENTATION.
       ELSE.
         package-package_registry = legacy_package-registry.
       ENDIF.
-      package-timestamp = legacy_package-timestamp.
       package-trkorr = legacy_package-transport-trkorr.
       package-manifest = legacy_package-xmanifest.
       package-devclass = find_root_devclass( legacy_package-tdevc ).
