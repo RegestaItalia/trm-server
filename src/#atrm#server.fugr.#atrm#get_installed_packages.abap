@@ -15,7 +15,7 @@ FUNCTION /atrm/get_installed_packages.
 
   TRY.
       IF package_name IS INITIAL.
-        packages = /atrm/cl_singleton=>get( )->get_installed_packages( ).
+        packages = /atrm/cl_core=>get_installed_packages( ).
       ELSE.
         packages = /atrm/cl_core=>get_installed_packages(
           package_name     = package_name
