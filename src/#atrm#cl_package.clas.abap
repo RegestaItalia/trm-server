@@ -363,49 +363,69 @@ CLASS /atrm/cl_package IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_dirty_entries.
-    TYPES: BEGIN OF dirty_transport,
+    TYPES: BEGIN OF transport,
              trkorr   TYPE trkorr,
              strkorr  TYPE strkorr,
              pgmid    TYPE pgmid,
              object   TYPE trobjtype,
              obj_name TYPE trobj_name,
-           END OF dirty_transport.
+           END OF transport.
     DATA: tadir           TYPE scts_tadir,
-          tadir_line      LIKE LINE OF tadir,
-          e071            TYPE STANDARD TABLE OF e071,
-          e071_line       LIKE LINE OF e071,
-          e071_dirty      TYPE STANDARD TABLE OF dirty_transport,
+          transports      TYPE STANDARD TABLE OF transport,
+          transport_line  LIKE LINE OF transports,
+          e071            TYPE e071,
+          parent          TYPE tadir,
+          parent_e071     TYPE e071,
+          e071_dirty      TYPE STANDARD TABLE OF transport,
           e071_dirty_line LIKE LINE OF e071_dirty,
-          dirty_line      LIKE LINE OF dirty.
+          dirty_line      LIKE LINE OF dirty,
+          e07t            TYPE STANDARD TABLE OF e07t,
+          e07t_line       LIKE LINE OF e07t.
+    FIELD-SYMBOLS <dirty_line> TYPE /atrm/dirty.
+
     get_objects(
       EXPORTING
         incl_sub = 'X'
       IMPORTING
         tadir    = tadir
     ).
-    LOOP AT tadir INTO tadir_line.
-      CLEAR e071_line.
-      e071_line-pgmid = tadir_line-pgmid.
-      e071_line-object = tadir_line-object.
-      e071_line-obj_name = tadir_line-obj_name.
-      APPEND e071_line TO e071.
-    ENDLOOP.
+    CHECK tadir[] IS NOT INITIAL.
 
-    CHECK e071[] IS NOT INITIAL.
     SELECT e070~trkorr e070~strkorr e071~pgmid e071~object e071~obj_name
       FROM e070
       INNER JOIN e071 ON e071~trkorr = e070~trkorr
-      INTO CORRESPONDING FIELDS OF TABLE e071_dirty
-      FOR ALL ENTRIES IN e071
+      INTO CORRESPONDING FIELDS OF TABLE transports
       WHERE ( e070~trfunction EQ 'K' OR e070~trfunction EQ 'S' OR e070~trfunction EQ 'R' )
-        AND e071~pgmid EQ e071-pgmid
-        AND e071~object EQ e071-object
-        AND e071~obj_name EQ e071-obj_name
         AND ( e070~as4date GT from_date OR (
               e070~as4date EQ from_date AND
               e070~as4time GT from_time
              ) ).
-    SORT e071_dirty BY trkorr DESCENDING.
+    CHECK transports[] IS NOT INITIAL.
+
+    LOOP AT transports INTO transport_line.
+      CLEAR parent.
+      CLEAR parent_e071.
+      IF transport_line-pgmid EQ 'R3TR'.
+        parent-pgmid = transport_line-pgmid.
+        parent-object = transport_line-object.
+        parent-obj_name = transport_line-obj_name.
+      ELSE.
+        CLEAR e071.
+        MOVE-CORRESPONDING transport_line TO e071.
+        CALL FUNCTION 'TR_CHECK_TYPE'
+          EXPORTING
+            wi_e071  = e071
+          IMPORTING
+            we_tadir = parent.
+      ENDIF.
+      parent_e071-pgmid = parent-pgmid.
+      parent_e071-object = parent-object.
+      parent_e071-obj_name = parent-obj_name.
+      READ TABLE tadir TRANSPORTING NO FIELDS WITH KEY pgmid = parent_e071-pgmid object = parent_e071-object obj_name = parent_e071-obj_name.
+      CHECK sy-subrc EQ 0.
+      APPEND transport_line TO e071_dirty.
+    ENDLOOP.
+
     LOOP AT e071_dirty INTO e071_dirty_line.
       " only write header transports
       READ TABLE e071_dirty TRANSPORTING NO FIELDS WITH KEY trkorr = e071_dirty_line-strkorr pgmid = e071_dirty_line-pgmid object = e071_dirty_line-object obj_name = e071_dirty_line-obj_name.
@@ -416,6 +436,26 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       dirty_line-object = e071_dirty_line-object.
       dirty_line-obj_name = e071_dirty_line-obj_name.
       APPEND dirty_line TO dirty.
+    ENDLOOP.
+
+    CHECK dirty[] IS NOT INITIAL.
+
+    SELECT trkorr langu as4text
+    FROM e07t
+    INTO CORRESPONDING FIELDS OF TABLE e07t
+    FOR ALL ENTRIES IN dirty
+    WHERE trkorr EQ dirty-trkorr.
+
+    LOOP AT dirty ASSIGNING <dirty_line>.
+      CLEAR e07t_line.
+      READ TABLE e07t INTO e07t_line WITH KEY trkorr = <dirty_line>-trkorr langu = sy-langu.
+      IF sy-subrc EQ 0.
+        <dirty_line>-as4text = e07t_line-as4text.
+      ELSE.
+        LOOP AT e07t INTO e07t_line WHERE trkorr EQ <dirty_line>-trkorr.
+          <dirty_line>-as4text = e07t_line-as4text.
+        ENDLOOP.
+      ENDIF.
     ENDLOOP.
   ENDMETHOD.
 
