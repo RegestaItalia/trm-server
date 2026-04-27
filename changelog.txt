@@ -9,38 +9,38 @@ Legend
 - : removed
 
 
+2026-04-27 v6.1.0
+-------------------
++ optional filter installed packages
+- remove useless number range
+! update dirty packages
+
 2026-04-15 v6.0.0
 -------------------
-
 ! moved from Z to namespace /ATRM/
 ! get objs locks methods
 + new api methods
 
 2026-03-03 v5.2.0
 -------------------
-
 ! moved abap class source extraction for badi usage
 + transport import status api
 
 2026-11-02 v5.1.0
 -------------------
-
 ! dependency detection
 * subpackages
 
 2025-08-27 v5.0.1
 -------------------
-
 + add client to import tr function
 
 2025-07-15 v5.0.0
 -------------------
-
 ! update root package find (core issue)
 
 2025-06-03 v4.0.0
 -------------------
-
 ! context singleton for installed packages list
 ! manifest interface with dependencies
 ! trm-rest with trm-server dependency
@@ -48,14 +48,12 @@ Legend
 
 2025-05-29 v3.1.0
 -------------------
-
 ! set check auth rfc enabled
 - unused regen method
 + wb transport to installed packages list
 
 2025-04-29 v3.0.0
 -------------------
-
 ! package interface suppress access permission
 + abapdoc
 + before transport export check/fix
@@ -64,17 +62,14 @@ Legend
 
 2025-04-29 v2.2.2
 -------------------
-
 * add object to transport dump
 
 2025-04-29 v2.2.1
 -------------------
-
 * remove tr comments
 
 2025-02-06 v2.2.0
 -------------------
-
 + handle transports overwriting
 ! add remove transport comments method
 + add remove from skipped trkorr
