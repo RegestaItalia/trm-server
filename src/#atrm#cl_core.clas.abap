@@ -28,7 +28,9 @@ CLASS /atrm/cl_core DEFINITION
     CLASS-METHODS get_installed_packages_legacy
       RETURNING VALUE(packages) TYPE tyt_trm_package_legacy.
     CLASS-METHODS get_installed_packages
-      RETURNING VALUE(packages) TYPE /atrm/packages_t.
+      IMPORTING package_name     TYPE /atrm/package_name OPTIONAL
+                package_registry TYPE /atrm/package_registry OPTIONAL
+      RETURNING VALUE(packages)  TYPE /atrm/packages_t.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -351,6 +353,9 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
       INNER JOIN e070 ON e070~trkorr = /atrm/packages~trkorr
       INTO CORRESPONDING FIELDS OF TABLE packages.
+    IF package_name IS NOT INITIAL.
+      DELETE packages WHERE package_name <> package_name AND package_registry <> package_registry.
+    ENDIF.
     LOOP AT packages ASSIGNING <row>.
       CLEAR package.
       CREATE OBJECT package EXPORTING devclass = <row>-devclass.
