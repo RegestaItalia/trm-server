@@ -370,7 +370,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
     ENDLOOP.
     " add trm-server (and trm-rest eventually) if installed via abapgit
     READ TABLE packages TRANSPORTING NO FIELDS WITH KEY package_name = 'trm-server' package_registry = 'public'.
-    IF sy-subrc <> 0.
+    IF sy-subrc <> 0 AND ( package_name IS INITIAL OR ( package_name EQ 'trm-server' AND package_registry EQ 'public' ) ).
       UNASSIGN <row>.
       CLEAR dummy_manifest.
       APPEND INITIAL LINE TO packages ASSIGNING <row>.
@@ -391,7 +391,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
        RESULT XML <row>-manifest.
     ENDIF.
     READ TABLE packages TRANSPORTING NO FIELDS WITH KEY package_name = 'trm-rest' package_registry = 'public'.
-    IF sy-subrc <> 0.
+    IF sy-subrc <> 0 AND ( package_name IS INITIAL OR ( package_name EQ 'trm-rest' AND package_registry EQ 'public' ) ).
       ASSIGN ('/ATRM/IF_REST')=>('VERSION') TO <rest_version>.
       IF sy-subrc EQ 0.
         UNASSIGN <row>.
