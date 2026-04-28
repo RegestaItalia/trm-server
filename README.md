@@ -103,6 +103,21 @@ After the initial installation, it is recommended to install subsequent theit up
     <img src="https://docs.trmregistry.com/server/images/se38_4.png" alt="SE38">
 </p>
 
+### Offline install
+
+#### Download the releases
+
+1. Go to [https://trmregistry.com](https://trmregistry.com) and search for `trm-server`
+2. In the release page, press the **Download** button
+3. Download `trm-rest` too, if needed
+4. Open SE38 and run `ZTRM_INSTALLER`
+5. Open the **Offline** tab and select the file(s) downloaded
+6. Execute
+
+<p align="center">
+    <img src="https://docs.trmregistry.com/server/images/offline.png" alt="ZTRM_INSTALLER">
+</p>
+
 ### Online install
 
 The online installation is only possible if your system is allowed to connect to the external server [https://trmregistry.com](https://trmregistry.com).
@@ -168,21 +183,6 @@ The online installation is only possible if your system is allowed to connect to
 
 <p align="center">
     <img src="https://docs.trmregistry.com/server/images/online.png" alt="ZTRM_INSTALLER">
-</p>
-
-### Offline install
-
-#### Download the releases
-
-1. Go to [https://trmregistry.com](https://trmregistry.com) and search for `trm-server`
-2. In the release page, press the **Download** button
-3. Download `trm-rest` too, if needed
-4. Open SE38 and run `ZTRM_INSTALLER`
-5. Open the **Offline** tab and select the file(s) downloaded
-6. Execute
-
-<p align="center">
-    <img src="https://docs.trmregistry.com/server/images/offline.png" alt="ZTRM_INSTALLER">
 </p>
 
 ### Maintain Authorized Users
