@@ -45,15 +45,17 @@ SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
   SELECTION-SCREEN SKIP.
   SELECTION-SCREEN COMMENT /1(77) sc_txt3.
   SELECTION-SCREEN COMMENT /1(77) sc_txt4.
-  SELECTION-SCREEN SKIP.
   SELECTION-SCREEN COMMENT /1(77) sc_txt5.
+  SELECTION-SCREEN SKIP.
   SELECTION-SCREEN COMMENT /1(77) sc_txt6.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt7.
 SELECTION-SCREEN END OF BLOCK sc_header.
 
 SELECTION-SCREEN SKIP.
 
 PARAMETERS:
-  p_rest  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND rest.
+  p_srv  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND srv,
+  p_rest TYPE c AS CHECKBOX DEFAULT ' ' USER-COMMAND rest.
 
 SELECTION-SCREEN SKIP.
 
@@ -186,7 +188,7 @@ CLASS lcl_report DEFINITION.
         name      TYPE string
         integrity TYPE string
         devclass  TYPE devclass.
-    class-METHODS activate_rest_sicf.
+    CLASS-METHODS activate_rest_sicf.
 ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
@@ -250,22 +252,30 @@ CLASS lcl_report IMPLEMENTATION.
       install_versions TYPE string,
       ok_server        TYPE flag,
       ok_rest          TYPE flag.
-    SELECT COUNT( * ) FROM e070 WHERE trkorr EQ server_trkorr.
-    IF sy-subrc EQ 0.
-      CONCATENATE 'Transport' server_trkorr '(trm-server transport number)' 'already exists in' sy-sysid 'Do you want to overwrite?' INTO confirm_message SEPARATED BY space.
-      CALL FUNCTION 'POPUP_TO_CONFIRM'
-        EXPORTING
-          text_question         = confirm_message
-          text_button_1         = 'Continue'
-          icon_button_1         = '@0V@'
-          text_button_2         = 'Cancel'
-          icon_button_2         = '@0W@'
-          display_cancel_button = ' '
-        IMPORTING
-          answer                = confirm_answer.
-      IF confirm_answer = '2'.
-        WRITE / 'Installation cancelled by user.'.
-        RETURN.
+
+    IF p_srv <> 'X' AND p_rest <> 'X'.
+      MESSAGE 'Please select at least one component to install' TYPE 'E'.
+      WRITE / 'Please select at least one component to install'.
+      RETURN.
+    ENDIF.
+    IF p_srv EQ 'X'.
+      SELECT COUNT( * ) FROM e070 WHERE trkorr EQ server_trkorr.
+      IF sy-subrc EQ 0.
+        CONCATENATE 'Transport' server_trkorr '(trm-server transport number)' 'already exists in' sy-sysid 'Do you want to overwrite?' INTO confirm_message SEPARATED BY space.
+        CALL FUNCTION 'POPUP_TO_CONFIRM'
+          EXPORTING
+            text_question         = confirm_message
+            text_button_1         = 'Continue'
+            icon_button_1         = '@0V@'
+            text_button_2         = 'Cancel'
+            icon_button_2         = '@0W@'
+            display_cancel_button = ' '
+          IMPORTING
+            answer                = confirm_answer.
+        IF confirm_answer = '2'.
+          WRITE / 'Installation cancelled by user.'.
+          RETURN.
+        ENDIF.
       ENDIF.
     ENDIF.
     IF p_rest EQ 'X'.
@@ -305,7 +315,7 @@ CLASS lcl_report IMPLEMENTATION.
     get_versions( IMPORTING server = server_version rest = rest_version ).
     IF ok_server EQ 'X' OR ok_rest EQ 'X'.
       install_versions = 'Successfully installed'.
-      IF ok_server EQ 'X'.
+      IF p_srv EQ 'X' AND ok_server EQ 'X'.
         CONCATENATE install_versions 'trm-server' server_version INTO install_versions SEPARATED BY space.
       ENDIF.
       IF p_rest EQ 'X' AND ok_rest EQ 'X'.
@@ -344,78 +354,81 @@ CLASS lcl_report IMPLEMENTATION.
           file      TYPE xstring,
           integrity TYPE string.
 
-    IF p_lserv IS INITIAL.
+    IF p_srv EQ 'X' AND p_lserv IS INITIAL.
       MESSAGE 'Missing trm-server release file!' TYPE 'E'.
     ENDIF.
     IF p_rest EQ 'X' AND p_lrest IS INITIAL.
       MESSAGE 'Missing trm-rest release file!' TYPE 'E'.
     ENDIF.
-    filename = p_lserv.
 
-    CALL FUNCTION 'GUI_UPLOAD'
-      EXPORTING
-        filename                = filename
-        filetype                = 'BIN'
-      IMPORTING
-        filelength              = filelen
-      TABLES
-        data_tab                = bin
-      EXCEPTIONS
-        file_open_error         = 1
-        file_read_error         = 2
-        no_batch                = 3
-        gui_refuse_filetransfer = 4
-        invalid_type            = 5
-        no_authority            = 6
-        unknown_error           = 7
-        bad_data_format         = 8
-        header_not_allowed      = 9
-        separator_not_allowed   = 10
-        header_too_long         = 11
-        unknown_dp_error        = 12
-        access_denied           = 13
-        dp_out_of_memory        = 14
-        disk_full               = 15
-        dp_timeout              = 16
-        OTHERS                  = 17.
+    IF p_srv EQ 'X'.
+      filename = p_lserv.
 
-    IF sy-subrc <> 0.
-      MESSAGE |Error during binary upload.| TYPE 'E'.
-    ENDIF.
+      CALL FUNCTION 'GUI_UPLOAD'
+        EXPORTING
+          filename                = filename
+          filetype                = 'BIN'
+        IMPORTING
+          filelength              = filelen
+        TABLES
+          data_tab                = bin
+        EXCEPTIONS
+          file_open_error         = 1
+          file_read_error         = 2
+          no_batch                = 3
+          gui_refuse_filetransfer = 4
+          invalid_type            = 5
+          no_authority            = 6
+          unknown_error           = 7
+          bad_data_format         = 8
+          header_not_allowed      = 9
+          separator_not_allowed   = 10
+          header_too_long         = 11
+          unknown_dp_error        = 12
+          access_denied           = 13
+          dp_out_of_memory        = 14
+          disk_full               = 15
+          dp_timeout              = 16
+          OTHERS                  = 17.
 
-    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
-      EXPORTING
-        input_length = filelen
-      IMPORTING
-        buffer       = file
-      TABLES
-        binary_tab   = bin
-      EXCEPTIONS
-        failed       = 1
-        OTHERS       = 2.
+      IF sy-subrc <> 0.
+        MESSAGE |Error during binary upload.| TYPE 'E'.
+      ENDIF.
 
-    IF sy-subrc <> 0.
-      MESSAGE 'Error converting binary table' TYPE 'E'.
-    ENDIF.
+      CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+        EXPORTING
+          input_length = filelen
+        IMPORTING
+          buffer       = file
+        TABLES
+          binary_tab   = bin
+        EXCEPTIONS
+          failed       = 1
+          OTHERS       = 2.
 
-    WRITE / 'Starting installation of trm-server...'.
-    handle_release(
-      EXPORTING
-        name      = 'trm-server'
-        release   = file
-        trkorr    = server_trkorr
-      IMPORTING
-        installed = ok_server
-        integrity = integrity
-    ).
-    IF ok_server EQ 'X'.
-      update_packages_table(
-        name      = 'trm-server'
-        integrity = integrity
-        devclass  = '$TRM'
+      IF sy-subrc <> 0.
+        MESSAGE 'Error converting binary table' TYPE 'E'.
+      ENDIF.
+
+      WRITE / 'Starting installation of trm-server...'.
+      handle_release(
+        EXPORTING
+          name      = 'trm-server'
+          release   = file
+          trkorr    = server_trkorr
+        IMPORTING
+          installed = ok_server
+          integrity = integrity
       ).
-    ELSE.
-      RETURN.
+      IF ok_server EQ 'X'.
+        update_packages_table(
+          name      = 'trm-server'
+          integrity = integrity
+          devclass  = '$TRM'
+        ).
+      ELSE.
+        RETURN.
+      ENDIF.
     ENDIF.
 
     IF p_rest EQ 'X'.
@@ -545,10 +558,15 @@ CLASS lcl_report IMPLEMENTATION.
 
 
     WRITE / 'Successfully connected to TRM Registry.'.
-    IF p_rest EQ 'X'.
+    IF p_srv EQ 'X' AND p_rest EQ 'X'.
       confirm_message = 'trm-server and trm-rest'.
-    ELSE.
+    ELSEIF p_srv EQ 'X'.
       confirm_message = 'trm-server'.
+    ELSEIF p_rest EQ 'X'.
+      confirm_message = 'trm-rest'.
+    ELSE.
+      WRITE / 'Installation cancelled by user.'.
+      RETURN.
     ENDIF.
     CONCATENATE confirm_message 'will be downloaded from the registry and imported. Do you want to proceed?' INTO confirm_message SEPARATED BY space.
 
@@ -568,80 +586,82 @@ CLASS lcl_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    WRITE / 'Starting installation of trm-server...'.
+    IF p_srv EQ 'X'.
+      WRITE / 'Starting installation of trm-server...'.
 
-    WRITE / 'Downloading trm-server latest release from TRM Registry...'.
-    cl_progress_indicator=>progress_indicate(
-        i_text = 'Downloading trm-server latest release from TRM Registry...'
-        i_output_immediately = 'X' ).
+      WRITE / 'Downloading trm-server latest release from TRM Registry...'.
+      cl_progress_indicator=>progress_indicate(
+          i_text = 'Downloading trm-server latest release from TRM Registry...'
+          i_output_immediately = 'X' ).
 
-    " trm-server
-    client = get_client( '/package/trm-server' ).
-    client->request->set_method( if_http_request=>co_request_method_get ).
-    client->send( ).
-    client->receive(
-      EXCEPTIONS
-        http_communication_failure = 1
-        http_invalid_state         = 2
-        http_processing_failed     = 3
-        OTHERS                     = 4 ).
-    IF sy-subrc <> 0.
-      display_error( 'Error in HTTP Client Receive' ).
-      client->get_last_error(
-        IMPORTING
-          message = response ).
-      display_messages( response ).
-      RETURN.
-    ENDIF.
-    /ui2/cl_json=>deserialize(
-      EXPORTING
-        json             = client->response->get_cdata( )
-      CHANGING
-        data             = release
-    ).
-    client = get_client(
-      with_base_url = ' '
-      url           = release-download_link
-    ).
-    client->request->set_method( if_http_request=>co_request_method_get ).
-    client->request->set_header_field( name = 'Accept' value = 'application/octet-stream' ).
-    client->send( ).
-    client->receive(
-      EXCEPTIONS
-        http_communication_failure = 1
-        http_invalid_state         = 2
-        http_processing_failed     = 3
-        OTHERS                     = 4 ).
-    IF sy-subrc <> 0.
-      display_error( 'Error in HTTP Client Receive' ).
-      client->get_last_error(
-        IMPORTING
-          message = response ).
-      display_messages( response ).
-      RETURN.
-    ENDIF.
-    file = client->response->get_data(
-      virus_scan_profile = p_vscanp
-      vscan_scan_always  = vscan_check
-    ).
-    handle_release(
-      EXPORTING
-        name     = 'trm-server'
-        release  = file
-        trkorr   = server_trkorr
-        checksum = release-checksum
-      IMPORTING
-        installed = ok_server
-          integrity = integrity
-    ).
-    IF ok_server EQ 'X'.
-      update_packages_table(
-        name      = 'trm-server'
-        integrity = integrity
-        devclass  = '$TRM'
+      " trm-server
+      client = get_client( '/package/trm-server' ).
+      client->request->set_method( if_http_request=>co_request_method_get ).
+      client->send( ).
+      client->receive(
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3
+          OTHERS                     = 4 ).
+      IF sy-subrc <> 0.
+        display_error( 'Error in HTTP Client Receive' ).
+        client->get_last_error(
+          IMPORTING
+            message = response ).
+        display_messages( response ).
+        RETURN.
+      ENDIF.
+      /ui2/cl_json=>deserialize(
+        EXPORTING
+          json             = client->response->get_cdata( )
+        CHANGING
+          data             = release
       ).
-    ELSE.
-      RETURN.
+      client = get_client(
+        with_base_url = ' '
+        url           = release-download_link
+      ).
+      client->request->set_method( if_http_request=>co_request_method_get ).
+      client->request->set_header_field( name = 'Accept' value = 'application/octet-stream' ).
+      client->send( ).
+      client->receive(
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3
+          OTHERS                     = 4 ).
+      IF sy-subrc <> 0.
+        display_error( 'Error in HTTP Client Receive' ).
+        client->get_last_error(
+          IMPORTING
+            message = response ).
+        display_messages( response ).
+        RETURN.
+      ENDIF.
+      file = client->response->get_data(
+        virus_scan_profile = p_vscanp
+        vscan_scan_always  = vscan_check
+      ).
+      handle_release(
+        EXPORTING
+          name     = 'trm-server'
+          release  = file
+          trkorr   = server_trkorr
+          checksum = release-checksum
+        IMPORTING
+          installed = ok_server
+            integrity = integrity
+      ).
+      IF ok_server EQ 'X'.
+        update_packages_table(
+          name      = 'trm-server'
+          integrity = integrity
+          devclass  = '$TRM'
+        ).
+      ELSE.
+        RETURN.
+      ENDIF.
     ENDIF.
 
     IF p_rest EQ 'X'.
@@ -1097,9 +1117,9 @@ CLASS lcl_report IMPLEMENTATION.
         no_authority             = 3
         url_and_nodeguid_space   = 4
         url_and_nodeguid_fill_in = 5
-        others                   = 6
+        OTHERS                   = 6
     ).
-    IF SY-SUBRC <> 0.
+    IF sy-subrc <> 0.
       display_error( 'REST SICF node is not active!' ).
       WRITE: /, 'REST SICF node is not active!'.
     ENDIF.
@@ -1468,17 +1488,19 @@ INITIALIZATION.
   sc_txt2                = 'and trm-rest.'.
   sc_txt3                = 'You can either let the report download the latest release from the TRM'.
   sc_txt4                = 'registry or provide a release yourself via file upload.'.
-  sc_txt5                = '@X1@ TRM Installer v1.0.0 - RegestaItalia'.
-  sc_txt6                = 'Visit trmregistry.com'.
+  sc_txt5                = 'To perform online install, add the required certificates in STRUST.'.
+  sc_txt6                = '@X1@ TRM Installer v2.0.0 - RegestaItalia'.
+  sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
+  %_p_srv_%_app_%-text   = 'Install trm-server'.
   %_p_rest_%_app_%-text  = 'Install trm-rest'.
   online                 = '@Y4@ Online install'.
   offline                = '@FP@ Offline install'.
 
   psel-prog      = sy-repid.
-  psel-dynnr     = 100.
-  psel-activetab = 'TAB1'.
+  psel-dynnr     = 200.
+  psel-activetab = 'TAB2'.
 
   CREATE OBJECT report.
   DATA:
@@ -1489,7 +1511,7 @@ INITIALIZATION.
   lcl_report=>get_versions( IMPORTING server = server_version rest = rest_version ).
   IF server_version IS NOT INITIAL OR rest_version IS NOT INITIAL.
     confirm_message = 'Already installed'.
-    IF server_version IS NOT INITIAL.
+    IF p_srv EQ 'X' AND server_version IS NOT INITIAL.
       CONCATENATE confirm_message 'trm-server' server_version INTO confirm_message SEPARATED BY space.
     ENDIF.
     IF p_rest EQ 'X' AND rest_version IS NOT INITIAL.
@@ -1548,6 +1570,25 @@ AT SELECTION-SCREEN OUTPUT.
       ENDIF.
     ELSE.
       IF screen-name EQ 'P_VSCANP'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+    IF p_srv EQ 'X'.
+      IF screen-name EQ 'P_LSERV'.
+        screen-active = 1.
+        MODIFY SCREEN.
+      ENDIF.
+      IF screen-name EQ '%_P_LSERV_%_APP_%-TEXT'.
+        screen-active = 1.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSE.
+      IF screen-name EQ 'P_LSERV'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+      IF screen-name EQ '%_P_LSERV_%_APP_%-TEXT'.
         screen-active = 0.
         MODIFY SCREEN.
       ENDIF.
