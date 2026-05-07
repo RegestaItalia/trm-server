@@ -9,6 +9,11 @@ Legend
 - : removed
 
 
+2026-05-07 v6.2.0
+-------------------
+! remove generated sql views from package objects
+! error on namespace missing tadir interface
+
 2026-04-27 v6.1.0
 -------------------
 + optional filter installed packages
