@@ -134,11 +134,20 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD get_objects.
-    DATA: lt_devclass    TYPE STANDARD TABLE OF devclass,
-          lt_subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
-          ls_subpackage  LIKE LINE OF lt_subpackages,
-          lv_devclass    TYPE devclass,
-          lt_tadir       LIKE tadir.
+    TYPES: BEGIN OF ty_ddls_gen_view,
+             objectname TYPE char40,
+             objecttype TYPE char4,
+           END OF ty_ddls_gen_view.
+    DATA: lt_devclass      TYPE STANDARD TABLE OF devclass,
+          lt_subpackages   TYPE cl_pak_package_queries=>tt_subpackage_info,
+          ls_subpackage    LIKE LINE OF lt_subpackages,
+          lv_devclass      TYPE devclass,
+          lt_tadir         LIKE tadir,
+          ls_tadir         LIKE LINE OF tadir,
+          lt_ddls          TYPE STANDARD TABLE OF char40,
+          lt_ddls_gen_view TYPE STANDARD TABLE OF ty_ddls_gen_view,
+          ls_ddls_gen_view LIKE LINE OF lt_ddls_gen_view.
+
     lt_devclass = get_all_packages( ).
     IF incl_sub <> 'X'.
       DELETE lt_devclass WHERE table_line <> gv_devclass.
@@ -158,6 +167,22 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       ENDIF.
       APPEND LINES OF lt_tadir TO tadir.
     ENDLOOP.
+    LOOP AT lt_tadir INTO ls_tadir WHERE pgmid EQ 'R3TR' AND object EQ 'DDLS'.
+      APPEND ls_tadir-obj_name TO lt_ddls.
+    ENDLOOP.
+    IF lt_ddls[] IS NOT INITIAL.
+      TRY.
+          SELECT DISTINCT objectname objecttype
+          FROM ('DDLDEPENDENCY')
+          INTO CORRESPONDING FIELDS OF TABLE lt_ddls_gen_view
+          FOR ALL ENTRIES IN lt_ddls
+          WHERE ddlname EQ lt_ddls-table_line.
+        CATCH cx_sy_dynamic_osql_semantics.
+      ENDTRY.
+      LOOP AT lt_ddls_gen_view INTO ls_ddls_gen_view.
+        DELETE FROM tadir WHERE pgmid EQ 'R3TR' AND object EQ ls_ddls_gen_view-objecttype AND obj_name EQ ls_ddls_gen_view-objectname.
+      ENDLOOP.
+    ENDIF.
   ENDMETHOD.
 
 
@@ -334,6 +359,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+
   METHOD get_subpackages.
     cl_pak_package_queries=>get_all_subpackages(
       EXPORTING
@@ -352,6 +378,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ).
   ENDMETHOD.
 
+
   METHOD get_all_packages.
     DATA: subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
           subpackage  LIKE LINE OF subpackages.
@@ -361,6 +388,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       APPEND subpackage-package TO packages.
     ENDLOOP.
   ENDMETHOD.
+
 
   METHOD get_dirty_entries.
     TYPES: BEGIN OF transport,
@@ -458,5 +486,4 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
-
 ENDCLASS.
