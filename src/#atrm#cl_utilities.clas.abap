@@ -269,7 +269,25 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       EXCEPTIONS
         OTHERS             = 1.
     IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
+      IF sy-msgid EQ 'TO' AND sy-msgno EQ '123'.
+        " changes to an object that has a namespace not in system
+        " not much to do in this case, for now direct update but something to consider in the future
+        IF devclass IS NOT INITIAL.
+          UPDATE tadir SET devclass = devclass WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+        ENDIF.
+        IF srcsystem IS NOT INITIAL.
+          UPDATE tadir SET srcsystem = srcsystem WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+        ENDIF.
+        IF author IS NOT INITIAL.
+          UPDATE tadir SET author = author WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+        ENDIF.
+        COMMIT WORK AND WAIT.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+      ELSE.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
