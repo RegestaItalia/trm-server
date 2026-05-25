@@ -271,17 +271,37 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     IF sy-subrc <> 0.
       IF sy-msgid EQ 'TO' AND sy-msgno EQ '123'.
         " changes to an object that has a namespace not in system
-        " not much to do in this case, for now direct update but something to consider in the future
+        DATA: trint_devclass  LIKE devclass,
+              trint_srcsystem LIKE srcsystem,
+              trint_author    LIKE author.
         IF devclass IS NOT INITIAL.
-          UPDATE tadir SET devclass = devclass WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+          trint_devclass = devclass.
+        ELSE.
+          trint_devclass = '~'.
         ENDIF.
         IF srcsystem IS NOT INITIAL.
-          UPDATE tadir SET srcsystem = srcsystem WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+          trint_srcsystem = srcsystem.
+        ELSE.
+          trint_srcsystem = '~'.
         ENDIF.
         IF author IS NOT INITIAL.
-          UPDATE tadir SET author = author WHERE pgmid EQ pgmid AND object EQ object AND obj_name EQ objname.
+          trint_author = author.
+        ELSE.
+          trint_author = '~'.
         ENDIF.
-        COMMIT WORK AND WAIT.
+        CALL FUNCTION 'TRINT_TADIR_MODIFY'
+          EXPORTING
+            pgmid                = pgmid
+            object               = object
+            obj_name             = objname
+            devclass             = trint_devclass
+            srcsystem            = trint_srcsystem
+            author               = trint_author
+          EXCEPTIONS
+            object_exists_global = 1
+            object_exists_local  = 2
+            object_has_no_tadir  = 3
+            OTHERS               = 4.
         IF sy-subrc <> 0.
           /atrm/cx_exception=>raise( ).
         ENDIF.
