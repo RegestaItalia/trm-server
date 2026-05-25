@@ -1468,12 +1468,20 @@ CLASS lcl_report IMPLEMENTATION.
         i_output_immediately = 'X' ).
       LOOP AT tadir INTO tadir_line.
         READ TABLE hierarchy INTO node WITH KEY original = tadir_line-devclass.
-        " use of TR_TADIR_INTERFACE is not possible here
-        " it requires system to have /ATRM/ namespace
-        " direct update to tadir is against best practices but it's the only way to move the objects to the correct package
-        UPDATE tadir SET devclass = node-package srcsystem = 'TRM' genflag = 'X' WHERE pgmid = tadir_line-pgmid AND object = tadir_line-object AND obj_name = tadir_line-obj_name.
+        CALL FUNCTION 'TRINT_TADIR_MODIFY'
+          EXPORTING
+            pgmid                = tadir_line-pgmid
+            object               = tadir_line-object
+            obj_name             = tadir_line-obj_name
+            devclass             = node-package
+            srcsystem            = 'TRM'
+            genflag              = 'X'
+          EXCEPTIONS
+            object_exists_global = 1
+            object_exists_local  = 2
+            object_has_no_tadir  = 3
+            OTHERS               = 4.
       ENDLOOP.
-      COMMIT WORK AND WAIT.
     ENDIF.
     installed = 'X'.
   ENDMETHOD.
