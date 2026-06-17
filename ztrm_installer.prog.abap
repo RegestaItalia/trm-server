@@ -39,16 +39,16 @@ TYPES: BEGIN OF ty_vscan_f4,
 DATA vscan     TYPE STANDARD TABLE OF ty_vscan_f4.
 
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
-  SELECTION-SCREEN SKIP.
-  SELECTION-SCREEN COMMENT 1(77) sc_txt1.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt2.
-  SELECTION-SCREEN SKIP.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt3.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt4.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt5.
-  SELECTION-SCREEN SKIP.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt6.
-  SELECTION-SCREEN COMMENT /1(77) sc_txt7.
+SELECTION-SCREEN SKIP.
+SELECTION-SCREEN COMMENT 1(77) sc_txt1.
+SELECTION-SCREEN COMMENT /1(77) sc_txt2.
+SELECTION-SCREEN SKIP.
+SELECTION-SCREEN COMMENT /1(77) sc_txt3.
+SELECTION-SCREEN COMMENT /1(77) sc_txt4.
+SELECTION-SCREEN COMMENT /1(77) sc_txt5.
+SELECTION-SCREEN SKIP.
+SELECTION-SCREEN COMMENT /1(77) sc_txt6.
+SELECTION-SCREEN COMMENT /1(77) sc_txt7.
 SELECTION-SCREEN END OF BLOCK sc_header.
 
 SELECTION-SCREEN SKIP.
@@ -65,30 +65,30 @@ TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
 END OF BLOCK psel.
 
 SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
-  SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
-    PARAMETERS:
-      p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
-      p_vscan  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND vscan,
-      p_vscanp TYPE vscan_profile DEFAULT '/SIHTTP/HTTP_DOWNLOAD'.
-  SELECTION-SCREEN END OF BLOCK sc_serv.
+SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
+PARAMETERS:
+  p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
+  p_vscan  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND vscan,
+  p_vscanp TYPE vscan_profile DEFAULT '/SIHTTP/HTTP_DOWNLOAD'.
+SELECTION-SCREEN END OF BLOCK sc_serv.
 
-  SELECTION-SCREEN SKIP.
+SELECTION-SCREEN SKIP.
 
-  SELECTION-SCREEN BEGIN OF BLOCK sc_proxy WITH FRAME TITLE sc_titl3.
-    PARAMETERS:
-      p_proxy TYPE string LOWER CASE,
-      p_pport TYPE string LOWER CASE,
-      p_puser TYPE string LOWER CASE,
-      p_ppwd  TYPE string LOWER CASE.
-  SELECTION-SCREEN END OF BLOCK sc_proxy.
+SELECTION-SCREEN BEGIN OF BLOCK sc_proxy WITH FRAME TITLE sc_titl3.
+PARAMETERS:
+  p_proxy TYPE string LOWER CASE,
+  p_pport TYPE string LOWER CASE,
+  p_puser TYPE string LOWER CASE,
+  p_ppwd  TYPE string LOWER CASE.
+SELECTION-SCREEN END OF BLOCK sc_proxy.
 SELECTION-SCREEN END OF SCREEN 100.
 
 SELECTION-SCREEN BEGIN OF SCREEN 200 AS SUBSCREEN.
-  SELECTION-SCREEN BEGIN OF BLOCK sc_other WITH FRAME TITLE TEXT-001.
-    PARAMETERS:
-      p_lserv TYPE rlgrap-filename LOWER CASE,
-      p_lrest TYPE rlgrap-filename LOWER CASE.
-  SELECTION-SCREEN END OF BLOCK sc_other.
+SELECTION-SCREEN BEGIN OF BLOCK sc_other WITH FRAME TITLE text-001.
+PARAMETERS:
+  p_lserv TYPE rlgrap-filename LOWER CASE,
+  p_lrest TYPE rlgrap-filename LOWER CASE.
+SELECTION-SCREEN END OF BLOCK sc_other.
 SELECTION-SCREEN END OF SCREEN 200.
 
 CLASS lcl_report DEFINITION.
@@ -189,6 +189,7 @@ CLASS lcl_report DEFINITION.
         integrity TYPE string
         devclass  TYPE devclass.
     CLASS-METHODS activate_rest_sicf.
+
 ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
@@ -933,7 +934,7 @@ CLASS lcl_report IMPLEMENTATION.
 
       " Calculate hierarchy depth
       WHILE lv_walk_parent IS NOT INITIAL.
-        lv_level += 1.
+        ADD 1 TO lv_level.
         lv_walk_parent = get_parent(
           iv_package  = lv_walk_parent
           it_packages = lt_packages ).
@@ -1107,22 +1108,26 @@ CLASS lcl_report IMPLEMENTATION.
     COMMIT WORK AND WAIT.
   ENDMETHOD.
   METHOD activate_rest_sicf.
-    cl_icf_tree=>activate_node(
-      EXPORTING
-        url                      = '/ztrmserver'
-        hostname                 = 'DEFAULT_HOST'
-      EXCEPTIONS
-        node_not_existing        = 1
-        enqueue_error            = 2
-        no_authority             = 3
-        url_and_nodeguid_space   = 4
-        url_and_nodeguid_fill_in = 5
-        OTHERS                   = 6
-    ).
-    IF sy-subrc <> 0.
-      display_error( 'REST SICF node is not active!' ).
-      WRITE: /, 'REST SICF node is not active!'.
-    ENDIF.
+    TRY.
+        CALL METHOD ('CL_ICF_TREE')=>activate_node
+          EXPORTING
+            url                      = '/ztrmserver'
+            hostname                 = 'DEFAULT_HOST'
+          EXCEPTIONS
+            node_not_existing        = 1
+            enqueue_error            = 2
+            no_authority             = 3
+            url_and_nodeguid_space   = 4
+            url_and_nodeguid_fill_in = 5
+            OTHERS                   = 6.
+        IF sy-subrc <> 0.
+          display_error( 'REST SICF node is not active!' ).
+          WRITE: /, 'REST SICF node is not active!'.
+        ENDIF.
+      CATCH cx_sy_dyn_call_error.
+        display_error( 'REST SICF node is not active!' ).
+        WRITE: /, 'REST SICF node is not active!'.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD handle_release.
@@ -1228,21 +1233,26 @@ CLASS lcl_report IMPLEMENTATION.
       display_error( 'Error in release content: manifest not found' ).
       RETURN.
     ENDIF.
-    /ui2/cl_json=>deserialize(
-      EXPORTING
-        jsonx            = release_manifest_json
-      CHANGING
-        data             = release_manifest
-    ).
-    IF release_manifest-name <> name.
-      display_error( 'Error in release content: invalid manifest' ).
-      WRITE: /, 'Expected manifest name to be trm-server or trm-rest but found', release_manifest-name.
-      RETURN.
-    ENDIF.
-    IF release_manifest-registry IS NOT INITIAL.
-      display_error( 'Error in release content: registry field should be empty' ).
-      WRITE: /, 'Expected manifest registry field to be empty but found', release_manifest-registry.
-      RETURN.
+    TRY.
+        CALL METHOD ('/UI2/CL_JSON')=>deserialize
+          EXPORTING
+            jsonx = release_manifest_json
+          CHANGING
+            data  = release_manifest.
+      CATCH cx_sy_dyn_call_error.
+        WRITE: /, 'Package manifest was not validated, json deserialization not supported in this system.'.
+    ENDTRY.
+    IF release_manifest IS NOT INITIAL.
+      IF release_manifest-name <> name.
+        display_error( 'Error in release content: invalid manifest' ).
+        WRITE: /, 'Expected manifest name to be trm-server or trm-rest but found', release_manifest-name.
+        RETURN.
+      ENDIF.
+      IF release_manifest-registry IS NOT INITIAL.
+        display_error( 'Error in release content: registry field should be empty' ).
+        WRITE: /, 'Expected manifest registry field to be empty but found', release_manifest-registry.
+        RETURN.
+      ENDIF.
     ENDIF.
     zip->get(
       EXPORTING
