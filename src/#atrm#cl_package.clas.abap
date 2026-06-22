@@ -361,21 +361,37 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD get_subpackages.
-    cl_pak_package_queries=>get_all_subpackages(
-      EXPORTING
-        im_package                    = gv_devclass
-        im_also_local_packages        = 'X'
-      IMPORTING
-        et_subpackages                = subpackages
-      EXCEPTIONS
-        no_package_specified          = 1
-        package_has_no_tdevc_record   = 2
-        package_has_no_tadir_record   = 3
-        package_does_not_exist        = 4
-        invalid_superpackage          = 5
-        no_output_parameter_requested = 6
-        OTHERS                        = 7
-    ).
+    TRY.
+      CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
+        EXPORTING
+          im_package                    = gv_devclass
+          im_also_local_packages        = 'X'
+        IMPORTING
+          et_subpackages                = subpackages
+        EXCEPTIONS
+          no_package_specified          = 1
+          package_has_no_tdevc_record   = 2
+          package_has_no_tadir_record   = 3
+          package_does_not_exist        = 4
+          invalid_superpackage          = 5
+          no_output_parameter_requested = 6
+          OTHERS                        = 7.
+    CATCH cx_dynamic_check.
+      cl_pak_package_queries=>get_all_subpackages(
+       EXPORTING
+         im_package                    = gv_devclass
+       IMPORTING
+          et_subpackages                = subpackages
+        EXCEPTIONS
+         no_package_specified          = 1
+         package_has_no_tdevc_record   = 2
+         package_has_no_tadir_record   = 3
+          package_does_not_exist        = 4
+          invalid_superpackage          = 5
+         no_output_parameter_requested = 6
+         OTHERS                        = 7
+     ).
+    ENDTRY.
   ENDMETHOD.
 
 
