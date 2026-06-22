@@ -459,7 +459,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD update_package.
-    DATA: subrc   TYPE syst_subrc,
+    DATA: subrc   TYPE i,
           lo_badi TYPE REF TO /atrm/trm_package_data.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
