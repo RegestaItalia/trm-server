@@ -21,7 +21,7 @@ CLASS /atrm/cl_post_activity DEFINITION
     "! @parameter execute  | Flag that indicates if the post activity should be executed (X = true)
     CLASS-METHODS pre
       IMPORTING data     TYPE xstring
-      EXPORTING messages TYPE symsg_tab
+      EXPORTING messages TYPE /atrm/symsg_tab
                 execute  TYPE flag
       RAISING   /atrm/cx_exception.
 
@@ -30,7 +30,7 @@ CLASS /atrm/cl_post_activity DEFINITION
     "! @parameter messages | Table of messages returned from the execution
     CLASS-METHODS execute
       IMPORTING data     TYPE xstring
-      EXPORTING messages TYPE symsg_tab
+      EXPORTING messages TYPE /atrm/symsg_tab
       RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
@@ -45,7 +45,7 @@ CLASS /atrm/cl_post_activity DEFINITION
     CLASS-METHODS run
       IMPORTING iv_methname TYPE abap_methname
                 iv_data     TYPE xstring
-      EXPORTING et_messages TYPE symsg_tab
+      EXPORTING et_messages TYPE /atrm/symsg_tab
                 ev_execute  TYPE flag
       RAISING   /atrm/cx_exception.
 
@@ -220,7 +220,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
           OTHERS              = 3
       ).
       IF sy-subrc EQ 0.
-        IF lo_paramtype->get_relative_name( ) EQ 'SYMSG_TAB'.
+        IF lo_paramtype->get_relative_name( ) EQ '/ATRM/SYMSG_TAB'.
           CLEAR ls_parambind.
           ls_parambind-name = lc_pa_messages.
           ls_parambind-kind = 'I'.

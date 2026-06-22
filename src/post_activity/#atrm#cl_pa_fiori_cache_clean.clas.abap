@@ -31,7 +31,7 @@ CLASS /atrm/cl_pa_fiori_cache_clean DEFINITION
       IMPORTING
         !ui5_repository TYPE ty_ui5_repository_ui OPTIONAL
       EXPORTING
-        !messages       TYPE symsg_tab
+        !messages       TYPE /atrm/symsg_tab
       RAISING
         /atrm/cx_exception.
 
@@ -40,7 +40,7 @@ CLASS /atrm/cl_pa_fiori_cache_clean DEFINITION
     CLASS-METHODS submit
       IMPORTING report    TYPE raldb_repo
                 selection TYPE rsparams_tt OPTIONAL
-      CHANGING  messages  TYPE symsg_tab
+      CHANGING  messages  TYPE /atrm/symsg_tab
       RAISING   /atrm/cx_exception.
 ENDCLASS.
 
