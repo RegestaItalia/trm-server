@@ -77,7 +77,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
           lt_trkorr_package        TYPE STANDARD TABLE OF ty_trkorr_package,
           ls_trkorr_package        LIKE LINE OF lt_trkorr_package,
           lo_package               TYPE REF TO lcl_trm_package,
-          lv_tabix                 TYPE syst_tabix,
+          lv_tabix                 TYPE i,
           lo_devclass              TYPE REF TO /atrm/cl_package,
           lt_subpackages           TYPE cl_pak_package_queries=>tt_subpackage_info,
           ls_subpackage            LIKE LINE OF lt_subpackages,
