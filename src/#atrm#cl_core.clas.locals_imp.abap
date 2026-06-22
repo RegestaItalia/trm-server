@@ -143,7 +143,7 @@ CLASS lcl_trm_transport DEFINITION.
     METHODS get_e071
       RETURNING VALUE(rt_e071) TYPE tyt_e071.
 
-    METHODS _relevant
+    METHODS is_trm_relevant
       RETURNING VALUE(rv_relevant) TYPE flag.
 
     METHODS get_documentation
