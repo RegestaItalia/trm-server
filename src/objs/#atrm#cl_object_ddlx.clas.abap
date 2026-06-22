@@ -16,7 +16,8 @@ CLASS /atrm/cl_object_ddlx IMPLEMENTATION.
   METHOD /atrm/if_object~get_dependencies.
     DATA: lo_provider   TYPE REF TO object,
           lt_queries    TYPE REF TO data,
-          lt_ddlx_names TYPE REF TO data.
+          lt_ddlx_names TYPE REF TO data,
+          ls_dependency TYPE /atrm/object_dependency.
     FIELD-SYMBOLS: <fs_queries>    TYPE STANDARD TABLE,
                    <fs_query>      TYPE any,
                    <fs_entity>     TYPE any,
@@ -50,12 +51,16 @@ CLASS /atrm/cl_object_ddlx IMPLEMENTATION.
       UNASSIGN <fs_entity>.
       ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_row> TO <fs_entity>.
       CHECK <fs_entity> IS ASSIGNED.
+      CLEAR ls_dependency.
       TRY.
-          APPEND get_tadir_dependency(
-            EXPORTING
-              object     = 'DDLS'
-              obj_name   = <fs_entity>
-          ) TO dependencies.
+        get_tadir_dependency(
+          EXPORTING
+            object     = 'DDLS'
+            obj_name   = <fs_entity>
+          RECEIVING
+            dependency = ls_dependency
+        ).
+        APPEND ls_dependency TO dependencies.
         CATCH /atrm/cx_exception.
       ENDTRY.
     ENDLOOP.
