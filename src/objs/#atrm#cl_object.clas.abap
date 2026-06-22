@@ -123,7 +123,8 @@ CLASS /atrm/cl_object IMPLEMENTATION.
   METHOD /atrm/if_object~get_dependencies.
     DATA: lv_obj_type TYPE seu_obj,
           lv_obj_name TYPE sobj_name,
-          ls_senvi    TYPE senvi.
+          ls_senvi    TYPE senvi,
+          lo_map      TYPE REF TO /atrm/cl_senvi_map.
     lv_obj_type = key-object.
     lv_obj_name = key-obj_name.
     CALL FUNCTION 'REPOSITORY_ENVIRONMENT_ALL'
@@ -135,10 +136,16 @@ CLASS /atrm/cl_object IMPLEMENTATION.
         environment_tab = senvi.
 
     LOOP AT senvi INTO ls_senvi.
+      CLEAR lo_map.
       /atrm/cl_senvi_map=>get(
-        senvi = ls_senvi
-        origin = me
-      )->map_dependencies(
+        EXPORTING
+          senvi  = ls_senvi
+          origin = me
+        RECEIVING
+          map    = lo_map
+      ).
+      CHECK lo_map IS BOUND.
+      lo_map->map_dependencies(
         CHANGING
           deps = dependencies
       ).
