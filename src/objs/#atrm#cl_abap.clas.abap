@@ -115,11 +115,13 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           ls_include   LIKE LINE OF lt_includes.
     lv_classname = key-obj_name.
     TRY.
-        lt_includes = cl_oo_classname_service=>get_all_method_includes(
-          EXPORTING
-            clsname           = lv_classname
-            with_enhancements = 'X'
-        ).
+      cl_oo_classname_service=>get_all_method_includes(
+        EXPORTING
+          clsname           = lv_classname
+          with_enhancements = 'X'
+        RECEIVING
+          result = lt_includes
+      ).
       CATCH cx_class_not_existent.
     ENDTRY.
     LOOP AT lt_includes INTO ls_include.
@@ -236,7 +238,8 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           ls_exporting       TYPE ty_param,
           lt_nrob_check      TYPE STANDARD TABLE OF sobj_name,
           lt_nrob            TYPE STANDARD TABLE OF tadir,
-          ls_nrob            TYPE tadir.
+          ls_nrob            TYPE tadir,
+          ls_dependency      LIKE LINE OF ct_dependencies.
     FIELD-SYMBOLS <fs_dep> TYPE /atrm/object_dependency.
 
     LOOP AT function_modules INTO ls_function_module WHERE funcname = 'NUMBER_GET_NEXT'.
@@ -258,12 +261,16 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     LOOP AT lt_nrob INTO ls_nrob.
       READ TABLE ct_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = ls_nrob.
       CHECK sy-subrc <> 0.
+      CLEAR ls_dependency.
       TRY.
-          APPEND get_tadir_dependency(
-            EXPORTING
-              object     = ls_nrob-object
-              obj_name   = ls_nrob-obj_name
-          ) TO ct_dependencies.
+        get_tadir_dependency(
+          EXPORTING
+            object = ls_nrob-object
+            obj_name = ls_nrob-obj_name
+          RECEIVING
+            dependency = ls_dependency
+        ).
+        APPEND ls_dependency TO ct_dependencies.
         CATCH /atrm/cx_exception.
       ENDTRY.
     ENDLOOP.
