@@ -110,8 +110,8 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
       WHILE lo_root->previous IS BOUND.
         lo_root = lo_root->previous.
       ENDWHILE.
-      IF lo_root IS INSTANCE OF /atrm/cx_exception.
-        lo_trm_root ?= lo_root.
+      lo_trm_root ?= lo_root.
+      IF lo_trm_root IS BOUND.
         MESSAGE ID lo_trm_root->message-msgid
           TYPE 'I'
           NUMBER lo_trm_root->message-msgno
