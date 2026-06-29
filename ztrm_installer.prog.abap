@@ -103,14 +103,17 @@ CLASS lcl_report DEFINITION.
                 rest   TYPE string.
   PRIVATE SECTION.
     TYPES: ty_package_name TYPE devclass,
-           ty_package_tab  TYPE STANDARD TABLE OF ty_package_name WITH EMPTY KEY,
+           ty_package_tab  TYPE STANDARD TABLE OF ty_package_name WITH DEFAULT KEY,
            BEGIN OF ty_pkg_node,
              original TYPE devclass,
              package  TYPE devclass,
              parent   TYPE devclass,
              level    TYPE i,
            END OF ty_pkg_node,
-           ty_pkg_node_tab TYPE STANDARD TABLE OF ty_pkg_node WITH EMPTY KEY.
+           ty_pkg_node_tab TYPE STANDARD TABLE OF ty_pkg_node WITH DEFAULT KEY.
+    CLASS-METHODS raise_error
+      IMPORTING
+        message TYPE string.
     METHODS get_client
       IMPORTING
         with_base_url TYPE c DEFAULT 'X'
@@ -194,6 +197,11 @@ ENDCLASS.
 
 CLASS lcl_report IMPLEMENTATION.
 
+  METHOD raise_error.
+    cl_message_helper=>set_msg_vars_for_clike( message ).
+    MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDMETHOD.
+
   METHOD get_versions.
     FIELD-SYMBOLS: <trm_server_version>  TYPE string,
                    <fs_trm_rest_version> TYPE string.
@@ -255,8 +263,8 @@ CLASS lcl_report IMPLEMENTATION.
       ok_rest          TYPE flag.
 
     IF p_srv <> 'X' AND p_rest <> 'X'.
-      MESSAGE 'Please select at least one component to install' TYPE 'E'.
       WRITE / 'Please select at least one component to install'.
+      raise_error( 'Please select at least one component to install.' ).
       RETURN.
     ENDIF.
     IF p_srv EQ 'X'.
@@ -356,10 +364,10 @@ CLASS lcl_report IMPLEMENTATION.
           integrity TYPE string.
 
     IF p_srv EQ 'X' AND p_lserv IS INITIAL.
-      MESSAGE 'Missing trm-server release file!' TYPE 'E'.
+      raise_error( 'Missing trm-server release file!' ).
     ENDIF.
     IF p_rest EQ 'X' AND p_lrest IS INITIAL.
-      MESSAGE 'Missing trm-rest release file!' TYPE 'E'.
+      raise_error( 'Missing trm-rest release file!' ).
     ENDIF.
 
     IF p_srv EQ 'X'.
@@ -393,7 +401,7 @@ CLASS lcl_report IMPLEMENTATION.
           OTHERS                  = 17.
 
       IF sy-subrc <> 0.
-        MESSAGE |Error during binary upload.| TYPE 'E'.
+        raise_error( 'Error during binary upload.' ).
       ENDIF.
 
       CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
@@ -408,7 +416,7 @@ CLASS lcl_report IMPLEMENTATION.
           OTHERS       = 2.
 
       IF sy-subrc <> 0.
-        MESSAGE 'Error converting binary table' TYPE 'E'.
+        raise_error( 'Error converting binary table.' ).
       ENDIF.
 
       WRITE / 'Starting installation of trm-server...'.
@@ -463,7 +471,7 @@ CLASS lcl_report IMPLEMENTATION.
           OTHERS                  = 17.
 
       IF sy-subrc <> 0.
-        MESSAGE |Error during binary upload.| TYPE 'E'.
+        raise_error( 'Error during binary upload.' ).
       ENDIF.
 
       CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
@@ -478,7 +486,7 @@ CLASS lcl_report IMPLEMENTATION.
           OTHERS       = 2.
 
       IF sy-subrc <> 0.
-        MESSAGE 'Error converting binary table' TYPE 'E'.
+        raise_error( 'Error converting binary table.' ).
       ENDIF.
 
       WRITE / 'Starting installation of trm-rest...'.
@@ -1687,7 +1695,7 @@ FORM choose_file CHANGING file TYPE rlgrap-filename.
       OTHERS                  = 5.
 
   IF sy-subrc <> 0.
-    MESSAGE 'Error opening file chooser' TYPE 'E'.
+    raise_error( 'Error opening file chooser.' ).
   ENDIF.
 
   IF lv_action = cl_gui_frontend_services=>action_ok AND lv_rc > 0.
