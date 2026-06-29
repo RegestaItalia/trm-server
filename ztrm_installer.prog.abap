@@ -36,19 +36,20 @@ TYPES: BEGIN OF ty_vscan_f4,
          profile TYPE vscan_prof-profile,
          text    TYPE vscan_proft-text,
        END OF ty_vscan_f4.
-DATA vscan     TYPE STANDARD TABLE OF ty_vscan_f4.
+DATA: vscan          TYPE STANDARD TABLE OF ty_vscan_f4,
+      json_supported TYPE flag.
 
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
-SELECTION-SCREEN SKIP.
-SELECTION-SCREEN COMMENT 1(77) sc_txt1.
-SELECTION-SCREEN COMMENT /1(77) sc_txt2.
-SELECTION-SCREEN SKIP.
-SELECTION-SCREEN COMMENT /1(77) sc_txt3.
-SELECTION-SCREEN COMMENT /1(77) sc_txt4.
-SELECTION-SCREEN COMMENT /1(77) sc_txt5.
-SELECTION-SCREEN SKIP.
-SELECTION-SCREEN COMMENT /1(77) sc_txt6.
-SELECTION-SCREEN COMMENT /1(77) sc_txt7.
+  SELECTION-SCREEN SKIP.
+  SELECTION-SCREEN COMMENT 1(77) sc_txt1.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt2.
+  SELECTION-SCREEN SKIP.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt3.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt4.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt5.
+  SELECTION-SCREEN SKIP.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt6.
+  SELECTION-SCREEN COMMENT /1(77) sc_txt7.
 SELECTION-SCREEN END OF BLOCK sc_header.
 
 SELECTION-SCREEN SKIP.
@@ -60,35 +61,36 @@ PARAMETERS:
 SELECTION-SCREEN SKIP.
 
 SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 12 LINES,
-TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100,
 TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
+TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100,
 END OF BLOCK psel.
 
 SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
-SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
-PARAMETERS:
-  p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
-  p_vscan  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND vscan,
-  p_vscanp TYPE vscan_profile DEFAULT '/SIHTTP/HTTP_DOWNLOAD'.
-SELECTION-SCREEN END OF BLOCK sc_serv.
+  "SELECTION-SCREEN COMMENT 1(77) scs_txt1.
+  SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
+    PARAMETERS:
+      p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
+      p_vscan  TYPE c AS CHECKBOX DEFAULT 'X' USER-COMMAND vscan,
+      p_vscanp TYPE vscan_profile DEFAULT '/SIHTTP/HTTP_DOWNLOAD'.
+  SELECTION-SCREEN END OF BLOCK sc_serv.
 
-SELECTION-SCREEN SKIP.
+  SELECTION-SCREEN SKIP.
 
-SELECTION-SCREEN BEGIN OF BLOCK sc_proxy WITH FRAME TITLE sc_titl3.
-PARAMETERS:
-  p_proxy TYPE string LOWER CASE,
-  p_pport TYPE string LOWER CASE,
-  p_puser TYPE string LOWER CASE,
-  p_ppwd  TYPE string LOWER CASE.
-SELECTION-SCREEN END OF BLOCK sc_proxy.
+  SELECTION-SCREEN BEGIN OF BLOCK sc_proxy WITH FRAME TITLE sc_titl3.
+    PARAMETERS:
+      p_proxy TYPE string LOWER CASE,
+      p_pport TYPE string LOWER CASE,
+      p_puser TYPE string LOWER CASE,
+      p_ppwd  TYPE string LOWER CASE.
+  SELECTION-SCREEN END OF BLOCK sc_proxy.
 SELECTION-SCREEN END OF SCREEN 100.
 
 SELECTION-SCREEN BEGIN OF SCREEN 200 AS SUBSCREEN.
-SELECTION-SCREEN BEGIN OF BLOCK sc_other WITH FRAME TITLE text-001.
-PARAMETERS:
-  p_lserv TYPE rlgrap-filename LOWER CASE,
-  p_lrest TYPE rlgrap-filename LOWER CASE.
-SELECTION-SCREEN END OF BLOCK sc_other.
+  SELECTION-SCREEN BEGIN OF BLOCK sc_other WITH FRAME TITLE TEXT-001.
+    PARAMETERS:
+      p_lserv TYPE rlgrap-filename LOWER CASE,
+      p_lrest TYPE rlgrap-filename LOWER CASE.
+  SELECTION-SCREEN END OF BLOCK sc_other.
 SELECTION-SCREEN END OF SCREEN 200.
 
 CLASS lcl_report DEFINITION.
@@ -104,6 +106,8 @@ CLASS lcl_report DEFINITION.
     CLASS-METHODS get_versions
       EXPORTING server TYPE string
                 rest   TYPE string.
+    CLASS-METHODS check_json_parser
+      EXPORTING exists TYPE flag.
   PRIVATE SECTION.
     TYPES: ty_package_name TYPE devclass,
            ty_package_tab  TYPE STANDARD TABLE OF ty_package_name WITH DEFAULT KEY,
@@ -199,7 +203,17 @@ CLASS lcl_report IMPLEMENTATION.
 
   METHOD raise_error.
     cl_message_helper=>set_msg_vars_for_clike( message ).
-    MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 DISPLAY LIKE 'E'.
+  ENDMETHOD.
+
+  METHOD check_json_parser.
+    DATA test TYPE REF TO object.
+    TRY.
+        CREATE OBJECT test TYPE ('/UI2/CL_JSON').
+        exists = 'X'.
+      CATCH cx_sy_dyn_call_error.
+        CLEAR exists.
+    ENDTRY.
   ENDMETHOD.
 
   METHOD get_versions.
@@ -516,7 +530,7 @@ CLASS lcl_report IMPLEMENTATION.
              checksum      TYPE string,
            END OF release.
     DATA:
-      vscan_check     TYPE http_content_check,
+      vscan_check     TYPE c,
       code            TYPE i,
       client          TYPE REF TO if_http_client,
       reason          TYPE string,
@@ -621,12 +635,11 @@ CLASS lcl_report IMPLEMENTATION.
         display_messages( response ).
         RETURN.
       ENDIF.
-      /ui2/cl_json=>deserialize(
+      CALL METHOD ('/UI2/CL_JSON')=>deserialize
         EXPORTING
-          json             = client->response->get_cdata( )
+          json = client->response->get_cdata( )
         CHANGING
-          data             = release
-      ).
+          data = release.
       client = get_client(
         with_base_url = ' '
         url           = release-download_link
@@ -699,12 +712,11 @@ CLASS lcl_report IMPLEMENTATION.
         display_messages( response ).
         RETURN.
       ENDIF.
-      /ui2/cl_json=>deserialize(
+      CALL METHOD ('/UI2/CL_JSON')=>deserialize
         EXPORTING
-          json             = client->response->get_cdata( )
+          json = client->response->get_cdata( )
         CHANGING
-          data             = release
-      ).
+          data = release.
       client = get_client(
         with_base_url = ' '
         url           = release-download_link
@@ -1129,12 +1141,12 @@ CLASS lcl_report IMPLEMENTATION.
             url_and_nodeguid_fill_in = 5
             OTHERS                   = 6.
         IF sy-subrc <> 0.
-          display_error( 'REST SICF node is not active!' ).
-          WRITE: /, 'REST SICF node is not active!'.
+          display_error( 'SICF node "/ztrmserver" is not active! Activate it manually.' ).
+          WRITE: /, 'SICF node "/ztrmserver" is not active! Activate it manually.'.
         ENDIF.
       CATCH cx_sy_dyn_call_error.
-        display_error( 'REST SICF node is not active!' ).
-        WRITE: /, 'REST SICF node is not active!'.
+        display_error( 'SICF node "/ztrmserver" is not active! Activate it manually.' ).
+        WRITE: /, 'SICF node "/ztrmserver" is not active! Activate it manually.'.
     ENDTRY.
   ENDMETHOD.
 
@@ -1161,6 +1173,7 @@ CLASS lcl_report IMPLEMENTATION.
       tmssysnam             TYPE tmssysnam,
       subrc                 TYPE i,
       tmsrequests           TYPE tmsiqreqs,
+      tmsrequests_line      LIKE LINE OF tmsrequests,
       in_queue              TYPE c,
       transport_rc          TYPE i,
       e071                  TYPE STANDARD TABLE OF tadir,
@@ -1248,7 +1261,7 @@ CLASS lcl_report IMPLEMENTATION.
           CHANGING
             data  = release_manifest.
       CATCH cx_sy_dyn_call_error.
-        WRITE: /, 'Package manifest was not validated, json deserialization not supported in this system.'.
+        WRITE: /, 'Package manifest was not validated.'.
     ENDTRY.
     IF release_manifest IS NOT INITIAL.
       IF release_manifest-name <> name.
@@ -1378,13 +1391,14 @@ CLASS lcl_report IMPLEMENTATION.
       i_output_immediately = 'X' ).
     CLEAR in_queue.
     WHILE in_queue <> 'X'.
+      CLEAR: tmsrequests[], subrc, transport_rc, tmsrequests_line.
       WAIT UP TO 3 SECONDS.
       read_queue(
         EXPORTING
           target = tmssysnam
         IMPORTING
           requests = tmsrequests
-          subrc  = subrc
+          subrc    = subrc
       ).
       IF subrc <> 0.
         display_error( 'Error reading queue' ).
@@ -1393,14 +1407,15 @@ CLASS lcl_report IMPLEMENTATION.
       DELETE tmsrequests WHERE trkorr NE trkorr.
       SORT tmsrequests BY bufpos DESCENDING.
       IF tmsrequests IS NOT INITIAL.
-        IF tmsrequests[ 1 ]-impsing <> 'X'.
+        READ TABLE tmsrequests INTO tmsrequests_line INDEX 1.
+        IF tmsrequests_line-impsing <> 'X'.
           in_queue = 'X'.
         ENDIF.
-        IF tmsrequests[ 1 ]-maxrc IS INITIAL.
+        IF tmsrequests_line-maxrc IS INITIAL.
           transport_rc = -1.
         ELSE.
         ENDIF.
-        transport_rc = tmsrequests[ 1 ]-maxrc.
+        transport_rc = tmsrequests_line-maxrc.
       ENDIF.
     ENDWHILE.
     WRITE: /, 'Import of transport', trkorr, 'ended with return code', transport_rc.
@@ -1471,8 +1486,7 @@ CLASS lcl_report IMPLEMENTATION.
             invalid_translation_depth    = 18
             wrong_mainpack_value         = 19
             superpackage_invalid         = 20
-            error_in_cts_checks          = 21
-            OTHERS                       = 22
+            OTHERS                       = 21
         ).
         IF sy-subrc <> 0.
           display_error( 'Error in package create' ).
@@ -1509,20 +1523,28 @@ ENDCLASS.
 DATA report TYPE REF TO lcl_report.
 
 INITIALIZATION.
+  lcl_report=>check_json_parser(
+    IMPORTING
+      exists = json_supported
+  ).
   sc_titl1               = 'Description'.
   sc_txt1                = 'This report can be used to perform the first installs of trm-server'.
   sc_txt2                = 'and trm-rest.'.
-  sc_txt3                = 'You can either let the report download the latest release from the TRM'.
-  sc_txt4                = 'registry or provide a release yourself via file upload.'.
-  sc_txt5                = 'To perform online install, add the required certificates in STRUST.'.
-  sc_txt6                = '@X1@ TRM Installer v2.0.0 - RegestaItalia'.
+  IF json_supported EQ 'X'.
+    sc_txt3              = 'You can either let the report download the latest release from the TRM'.
+    sc_txt4              = 'registry or provide a release yourself via file upload.'.
+    sc_txt5              = 'To perform online install, add the required certificates in STRUST.'.
+    online               = '@Y4@ From registry'.
+  ELSE.
+    sc_txt3              = 'You can provide a release via file upload.'.
+  ENDIF.
+  sc_txt6                = '@X1@ TRM Installer v3.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
   %_p_srv_%_app_%-text   = 'Install trm-server'.
   %_p_rest_%_app_%-text  = 'Install trm-rest'.
-  online                 = '@Y4@ Online install'.
-  offline                = '@FP@ Offline install'.
+  offline                = '@FP@ From file'.
 
   psel-prog      = sy-repid.
   psel-dynnr     = 200.
@@ -1567,14 +1589,18 @@ AT SELECTION-SCREEN.
     occ   = 1 ).
   CASE sy-ucomm.
     WHEN 'TAB1'.
-      psel-dynnr = 100.
+      psel-dynnr     = 100.
       psel-activetab = 'TAB1'.
     WHEN 'TAB2'.
-      psel-dynnr = 200.
+      psel-dynnr     = 200.
       psel-activetab = 'TAB2'.
   ENDCASE.
 
 AT SELECTION-SCREEN OUTPUT.
+  IF json_supported <> 'X' AND psel-activetab = 'TAB1'.
+    psel-dynnr     = 200.
+    psel-activetab = 'TAB2'.
+  ENDIF.
   %_p_id_%_app_%-text     = 'SSL Client Identity'.
   %_p_vscan_%_app_%-text  = 'Use virus scan'.
   %_p_vscanp_%_app_%-text = 'Virus scan profile'.
@@ -1651,7 +1677,8 @@ AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_lrest.
 
 
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_vscanp.
-  DATA lt_return TYPE STANDARD TABLE OF ddshretval.
+  DATA: lt_return      TYPE STANDARD TABLE OF ddshretval,
+        ls_return_line LIKE LINE OF lt_return.
   IF vscan[] IS INITIAL.
     SELECT vscan_prof~profile vscan_proft~text
       FROM vscan_prof
@@ -1670,18 +1697,21 @@ AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_vscanp.
       value_tab  = vscan
       return_tab = lt_return.
 
-  IF lt_return IS NOT INITIAL  .
-    p_vscanp = lt_return[ 1 ]-fieldval.
+  IF lt_return IS NOT INITIAL.
+    READ TABLE lt_return INDEX 1 INTO ls_return_line.
+    p_vscanp = ls_return_line-fieldval.
   ENDIF.
 
 FORM choose_file CHANGING file TYPE rlgrap-filename.
   DATA: lt_filetable TYPE filetable,
         lv_rc        TYPE i,
-        lv_action    TYPE i.
+        lv_action    TYPE i,
+        ls_file      LIKE LINE OF lt_filetable.
 
   CALL METHOD cl_gui_frontend_services=>file_open_dialog
     EXPORTING
-      window_title            = 'Select a file'
+      window_title            = 'Select a release'
+      file_filter             = '*.trm'
       multiselection          = abap_false
     CHANGING
       file_table              = lt_filetable
@@ -1695,13 +1725,23 @@ FORM choose_file CHANGING file TYPE rlgrap-filename.
       OTHERS                  = 5.
 
   IF sy-subrc <> 0.
-    lcl_report=>raise_error( 'Error opening file chooser.' ).
+    CASE sy-subrc.
+      WHEN 3.
+        lcl_report=>raise_error( 'File chooser is not available in background/no GUI mode.' ).
+      WHEN 4.
+        lcl_report=>raise_error( 'File chooser is not supported by this GUI.' ).
+      WHEN OTHERS.
+        lcl_report=>raise_error( 'Error opening file chooser.' ).
+    ENDCASE.
+    RETURN.
   ENDIF.
 
-  IF lv_action = cl_gui_frontend_services=>action_ok AND lv_rc > 0.
-    READ TABLE lt_filetable INDEX 1 INTO DATA(ls_file).
-    IF sy-subrc = 0.
-      file = ls_file-filename.
-    ENDIF.
+  IF lv_action <> cl_gui_frontend_services=>action_ok OR lv_rc <= 0.
+    RETURN.
+  ENDIF.
+
+  READ TABLE lt_filetable INDEX 1 INTO ls_file.
+  IF sy-subrc = 0.
+    file = ls_file-filename.
   ENDIF.
 ENDFORM.
