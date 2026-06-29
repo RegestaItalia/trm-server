@@ -62,7 +62,8 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD serialize.
-    DATA: lo_repo        TYPE REF TO lcl_abapgit_repo,
+    DATA: lo_srv TYPE REF TO lcl_abapgit_repo_srv,
+          lo_repo        TYPE REF TO lcl_abapgit_repo,
           lo_dot_abapgit TYPE REF TO lcl_abapgit_dot_abapgit,
           lv_ignore      TYPE string,
           lo_log         TYPE REF TO lcl_abapgit_log,
@@ -71,7 +72,8 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
           ls_file        LIKE LINE OF lt_files,
           ls_ser_obj     LIKE LINE OF objects.
 
-    lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
+    lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
+    lo_srv->get_repo_from_package(
       EXPORTING
         iv_package = devclass
       IMPORTING
