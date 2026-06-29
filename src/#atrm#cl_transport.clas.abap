@@ -842,7 +842,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       ).
     ENDIF.
     SORT lt_stats BY timestamp DESCENDING.
-    stat = lt_stats[ 1 ].
+    READ TABLE lt_stats INTO stat INDEX 1.
   ENDMETHOD.
 
   METHOD get_targets.
