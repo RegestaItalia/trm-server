@@ -43,7 +43,7 @@ ENDCLASS.
 CLASS /atrm/cl_abapgit IMPLEMENTATION.
 
   METHOD get_dot_abapgit.
-    DATA: lo_srv TYPE REF TO lcl_abapgit_repo_srv,
+    DATA: lo_srv  TYPE REF TO lcl_abapgit_repo_srv,
           lo_repo TYPE REF TO lcl_abapgit_repo.
     lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
     lo_srv->get_repo_from_package(
@@ -62,9 +62,10 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD serialize.
-    DATA: lo_srv TYPE REF TO lcl_abapgit_repo_srv,
+    DATA: lo_srv         TYPE REF TO lcl_abapgit_repo_srv,
           lo_repo        TYPE REF TO lcl_abapgit_repo,
           lo_dot_abapgit TYPE REF TO lcl_abapgit_dot_abapgit,
+          ls_dot_abapgit TYPE lif_abapgit_dot_abapgit=>ty_dot_abapgit,
           lv_ignore      TYPE string,
           lo_log         TYPE REF TO lcl_abapgit_log,
           lo_serialize   TYPE REF TO lcl_abapgit_serialize,
@@ -86,12 +87,14 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
       lo_dot_abapgit = lcl_abapgit_dot_abapgit=>build_default( ).
       lo_dot_abapgit->set_folder_logic( lif_abapgit_dot_abapgit=>c_folder_logic-full ).
     ENDIF.
-    LOOP AT lo_dot_abapgit->get_data( )-ignore INTO lv_ignore.
+    ls_dot_abapgit = lo_dot_abapgit->get_data( ).
+    LOOP AT ls_dot_abapgit-ignore INTO lv_ignore.
       lo_dot_abapgit->remove_ignore(
         iv_path     = lv_ignore
         iv_filename = ''
       ).
     ENDLOOP.
+    ls_dot_abapgit = lo_dot_abapgit->get_data( ).
     CREATE OBJECT lo_log.
     CREATE OBJECT lo_serialize
       EXPORTING

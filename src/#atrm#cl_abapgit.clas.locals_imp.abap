@@ -245,10 +245,13 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_data.
-    DATA ls_data   TYPE REF TO data.
-    GET REFERENCE OF rs_data INTO ls_data.
+    DATA ls_data TYPE REF TO data.
+    FIELD-SYMBOLS <ls_data> TYPE ANY.
+    create_data ls_data 'ZIF_ABAPGIT_DOT_ABAPGIT=>TY_DOT_ABAPGIT'.
     add_param 'RS_DATA' ls_data cl_abap_objectdescr=>receiving.
     call_object_method go_instance 'GET_DATA'.
+    ASSIGN ls_data->* TO <ls_data>.
+    MOVE-CORRESPONDING <ls_data> TO rs_data.
   ENDMETHOD.
 
   METHOD remove_ignore.

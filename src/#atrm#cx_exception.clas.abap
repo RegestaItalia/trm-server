@@ -27,7 +27,7 @@ CLASS /atrm/cx_exception DEFINITION
         pa_param_missing         TYPE string VALUE 'PA_PARAM_MISSING',
         pa_unexpected_param      TYPE string VALUE 'PA_UNEXPECTED_PARAM',
         pa_exception             TYPE string VALUE 'PA_EXCEPTION',
-        program_not_found        TYPE string value 'PROGRAM_NOT_FOUND',
+        program_not_found        TYPE string VALUE 'PROGRAM_NOT_FOUND',
       END OF c_reason .
 
     "! Constructor
@@ -110,7 +110,10 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
       WHILE lo_root->previous IS BOUND.
         lo_root = lo_root->previous.
       ENDWHILE.
-      lo_trm_root ?= lo_root.
+      TRY.
+          lo_trm_root ?= lo_root.
+        CATCH cx_sy_move_cast_error.
+      ENDTRY.
       IF lo_trm_root IS BOUND.
         MESSAGE ID lo_trm_root->message-msgid
           TYPE 'I'
