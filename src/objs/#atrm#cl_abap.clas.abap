@@ -58,6 +58,8 @@ CLASS /atrm/cl_abap DEFINITION
 
     METHODS add_nrob
       CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
+    METHODS add_docv
+      CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
 ENDCLASS.
 
 
@@ -107,6 +109,7 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
         dependencies = dependencies
     ).
     add_nrob( CHANGING ct_dependencies = dependencies ).
+    add_docv( CHANGING ct_dependencies = dependencies ).
   ENDMETHOD.
 
   METHOD get_clas_programs.
@@ -115,13 +118,13 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           ls_include   LIKE LINE OF lt_includes.
     lv_classname = key-obj_name.
     TRY.
-      cl_oo_classname_service=>get_all_method_includes(
-        EXPORTING
-          clsname           = lv_classname
-          with_enhancements = 'X'
-        RECEIVING
-          result = lt_includes
-      ).
+        cl_oo_classname_service=>get_all_method_includes(
+          EXPORTING
+            clsname           = lv_classname
+            with_enhancements = 'X'
+          RECEIVING
+            result = lt_includes
+        ).
       CATCH cx_class_not_existent.
     ENDTRY.
     LOOP AT lt_includes INTO ls_include.
@@ -263,14 +266,69 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
       CHECK sy-subrc <> 0.
       CLEAR ls_dependency.
       TRY.
-        get_tadir_dependency(
-          EXPORTING
-            object = ls_nrob-object
-            obj_name = ls_nrob-obj_name
-          RECEIVING
-            dependency = ls_dependency
-        ).
-        APPEND ls_dependency TO ct_dependencies.
+          get_tadir_dependency(
+            EXPORTING
+              object = ls_nrob-object
+              obj_name = ls_nrob-obj_name
+            RECEIVING
+              dependency = ls_dependency
+          ).
+          APPEND ls_dependency TO ct_dependencies.
+        CATCH /atrm/cx_exception.
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD add_docv.
+    DATA: ls_function_module TYPE ty_function_module,
+          ls_exporting       TYPE ty_param,
+          lv_objname_full    TYPE sobj_name,
+          lv_namespace       TYPE string,
+          lv_objname         TYPE string,
+          lt_docv_check      TYPE STANDARD TABLE OF sobj_name,
+          lt_docv            TYPE STANDARD TABLE OF tadir,
+          ls_docv            TYPE tadir,
+          ls_dependency      LIKE LINE OF ct_dependencies.
+    FIELD-SYMBOLS <fs_dep> TYPE /atrm/object_dependency.
+
+    LOOP AT function_modules INTO ls_function_module WHERE funcname = 'POPUP_DISPLAY_TEXT'.
+      READ TABLE ls_function_module-exporting INTO ls_exporting WITH KEY name = 'TEXT_OBJECT'.
+      CHECK sy-subrc EQ 0.
+      IF strlen( ls_exporting-value ) LE 38.
+        CLEAR lv_objname_full.
+        IF ls_exporting-value CP '/*'.
+          CLEAR lv_namespace.
+          CLEAR lv_objname.
+          FIND REGEX '^(/[^/]+/)(.+)$' IN ls_exporting-value SUBMATCHES lv_namespace lv_objname.
+          CONCATENATE lv_namespace 'DT' lv_objname INTO lv_objname_full.
+        ELSE.
+          CONCATENATE 'DT' ls_exporting-value INTO lv_objname_full.
+        ENDIF.
+        APPEND lv_objname_full TO lt_docv_check.
+      ENDIF.
+    ENDLOOP.
+
+    CHECK lt_docv_check[] IS NOT INITIAL.
+
+    SELECT pgmid object obj_name
+    INTO CORRESPONDING FIELDS OF TABLE lt_docv
+    FROM tadir
+    FOR ALL ENTRIES IN lt_docv_check
+    WHERE pgmid EQ 'R3TR' AND object EQ 'DOCV' AND obj_name EQ lt_docv_check-table_line.
+
+    LOOP AT lt_docv INTO ls_docv.
+      READ TABLE ct_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = ls_docv.
+      CHECK sy-subrc <> 0.
+      CLEAR ls_dependency.
+      TRY.
+          get_tadir_dependency(
+            EXPORTING
+              object = ls_docv-object
+              obj_name = ls_docv-obj_name
+            RECEIVING
+              dependency = ls_dependency
+          ).
+          APPEND ls_dependency TO ct_dependencies.
         CATCH /atrm/cx_exception.
       ENDTRY.
     ENDLOOP.
