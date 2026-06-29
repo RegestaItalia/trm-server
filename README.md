@@ -76,7 +76,8 @@ It exposes the APIs that allow TRM to import/export transports, and, as a conseq
 The first installation must be performed using the [standalone installer](https://raw.githubusercontent.com/RegestaItalia/trm-server/refs/heads/main/ztrm_installer.prog.abap).
 
 The **standalone installer** is a self-contained ABAP report that allows the installation of **trm-server** and **trm-rest**.\
-The installer will import trm-server transports (and eventually trm-rest transports too, if needed) into your system and automatically move its objects into the temporary package `$TRM` (which will also be generated).
+The installer will import trm-server transports (and eventually trm-rest transports too, if necessary) into your system and automatically move its objects into the temporary package `$TRM` (which will also be generated).\
+The installer does not import the **/ATRM/** namespace, as trm-server and trm-rest are intended to be used as-is. If you need to modify their objects, consider [installing them via abapGit](#install-with-abapgit) instead.
 
 After the initial installation, it is recommended to install subsequent theit updates via TRM.
 
@@ -105,20 +106,23 @@ After the initial installation, it is recommended to install subsequent theit up
     <img src="https://docs.trmregistry.com/server/images/se38_4.png" alt="SE38">
 </p>
 
-### Offline install
+### Release file install (From file)
 
 #### Download the releases
 
-1. Go to [https://trmregistry.com](https://trmregistry.com) and search for `trm-server`
+1. Go to [https://trmregistry.com](https://trmregistry.com) and search for [trm-server](https://trmregistry.com/package/trm-server)
 2. In the release page, press the **Download** button
-3. Download `trm-rest` too, if needed
+3. Download [trm-rest](https://trmregistry.com/package/trm-rest) too, if needed
 4. Open SE38 and run `ZTRM_INSTALLER`
-5. Open the **Offline** tab and select the file(s) downloaded
-6. Execute
+5. Select the file(s) downloaded
+6. Execute and wait for install to complete (~ 5 minutes)
 
 <p align="center">
     <img src="https://docs.trmregistry.com/server/images/offline.png" alt="ZTRM_INSTALLER">
 </p>
+
+<details>
+  <summary>Online install (From registry)</summary>
 
 ### Online install
 
@@ -181,11 +185,13 @@ The online installation is only possible if your system is allowed to connect to
 
 1. Open SE38 and run `ZTRM_INSTALLER`
 2. In the report you can configure connection settings (if needed) and select/deselect `trm-rest` install
-3. Execute
+3. Execute and wait for install to complete (~ 5 minutes)
 
 <p align="center">
     <img src="https://docs.trmregistry.com/server/images/online.png" alt="ZTRM_INSTALLER">
 </p>
+
+</details>
 
 ### Maintain Authorized Users
 
