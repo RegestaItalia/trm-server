@@ -169,11 +169,23 @@ CLASS lcl_abapgit_zip IMPLEMENTATION.
 
   METHOD encode_files.
     DATA: lt_files TYPE REF TO data,
-          lv_xstr  TYPE REF TO data.
-    FIELD-SYMBOLS: <lt_files> TYPE ANY.
+          lv_xstr  TYPE REF TO data,
+          lr_line  TYPE REF TO data.
+    FIELD-SYMBOLS:
+      <lt_files> TYPE STANDARD TABLE,
+      <ls_src>   TYPE any,
+      <ls_file>  TYPE any.
+
     create_data lt_files 'ZIF_ABAPGIT_DEFINITIONS=>TY_FILES_ITEM_TT'.
     ASSIGN lt_files->* TO <lt_files>.
-    MOVE-CORRESPONDING it_files TO <lt_files>.
+    CREATE DATA lr_line LIKE LINE OF <lt_files>.
+    ASSIGN lr_line->* TO <ls_file>.
+    LOOP AT it_files ASSIGNING <ls_src>.
+      CLEAR <ls_file>.
+      MOVE-CORRESPONDING <ls_src> TO <ls_file>.
+      APPEND <ls_file> TO <lt_files>.
+    ENDLOOP.
+
     add_param 'IT_FILES' lt_files cl_abap_objectdescr=>exporting.
     GET REFERENCE OF rv_xstr INTO lv_xstr.
     add_param 'RV_XSTR' lv_xstr cl_abap_objectdescr=>receiving.
@@ -229,7 +241,7 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
 
   METHOD build_default.
     DATA: lo_dot_abapgit TYPE REF TO data.
-    FIELD-SYMBOLS: <lo_dot_abapgit> TYPE ANY.
+    FIELD-SYMBOLS: <lo_dot_abapgit> TYPE any.
     create_data_ref lo_dot_abapgit 'ZCL_ABAPGIT_DOT_ABAPGIT'.
     add_param 'RO_DOT_ABAPGIT' lo_dot_abapgit cl_abap_objectdescr=>receiving.
     call_static_method 'ZCL_ABAPGIT_DOT_ABAPGIT' 'BUILD_DEFAULT'.
@@ -246,7 +258,7 @@ CLASS lcl_abapgit_dot_abapgit IMPLEMENTATION.
 
   METHOD get_data.
     DATA ls_data TYPE REF TO data.
-    FIELD-SYMBOLS <ls_data> TYPE ANY.
+    FIELD-SYMBOLS <ls_data> TYPE any.
     create_data ls_data 'ZIF_ABAPGIT_DOT_ABAPGIT=>TY_DOT_ABAPGIT'.
     add_param 'RS_DATA' ls_data cl_abap_objectdescr=>receiving.
     call_object_method go_instance 'GET_DATA'.
@@ -306,9 +318,14 @@ CLASS lcl_abapgit_serialize IMPLEMENTATION.
   METHOD files_local.
     DATA: lv_package TYPE REF TO data,
           lo_log     TYPE REF TO data,
-          lt_files   TYPE REF TO data.
+          lt_files   TYPE REF TO data,
+          lr_line    TYPE REF TO data.
+
     FIELD-SYMBOLS: <fs_log>   TYPE any,
-                   <lt_files> TYPE any.
+                   <lt_files> TYPE STANDARD TABLE,
+                   <ls_src>   TYPE any,
+                   <ls_file>  TYPE any.
+
     create_data lt_files 'ZIF_ABAPGIT_DEFINITIONS=>TY_FILES_ITEM_TT'.
     GET REFERENCE OF iv_package INTO lv_package.
     add_param 'IV_PACKAGE' lv_package cl_abap_objectdescr=>exporting.
@@ -319,7 +336,14 @@ CLASS lcl_abapgit_serialize IMPLEMENTATION.
     add_param 'RT_FILES' lt_files cl_abap_objectdescr=>receiving.
     call_object_method go_instance 'FILES_LOCAL'.
     ASSIGN lt_files->* TO <lt_files>.
-    MOVE-CORRESPONDING <lt_files> TO rt_files.
+
+    CREATE DATA lr_line LIKE LINE OF rt_files.
+    ASSIGN lr_line->* TO <ls_file>.
+    LOOP AT <lt_files> ASSIGNING <ls_src>.
+      CLEAR <ls_file>.
+      MOVE-CORRESPONDING <ls_src> TO <ls_file>.
+      APPEND <ls_file> TO rt_files.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
@@ -346,7 +370,7 @@ CLASS lcl_abapgit_repo IMPLEMENTATION.
 
   METHOD get_dot_abapgit.
     DATA: lo_dot_abapgit TYPE REF TO data.
-    FIELD-SYMBOLS: <lo_dot_abapgit> TYPE ANY.
+    FIELD-SYMBOLS: <lo_dot_abapgit> TYPE any.
     create_data_ref lo_dot_abapgit 'ZCL_ABAPGIT_DOT_ABAPGIT'.
     add_param 'RO_DOT_ABAPGIT' lo_dot_abapgit cl_abap_objectdescr=>receiving.
     call_object_method go_instance 'GET_DOT_ABAPGIT'.
@@ -378,7 +402,7 @@ CLASS lcl_abapgit_repo_srv IMPLEMENTATION.
 
   METHOD constructor.
     DATA: lo_instance TYPE REF TO data.
-    FIELD-SYMBOLS: <lo_instance> TYPE ANY.
+    FIELD-SYMBOLS: <lo_instance> TYPE any.
     super->constructor( ).
     create_data_ref lo_instance 'ZIF_ABAPGIT_REPO_SRV'.
     add_param 'RI_SRV' lo_instance cl_abap_objectdescr=>receiving.
@@ -394,7 +418,7 @@ CLASS lcl_abapgit_repo_srv IMPLEMENTATION.
   METHOD get_repo_from_package.
     DATA: lo_repo    TYPE REF TO data,
           lo_package TYPE REF TO data.
-    FIELD-SYMBOLS: <lo_repo> TYPE ANY.
+    FIELD-SYMBOLS: <lo_repo> TYPE any.
     create_data_ref lo_repo 'ZIF_ABAPGIT_REPO'.
     GET REFERENCE OF iv_package INTO lo_package.
     add_param 'IV_PACKAGE' lo_package cl_abap_objectdescr=>exporting.

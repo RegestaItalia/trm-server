@@ -58,19 +58,34 @@ CLASS lcl_numberrange_intervals IMPLEMENTATION.
           lv_object    TYPE REF TO data,
           lv_subobject TYPE REF TO data,
           ls_option    TYPE REF TO data,
-          lv_error     TYPE REF TO data.
+          lv_error     TYPE REF TO data,
+          lr_interval  TYPE REF TO data.
+    FIELD-SYMBOLS:
+      <lt_interval> TYPE STANDARD TABLE,
+      <ls_src>      TYPE any,
+      <ls_interval> TYPE any,
+      <ls_option>   TYPE any.
+
     create_data lt_interval 'CL_NUMBERRANGE_INTERVALS=>NR_INTERVAL'.
-    MOVE-CORRESPONDING interval TO lt_interval->*.
+    ASSIGN lt_interval->* TO <lt_interval>.
+    CREATE DATA lr_interval LIKE LINE OF <lt_interval>.
+    ASSIGN lr_interval->* TO <ls_interval>.
+    LOOP AT interval ASSIGNING <ls_src>.
+      CLEAR <ls_interval>.
+      MOVE-CORRESPONDING <ls_src> TO <ls_interval>.
+      APPEND <ls_interval> TO <lt_interval>.
+    ENDLOOP.
     create_data lv_object 'CL_NUMBERRANGE_INTERVALS=>NR_OBJECT'.
     MOVE object TO lv_object->*.
     create_data lv_subobject 'CL_NUMBERRANGE_INTERVALS=>NR_SUBOBJECT'.
     MOVE subobject TO lv_subobject->*.
     create_data ls_option 'CL_NUMBERRANGE_INTERVALS=>NR_OPTION'.
-    MOVE-CORRESPONDING option TO ls_option->*.
-    add_param 'INTERVAL' lt_interval cl_abap_objectdescr=>exporting.
-    add_param 'OBJECT' lv_object cl_abap_objectdescr=>exporting.
+    ASSIGN ls_option->* TO <ls_option>.
+    MOVE-CORRESPONDING option TO <ls_option>.
+    add_param 'INTERVAL'  lt_interval  cl_abap_objectdescr=>exporting.
+    add_param 'OBJECT'    lv_object    cl_abap_objectdescr=>exporting.
     add_param 'SUBOBJECT' lv_subobject cl_abap_objectdescr=>exporting.
-    add_param 'OPTION' ls_option cl_abap_objectdescr=>exporting.
+    add_param 'OPTION'    ls_option    cl_abap_objectdescr=>exporting.
     GET REFERENCE OF error INTO lv_error.
     add_param 'ERROR' lv_error cl_abap_objectdescr=>importing.
     call_static_method 'CL_NUMBERRANGE_INTERVALS' 'CREATE'.
