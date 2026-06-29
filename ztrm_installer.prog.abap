@@ -98,6 +98,9 @@ CLASS lcl_report DEFINITION.
                server_trkorr TYPE trkorr VALUE 'A4HK999999',
                rest_trkorr   TYPE trkorr VALUE 'A4HK9A0002'.
     METHODS run.
+    CLASS-METHODS raise_error
+      IMPORTING
+        message TYPE string.
     CLASS-METHODS get_versions
       EXPORTING server TYPE string
                 rest   TYPE string.
@@ -111,9 +114,6 @@ CLASS lcl_report DEFINITION.
              level    TYPE i,
            END OF ty_pkg_node,
            ty_pkg_node_tab TYPE STANDARD TABLE OF ty_pkg_node WITH DEFAULT KEY.
-    CLASS-METHODS raise_error
-      IMPORTING
-        message TYPE string.
     METHODS get_client
       IMPORTING
         with_base_url TYPE c DEFAULT 'X'
@@ -1695,7 +1695,7 @@ FORM choose_file CHANGING file TYPE rlgrap-filename.
       OTHERS                  = 5.
 
   IF sy-subrc <> 0.
-    raise_error( 'Error opening file chooser.' ).
+    lcl_report=>raise_error( 'Error opening file chooser.' ).
   ENDIF.
 
   IF lv_action = cl_gui_frontend_services=>action_ok AND lv_rc > 0.
