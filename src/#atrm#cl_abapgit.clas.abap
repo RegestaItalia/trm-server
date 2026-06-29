@@ -43,8 +43,10 @@ ENDCLASS.
 CLASS /atrm/cl_abapgit IMPLEMENTATION.
 
   METHOD get_dot_abapgit.
-    DATA lo_repo TYPE REF TO lcl_abapgit_repo.
-    lcl_abapgit_repo_srv=>get_instance( )->get_repo_from_package(
+    DATA: lo_srv TYPE REF TO lcl_abapgit_repo_srv,
+          lo_repo TYPE REF TO lcl_abapgit_repo.
+    lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
+    lo_srv->get_repo_from_package(
       EXPORTING
         iv_package = devclass
       IMPORTING
