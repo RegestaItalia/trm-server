@@ -36,8 +36,9 @@ TYPES: BEGIN OF ty_vscan_f4,
          profile TYPE vscan_prof-profile,
          text    TYPE vscan_proft-text,
        END OF ty_vscan_f4.
-DATA: vscan          TYPE STANDARD TABLE OF ty_vscan_f4,
-      json_supported TYPE flag.
+DATA: vscan                   TYPE STANDARD TABLE OF ty_vscan_f4,
+      json_supported          TYPE flag,
+      vscan_profile_supported TYPE flag.
 
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
   SELECTION-SCREEN SKIP.
@@ -107,7 +108,9 @@ CLASS lcl_report DEFINITION.
       EXPORTING server TYPE string
                 rest   TYPE string.
     CLASS-METHODS check_json_parser
-      EXPORTING exists TYPE flag.
+      RETURNING VALUE(exists) TYPE flag.
+    CLASS-METHODS check_vscan_profile
+      RETURNING VALUE(exists) TYPE abap_bool.
   PRIVATE SECTION.
     TYPES: ty_package_name TYPE devclass,
            ty_package_tab  TYPE STANDARD TABLE OF ty_package_name WITH DEFAULT KEY,
@@ -214,6 +217,21 @@ CLASS lcl_report IMPLEMENTATION.
       CATCH cx_sy_dyn_call_error.
         CLEAR exists.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD check_vscan_profile.
+    DATA: lo_intf   TYPE REF TO cl_abap_intfdescr,
+          ls_method TYPE abap_methdescr.
+    lo_intf ?= cl_abap_typedescr=>describe_by_name( 'IF_HTTP_RESPONSE' ).
+    READ TABLE lo_intf->methods WITH KEY name = 'GET_DATA' INTO ls_method.
+    IF sy-subrc EQ 0.
+      READ TABLE ls_method-parameters WITH KEY name = 'VIRUS_SCAN_PROFILE' parm_kind = cl_abap_objectdescr=>importing TRANSPORTING NO FIELDS.
+      IF sy-subrc EQ 0.
+        exists = 'X'.
+      ELSE.
+        CLEAR exists.
+      ENDIF.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_versions.
@@ -661,10 +679,18 @@ CLASS lcl_report IMPLEMENTATION.
         display_messages( response ).
         RETURN.
       ENDIF.
-      file = client->response->get_data(
-        virus_scan_profile = p_vscanp
-        vscan_scan_always  = vscan_check
-      ).
+      TRY.
+          CALL METHOD client->response->('GET_DATA')
+            EXPORTING
+              virus_scan_profile = p_vscanp
+              vscan_scan_always  = vscan_check
+            RECEIVING
+              data               = file.
+        CATCH cx_sy_dyn_call_error.
+          file = client->response->get_data(
+            vscan_scan_always  = vscan_check
+          ).
+      ENDTRY.
       handle_release(
         EXPORTING
           name     = 'trm-server'
@@ -738,10 +764,18 @@ CLASS lcl_report IMPLEMENTATION.
         display_messages( response ).
         RETURN.
       ENDIF.
-      file = client->response->get_data(
-        virus_scan_profile = p_vscanp
-        vscan_scan_always  = vscan_check
-      ).
+      TRY.
+          CALL METHOD client->response->('GET_DATA')
+            EXPORTING
+              virus_scan_profile = p_vscanp
+              vscan_scan_always  = vscan_check
+            RECEIVING
+              data               = file.
+        CATCH cx_sy_dyn_call_error.
+          file = client->response->get_data(
+            vscan_scan_always  = vscan_check
+          ).
+      ENDTRY.
       handle_release(
         EXPORTING
           name     = 'trm-rest'
@@ -1523,10 +1557,8 @@ ENDCLASS.
 DATA report TYPE REF TO lcl_report.
 
 INITIALIZATION.
-  lcl_report=>check_json_parser(
-    IMPORTING
-      exists = json_supported
-  ).
+  json_supported = lcl_report=>check_json_parser( ).
+  vscan_profile_supported = lcl_report=>check_vscan_profile( ).
   sc_titl1               = 'Description'.
   sc_txt1                = 'This report can be used to perform the first installs of trm-server'.
   sc_txt2                = 'and trm-rest.'.
@@ -1617,11 +1649,27 @@ AT SELECTION-SCREEN OUTPUT.
     ENDIF.
     IF p_vscan EQ 'X'.
       IF screen-name EQ 'P_VSCANP'.
-        screen-active = 1.
+        IF vscan_profile_supported EQ 'X'.
+          screen-active = 1.
+        ELSE.
+          screen-active = 0.
+        ENDIF.
+        MODIFY SCREEN.
+      ENDIF.
+      IF screen-name EQ '%_P_VSCANP_%_APP_%-TEXT'.
+        IF vscan_profile_supported EQ 'X'.
+          screen-active = 1.
+        ELSE.
+          screen-active = 0.
+        ENDIF.
         MODIFY SCREEN.
       ENDIF.
     ELSE.
       IF screen-name EQ 'P_VSCANP'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+      IF screen-name EQ '%_P_VSCANP_%_APP_%-TEXT'.
         screen-active = 0.
         MODIFY SCREEN.
       ENDIF.
