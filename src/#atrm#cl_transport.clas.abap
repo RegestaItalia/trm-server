@@ -6,7 +6,7 @@ CLASS /atrm/cl_transport DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF lxe_tt_packg_line WITH DEFAULT KEY,
+    TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF /atrm/devclass_range WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
@@ -842,7 +842,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       ).
     ENDIF.
     SORT lt_stats BY timestamp DESCENDING.
-    stat = lt_stats[ 1 ].
+    READ TABLE lt_stats INTO stat INDEX 1.
   ENDMETHOD.
 
   METHOD get_targets.

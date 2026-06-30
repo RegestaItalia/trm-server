@@ -36,7 +36,7 @@ CLASS /atrm/cl_pa_no_range_interval DEFINITION
         !nrrangenr TYPE ty_nrnr
         !toyear    TYPE ty_nryear
       EXPORTING
-        !messages  TYPE symsg_tab
+        !messages  TYPE /atrm/symsg_tab
         !execute   TYPE flag
       RAISING
         /atrm/cx_exception.
@@ -66,7 +66,7 @@ CLASS /atrm/cl_pa_no_range_interval DEFINITION
         !procind           TYPE ty_procind OPTIONAL
         !transport_request TYPE trkorr OPTIONAL
       EXPORTING
-        !messages          TYPE symsg_tab
+        !messages          TYPE /atrm/symsg_tab
       RAISING
         /atrm/cx_exception.
 

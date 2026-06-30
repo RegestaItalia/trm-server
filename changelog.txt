@@ -8,6 +8,10 @@ Legend
 + : added
 - : removed
 
+2026-06-29 v6.4.0
+-------------------
+! syntax for ecc
++ dependency detection for DOCV type DT
 
 2026-05-25 v6.3.0
 -------------------

@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "lint": "abaplint",
+    "lint:fix": "abaplint --fix"
+  },
+  "devDependencies": {
+    "@abaplint/cli": "^2.119.46"
+  }
+}

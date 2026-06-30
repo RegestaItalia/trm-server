@@ -173,10 +173,11 @@ CLASS lcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD is_trm_relevant.
-    DATA: ls_e071        TYPE e071,
+    DATA: lt_e071        TYPE tyt_e071,
+          ls_e071        TYPE e071,
           lv_has_name    TYPE flag,
           lv_has_version TYPE flag.
-    DATA(lt_e071) = get_e071( ).
+    lt_e071 = get_e071( ).
     READ TABLE lt_e071 TRANSPORTING NO FIELDS WITH KEY pgmid = 'R3TR'.
     CHECK sy-subrc EQ 0. " make it work
     DELETE lt_e071 WHERE NOT ( pgmid EQ '*' AND object EQ 'ZTRM' ).
@@ -279,7 +280,8 @@ CLASS lcl_trm_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_date.
-    DATA(ls_e070) = get_e070( ).
+    DATA ls_e070 TYPE e070.
+    ls_e070 = get_e070( ).
     CONVERT DATE ls_e070-as4date TIME ls_e070-as4time INTO TIME STAMP rv_date TIME ZONE sy-zonlo.
   ENDMETHOD.
 

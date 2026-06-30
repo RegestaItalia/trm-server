@@ -19,7 +19,7 @@ CLASS /atrm/cl_before_export DEFINITION
     "! @raising /atrm/cx_exception | Exception
     "! @parameter messages | Messages from processing
     METHODS run
-      EXPORTING messages TYPE symsg_tab
+      EXPORTING messages TYPE /atrm/symsg_tab
       RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
@@ -32,7 +32,7 @@ CLASS /atrm/cl_before_export DEFINITION
           gt_e071k     TYPE /atrm/cl_transport=>tyt_e071k.
 
     METHODS stree
-      CHANGING messages TYPE symsg_tab.
+      CHANGING messages TYPE /atrm/symsg_tab.
 
 ENDCLASS.
 

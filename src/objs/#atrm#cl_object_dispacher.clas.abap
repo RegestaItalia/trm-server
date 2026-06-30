@@ -65,9 +65,11 @@ CLASS /ATRM/CL_OBJECT_DISPACHER IMPLEMENTATION.
       MOVE-CORRESPONDING ls_object TO ls_key.
       APPEND INITIAL LINE TO /atrm/cl_object_dispacher=>dependencies ASSIGNING <fs_object_deps>.
       MOVE-CORRESPONDING ls_key TO <fs_object_deps>.
-      lo_object = get(
+      get(
         EXPORTING
           key = ls_key
+        RECEIVING
+          ro_instance = lo_object
       ).
       lo_object->get_dependencies(
         IMPORTING

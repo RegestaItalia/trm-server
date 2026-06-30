@@ -99,7 +99,7 @@ CLASS /atrm/cl_utilities DEFINITION
     "! @parameter messages | Message table to append entries from memory
     CLASS-METHODS append_messages_from_memory
       CHANGING
-        messages TYPE symsg_tab.
+        messages TYPE /atrm/symsg_tab.
 
     "! Returns for all objects the transport request that locks them, if any
     "! @parameter objects               | TADIR key table to check for locks
@@ -459,7 +459,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD update_package.
-    DATA: subrc   TYPE syst_subrc,
+    DATA: subrc   TYPE i,
           lo_badi TYPE REF TO /atrm/trm_package_data.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
