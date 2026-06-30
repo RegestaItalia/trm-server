@@ -77,7 +77,7 @@ The first installation must be performed using the [standalone installer](https:
 
 The **standalone installer** is a self-contained ABAP report that allows the installation of **trm-server** and **trm-rest**.\
 The installer will import trm-server transports (and eventually trm-rest transports too, if necessary) into your system and automatically move its objects into the temporary package `$TRM` (which will also be generated).\
-The installer does not import the **/ATRM/** namespace, as trm-server and trm-rest are intended to be used as-is. If you need to modify their objects, consider [installing them via abapGit](#install-with-abapgit) instead.
+The installer does not import the **/ATRM/** namespace, as trm-server and trm-rest are intended to be used as-is. If you need to modify its objects, consider [installing them via abapGit](#install-with-abapgit) instead.
 
 After the initial installation, it is recommended to install subsequent theit updates via TRM.
 
