@@ -9,7 +9,8 @@ CLASS /atrm/cl_pa_activate_sicf_node DEFINITION
 
     CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
 
-    TYPES: ty_icfname   TYPE c LENGTH 15.
+    TYPES: ty_icfname   TYPE c LENGTH 15,
+           ty_icfurlbuf TYPE c LENGTH 116.
 
     "! @parameter url              | Url
     "! @parameter hostname         | Hostname
@@ -48,46 +49,20 @@ ENDCLASS.
 
 CLASS /atrm/cl_pa_activate_sicf_node IMPLEMENTATION.
 
-  METHOD pre.
-    DATA: root   TYPE REF TO cx_dynamic_check,
-          active TYPE c.
-    CLEAR execute.
-    TRY.
-        CALL METHOD ('CL_ICF_TREE')=>is_service_active
-          EXPORTING
-            url                    = url
-            hostname               = hostname
-          IMPORTING
-            active                 = active
-          EXCEPTIONS
-            invalid_url            = 1
-            empty_url_and_nodeguid = 2
-            internal_error         = 3
-            OTHERS                 = 4.
-        IF sy-subrc EQ 0.
-          IF execute <> 'X'.
-            execute = 'X'.
-          ENDIF.
-        ELSE.
-          /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-generic ).
-        ENDIF.
-      CATCH cx_sy_dyn_call_error INTO root.
-        /atrm/cx_exception=>raise(
-          io_root    = root
-          iv_reason  = /atrm/cx_exception=>c_reason-pa_dynamic
-        ).
-    ENDTRY.
-  ENDMETHOD.
 
   METHOD execute.
-    DATA: root       TYPE REF TO cx_dynamic_check,
+    DATA: icfurlbuf  TYPE ty_icfurlbuf,
+          icfname    TYPE ty_icfname,
+          root       TYPE REF TO cx_dynamic_check,
           lv_message TYPE string,
           ls_message LIKE LINE OF messages.
+    icfurlbuf = url.
+    icfname = hostname.
     TRY.
         CALL METHOD ('CL_ICF_TREE')=>activate_node
           EXPORTING
-            url                      = url
-            hostname                 = hostname
+            url                      = icfurlbuf
+            hostname                 = icfname
           EXCEPTIONS
             node_not_existing        = 1
             enqueue_error            = 2
@@ -113,4 +88,37 @@ CLASS /atrm/cl_pa_activate_sicf_node IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 
+
+  METHOD pre.
+    DATA: icfname   TYPE ty_icfname,
+          root      TYPE REF TO cx_dynamic_check,
+          active    TYPE c.
+    CLEAR execute.
+    icfname = hostname.
+    TRY.
+        CALL METHOD ('CL_ICF_TREE')=>is_service_active
+          EXPORTING
+            url                    = url
+            hostname               = icfname
+          RECEIVING
+            active                 = active
+          EXCEPTIONS
+            invalid_url            = 1
+            empty_url_and_nodeguid = 2
+            internal_error         = 3
+            OTHERS                 = 4.
+        IF sy-subrc EQ 0.
+          IF active <> 'X'.
+            execute = 'X'.
+          ENDIF.
+        ELSE.
+          /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-generic ).
+        ENDIF.
+      CATCH cx_sy_dyn_call_error INTO root.
+        /atrm/cx_exception=>raise(
+          io_root    = root
+          iv_reason  = /atrm/cx_exception=>c_reason-pa_dynamic
+        ).
+    ENDTRY.
+  ENDMETHOD.
 ENDCLASS.
