@@ -60,6 +60,8 @@ CLASS /atrm/cl_object_ddlx IMPLEMENTATION.
           RECEIVING
             dependency = ls_dependency
         ).
+        READ TABLE dependencies WITH KEY tabname = 'TADIR' tabkey = ls_dependency-tabkey TRANSPORTING NO FIELDS.
+        CHECK sy-subrc <> 0.
         APPEND ls_dependency TO dependencies.
         CATCH /atrm/cx_exception.
       ENDTRY.
