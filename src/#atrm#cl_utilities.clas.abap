@@ -131,9 +131,10 @@ ENDCLASS.
 CLASS /atrm/cl_utilities IMPLEMENTATION.
 
   METHOD check_functions_authorization.
-    CLEAR authorized.
-    SELECT COUNT( * ) FROM /atrm/users WHERE uname = sy-uname.
-    IF sy-dbcnt EQ 1.
+    AUTHORITY-CHECK OBJECT 'ZTRM_AUTH' ID 'ACTVT' FIELD '16'.
+    IF sy-subrc <> 0.
+      CLEAR authorized.
+    ELSE.
       authorized = 'X'.
     ENDIF.
   ENDMETHOD.
