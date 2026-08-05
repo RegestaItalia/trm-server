@@ -10,11 +10,6 @@ CLASS /atrm/cl_transport DEFINITION
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
-    CONSTANTS:
-      c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
-      c_migrate_object      TYPE nrobj  VALUE '/ATRM/TRNR',
-      c_migrate_subobj      TYPE nrsobj VALUE space,
-      c_migrate_toyear      TYPE nryear VALUE '0000'.
 
     "! Constructor
     "! @parameter trkorr | Transport request number
