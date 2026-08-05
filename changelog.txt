@@ -8,6 +8,12 @@ Legend
 + : added
 - : removed
 
+2026-08-05 v7.0.0
+-------------------
+- outdated number range pa
++ regenerate sap_all pa
+! /atrm/users -> auth object ZTRM_AUTH
+
 2026-07-20 v6.4.1
 -------------------
 + activate sicf pa
