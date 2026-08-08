@@ -43,29 +43,28 @@ CLASS /atrm/cl_object_ddlx IMPLEMENTATION.
             i_mdata_queries = <fs_queries>
           IMPORTING
             e_ddlxnames     = <fs_ddlx_names>.
-      CATCH cx_dynamic_check.
-        RETURN.
-    ENDTRY.
 
-    LOOP AT <fs_ddlx_names> ASSIGNING <fs_row>.
-      UNASSIGN <fs_entity>.
-      ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_row> TO <fs_entity>.
-      CHECK <fs_entity> IS ASSIGNED.
-      CLEAR ls_dependency.
-      TRY.
-        get_tadir_dependency(
-          EXPORTING
-            object     = 'DDLS'
-            obj_name   = <fs_entity>
-          RECEIVING
-            dependency = ls_dependency
-        ).
-        READ TABLE dependencies WITH KEY tabname = 'TADIR' tabkey = ls_dependency-tabkey TRANSPORTING NO FIELDS.
-        CHECK sy-subrc <> 0.
-        APPEND ls_dependency TO dependencies.
-        CATCH /atrm/cx_exception.
-      ENDTRY.
-    ENDLOOP.
+        LOOP AT <fs_ddlx_names> ASSIGNING <fs_row>.
+          UNASSIGN <fs_entity>.
+          ASSIGN COMPONENT 'ENTITY' OF STRUCTURE <fs_row> TO <fs_entity>.
+          CHECK <fs_entity> IS ASSIGNED.
+          CLEAR ls_dependency.
+          TRY.
+              get_tadir_dependency(
+                EXPORTING
+                  object     = 'DDLS'
+                  obj_name   = <fs_entity>
+                RECEIVING
+                  dependency = ls_dependency
+              ).
+              READ TABLE dependencies WITH KEY tabname = 'TADIR' tabkey = ls_dependency-tabkey TRANSPORTING NO FIELDS.
+              CHECK sy-subrc <> 0.
+              APPEND ls_dependency TO dependencies.
+            CATCH /atrm/cx_exception.
+          ENDTRY.
+        ENDLOOP.
+      CATCH cx_dynamic_check.
+    ENDTRY.
   ENDMETHOD.
 
 ENDCLASS.
