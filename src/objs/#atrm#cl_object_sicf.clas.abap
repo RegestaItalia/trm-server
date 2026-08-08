@@ -17,14 +17,14 @@ CLASS /atrm/cl_object_sicf DEFINITION
         icfname    TYPE ty_icf_name,
         icfnodguid TYPE ty_icfguid,
       END OF ty_parent,
-      tt_parent TYPE STANDARD TABLE OF ty_parent WITH DEFAULT KEY.
+      tyt_parent TYPE STANDARD TABLE OF ty_parent WITH DEFAULT KEY.
 
     CLASS-METHODS get_parent_nodes
       IMPORTING
         iv_icf_name      TYPE ty_icf_name
         iv_icfparguid    TYPE ty_icfguid
       RETURNING
-        VALUE(rt_parent) TYPE tt_parent.
+        VALUE(rt_parent) TYPE tyt_parent.
 
     METHODS single_dependencies
       IMPORTING
@@ -38,6 +38,7 @@ ENDCLASS.
 CLASS /atrm/cl_object_sicf IMPLEMENTATION.
 
   METHOD get_parent_nodes.
+    TYPES: tyt_parts TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
     DATA:
       lv_node_guid   TYPE ty_icfguid,
       lv_icf_name    TYPE ty_icf_name,
@@ -45,7 +46,7 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
       lv_ext_url     TYPE string,
       lv_query       TYPE string,
       lv_path        TYPE string,
-      lt_parts       TYPE STANDARD TABLE OF string WITH EMPTY KEY,
+      lt_parts       TYPE tyt_parts,
       lv_parts_count TYPE i,
       lv_part        LIKE LINE OF lt_parts,
       lv_parent_path TYPE string.
@@ -121,11 +122,12 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
                  icf_name   TYPE ty_icf_name,
                  icfparguid TYPE ty_icfguid,
                  icfnodguid TYPE ty_icfguid,
-               END OF ty_parent_icf.
+               END OF ty_parent_icf,
+               tyt_parent_icf TYPE STANDARD TABLE OF ty_parent_icf WITH DEFAULT KEY.
         DATA: lv_icf_name   TYPE ty_icf_name,
               lv_icfparguid TYPE ty_icfguid,
-              lt_parent     TYPE tt_parent,
-              lt_parent_icf TYPE STANDARD TABLE OF ty_parent_icf WITH DEFAULT KEY,
+              lt_parent     TYPE tyt_parent,
+              lt_parent_icf TYPE tyt_parent_icf,
               ls_parent_icf LIKE LINE OF lt_parent_icf,
               obj_name      TYPE sobj_name,
               ls_dependency TYPE /atrm/object_dependency,
