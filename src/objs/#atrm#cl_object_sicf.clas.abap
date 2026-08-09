@@ -192,6 +192,7 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
 
   METHOD add_guid_dependency.
     DATA: lv_node_guid TYPE ty_icfguid,
+          lv_obj_name  TYPE c LENGTH 40,
           ls_service   TYPE ty_service.
     FIELD-SYMBOLS <lv_node_guid> TYPE any.
 
@@ -208,14 +209,15 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
         rs_service   = ls_service.
     CHECK ls_service-icf_name IS NOT INITIAL.
 
-    collect_service_dependencies(
+    CLEAR lv_obj_name.
+    lv_obj_name+0(15)  = ls_service-icf_name.
+    lv_obj_name+15(25) = ls_service-icfparguid.
+    CALL METHOD add_tadir_dependency
       EXPORTING
-        is_service      = ls_service
-        iv_add_service  = 'X'
+        iv_object       = 'SICF'
+        iv_obj_name     = lv_obj_name
       CHANGING
-        ct_dependencies = ct_dependencies
-        ct_visited      = ct_visited
-    ).
+        ct_dependencies = ct_dependencies.
   ENDMETHOD.
 
   METHOD add_url_dependencies.
@@ -223,6 +225,7 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
           lv_method_name TYPE string,
           lv_node_guid  TYPE ty_icfguid,
           lv_icf_name   TYPE ty_icf_name,
+          lv_obj_name   TYPE c LENGTH 40,
           ls_service    TYPE ty_service.
 
     CHECK iv_url IS NOT INITIAL.
@@ -255,23 +258,24 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
     CHECK ls_service-icf_name IS NOT INITIAL.
     CHECK ls_service-icf_name EQ lv_icf_name.
 
-    collect_service_dependencies(
+    CLEAR lv_obj_name.
+    lv_obj_name+0(15)  = ls_service-icf_name.
+    lv_obj_name+15(25) = ls_service-icfparguid.
+    CALL METHOD add_tadir_dependency
       EXPORTING
-        is_service      = ls_service
-        iv_add_service  = 'X'
+        iv_object       = 'SICF'
+        iv_obj_name     = lv_obj_name
       CHANGING
-        ct_dependencies = ct_dependencies
-        ct_visited      = ct_visited
-    ).
+        ct_dependencies = ct_dependencies.
   ENDMETHOD.
 
   METHOD collect_service_dependencies.
-    DATA: lv_obj_name      TYPE c LENGTH 40,
-          lv_class_name    TYPE string,
-          lv_method_name   TYPE string,
+    DATA: lv_obj_name       TYPE c LENGTH 40,
+          lv_class_name     TYPE string,
+          lv_method_name    TYPE string,
           lv_serv_info_type TYPE string,
-          lr_serv_info     TYPE REF TO data,
-          ls_parent        TYPE ty_service.
+          lr_serv_info      TYPE REF TO data,
+          ls_parent         TYPE ty_service.
     FIELD-SYMBOLS <lt_serv_info> TYPE ANY TABLE.
 
     CHECK is_service-icf_name IS NOT INITIAL.
@@ -287,13 +291,12 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
       CLEAR lv_obj_name.
       lv_obj_name+0(15)  = is_service-icf_name.
       lv_obj_name+15(25) = is_service-icfparguid.
-      add_tadir_dependency(
+      CALL METHOD add_tadir_dependency
         EXPORTING
           iv_object       = 'SICF'
           iv_obj_name     = lv_obj_name
         CHANGING
-          ct_dependencies = ct_dependencies
-      ).
+          ct_dependencies = ct_dependencies.
     ENDIF.
 
     lv_serv_info_type = 'ICFSERVTBL'.
@@ -315,13 +318,12 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
           no_authority      = 4
           OTHERS            = 5.
       IF sy-subrc EQ 0.
-        single_dependencies(
+        CALL METHOD single_dependencies
           EXPORTING
             ir_serv_info    = lr_serv_info
           CHANGING
             ct_dependencies = ct_dependencies
-            ct_visited      = ct_visited
-        ).
+            ct_visited      = ct_visited.
       ENDIF.
     ENDIF.
 
@@ -331,14 +333,15 @@ CLASS /atrm/cl_object_sicf IMPLEMENTATION.
       RECEIVING
         rs_service   = ls_parent.
     IF ls_parent-icf_name IS NOT INITIAL.
-      collect_service_dependencies(
+      CLEAR lv_obj_name.
+      lv_obj_name+0(15)  = ls_parent-icf_name.
+      lv_obj_name+15(25) = ls_parent-icfparguid.
+      CALL METHOD add_tadir_dependency
         EXPORTING
-          is_service      = ls_parent
-          iv_add_service  = 'X'
+          iv_object       = 'SICF'
+          iv_obj_name     = lv_obj_name
         CHANGING
-          ct_dependencies = ct_dependencies
-          ct_visited      = ct_visited
-      ).
+          ct_dependencies = ct_dependencies.
     ENDIF.
   ENDMETHOD.
 
