@@ -14,7 +14,17 @@ ENDCLASS.
 CLASS /atrm/cl_object_vkos IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
-    " empty implementation
+    DATA ls_dependency TYPE /atrm/object_dependency.
+    TRY.
+        CALL METHOD get_tadir_dependency
+          EXPORTING object = 'TABL' obj_name = me->key-obj_name
+          RECEIVING dependency = ls_dependency.
+        IF ls_dependency IS NOT INITIAL.
+          APPEND ls_dependency TO dependencies.
+        ENDIF.
+      CATCH cx_root.
+        " generated condition table may not exist in the target system
+    ENDTRY.
   ENDMETHOD.
 
 ENDCLASS.

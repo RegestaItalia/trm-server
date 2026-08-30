@@ -156,31 +156,34 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD dequeue.
     CALL FUNCTION 'DEQUEUE_E_TABLE'
       EXPORTING
-        mode_rstable   = mode_rstable
-        tabname        = tabname
-      EXCEPTIONS
-        foreign_lock   = 1
-        system_failure = 2
-        OTHERS         = 3.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dequeue_error ).
-    ENDIF.
+        mode_rstable = mode_rstable
+        tabname      = tabname.
   ENDMETHOD.
 
   METHOD get_binary_file.
+    DATA lv_subrc TYPE sysubrc.
     OPEN DATASET file_path FOR INPUT IN BINARY MODE.
-    READ DATASET file_path INTO file.
-    CLOSE DATASET file_path.
     IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-not_found ).
+    ENDIF.
+    READ DATASET file_path INTO file.
+    lv_subrc = sy-subrc.
+    CLOSE DATASET file_path.
+    IF lv_subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
   ENDMETHOD.
 
   METHOD write_binary_file.
+    DATA lv_subrc TYPE sysubrc.
     OPEN DATASET file_path FOR OUTPUT IN BINARY MODE.
-    TRANSFER file TO file_path.
-    CLOSE DATASET file_path.
     IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    TRANSFER file TO file_path.
+    lv_subrc = sy-subrc.
+    CLOSE DATASET file_path.
+    IF lv_subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
   ENDMETHOD.
@@ -203,7 +206,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD get_file_sys.
     SELECT SINGLE filesys INTO file_sys FROM opsystem WHERE opsys = sy-opsys.
     IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( iv_message = 'File system not found'
+      /atrm/cx_exception=>raise( iv_message = 'File system not found' "#EC NOTEXT
                                 iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
     ENDIF.
   ENDMETHOD.
@@ -357,9 +360,9 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
            END OF ty_result.
     DATA: cmd    TYPE ty_cmd,
           result TYPE STANDARD TABLE OF ty_result.
-    cmd = 'R3trans'.
+    cmd = 'R3trans'. "#EC NOTEXT
     CALL 'SYSTEM' ID 'COMMAND' FIELD cmd
-                  ID 'TAB'     FIELD result.
+                  ID 'TAB'     FIELD result. "#EC CI_SYSTEMCALL
     IF sy-subrc <> 12. "Fatal errors have occurred, R3trans sets to 12 when running without options
       /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-r3trans_cmd_error ).
     ENDIF.
@@ -373,17 +376,19 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           ls_ascii     LIKE LINE OF lt_ascii_tab,
           lv_lines     TYPE i,
           ls_message   LIKE LINE OF messages.
-    FIELD-SYMBOLS <fs_msg> TYPE symsg.
     CALL FUNCTION 'LIST_FROM_MEMORY'
       TABLES
         listobject = lt_list_tab
       EXCEPTIONS
         not_found  = 1
         OTHERS     = 2.
-    CALL FUNCTION 'LIST_FREE_MEMORY'
-      EXCEPTIONS
-        error_message = 1
-        OTHERS        = 2.
+    IF sy-subrc <> 0.
+      CALL FUNCTION 'LIST_FREE_MEMORY'
+        EXCEPTIONS
+          error_message = 0
+          OTHERS        = 0.
+      RETURN.
+    ENDIF.
     CALL FUNCTION 'LIST_TO_ASCI'
       TABLES
         listasci           = lt_ascii_tab
@@ -393,8 +398,15 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
         list_index_invalid = 2
         error_message      = 3
         OTHERS             = 4.
+    IF sy-subrc <> 0.
+      CLEAR lt_ascii_tab.
+    ENDIF.
+    CALL FUNCTION 'LIST_FREE_MEMORY'
+      EXCEPTIONS
+        error_message = 0
+        OTHERS        = 0.
     DESCRIBE TABLE lt_ascii_tab LINES lv_lines.
-    IF lv_lines GE 3. " remove report header
+    IF lv_lines GE 3.
       READ TABLE lt_ascii_tab INTO ls_ascii INDEX 2.
       IF '-' CO ls_ascii-line.
         DELETE lt_ascii_tab FROM 1 TO 3.
@@ -464,18 +476,21 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           lo_badi TYPE REF TO /atrm/trm_package_data.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
-    COMMIT WORK AND WAIT.
     subrc = sy-subrc.
-    dequeue( tabname = '/ATRM/PACKAGES' ).
     IF subrc EQ 0.
-      TRY.
-          GET BADI lo_badi.
-          CALL BADI lo_badi->trm_packages_change
-            EXPORTING
-              data = package.
-        CATCH cx_badi_not_implemented cx_badi_initial_reference.
-      ENDTRY.
+      COMMIT WORK AND WAIT.
     ENDIF.
+    dequeue( tabname = '/ATRM/PACKAGES' ).
+    IF subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    TRY.
+        GET BADI lo_badi.
+        CALL BADI lo_badi->trm_packages_change
+          EXPORTING
+            data = package.
+      CATCH cx_badi_not_implemented cx_badi_initial_reference.
+    ENDTRY.
   ENDMETHOD.
 
 ENDCLASS.
