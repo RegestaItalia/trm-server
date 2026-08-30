@@ -236,7 +236,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           lt_comp    TYPE lxe_tt_comp.
 
     IF devclass[] IS INITIAL.
-      /atrm/cx_exception=>raise( iv_message = 'No input packages defined'
+      /atrm/cx_exception=>raise( iv_message = 'No input packages defined' "#EC NOTEXT
                                 iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
     ENDIF.
 
@@ -349,7 +349,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         MESSAGE ID ls_log-ag TYPE 'I' NUMBER ls_log-msgnr WITH ls_log-var1 ls_log-var2 ls_log-var3 ls_log-var4 INTO lv_message.
         /atrm/cx_exception=>raise( iv_message = lv_message ).
       ELSE.
-        /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ).
+        /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ). "#EC NOTEXT
       ENDIF.
     ENDIF.
   ENDMETHOD.
@@ -730,7 +730,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           lt_log          TYPE /atrm/cx_exception=>tyt_log,
           ls_exception    TYPE stmscalert.
 
-    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ gv_trkorr.
+    SELECT domnam sysnam trkorr tarcli FROM tmsbuffer INTO CORRESPONDING FIELDS OF ls_tmsbuffer
+      UP TO 1 ROWS
+      WHERE sysnam EQ system
+        AND trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
     CHECK sy-subrc EQ 0.
 
     CALL FUNCTION 'TMS_MGR_MAINTAIN_TR_QUEUE'
@@ -767,9 +772,15 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA ls_tmsbuftxt TYPE tmsbuftxt.
     SELECT SINGLE * FROM tmsbuftxt INTO ls_tmsbuftxt WHERE trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
-    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text
+      WHERE trkorr EQ gv_trkorr
+        AND langu EQ sy-langu.
     SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
-    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli WHERE trkorr EQ gv_trkorr.
+    SELECT client FROM e070c INTO ls_tmsbuftxt-srccli
+      UP TO 1 ROWS
+      WHERE trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
     " there's no standard way to update buffer text table other than clearing the buffer as a whole?
     MODIFY tmsbuftxt FROM ls_tmsbuftxt.
     COMMIT WORK AND WAIT.
@@ -816,8 +827,18 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: ls_tmsbuffer TYPE tmsbuffer,
           lt_stats     TYPE tpstats.
 
-    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ gv_trkorr.
-    CHECK sy-subrc EQ 0.
+    SELECT * FROM tmsbuffer INTO ls_tmsbuffer
+      UP TO 1 ROWS
+      WHERE sysnam EQ system
+        AND trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise(
+        iv_message = 'Transport was not found in the target system buffer' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-not_found
+      ).
+    ENDIF.
     CALL FUNCTION 'TMS_IMU_FILTER_TPSTAT'
       EXPORTING
         iv_system   = ls_tmsbuffer-sysnam
@@ -832,7 +853,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         et_tpstat   = lt_stats.
     IF lt_stats[] IS INITIAL.
       /atrm/cx_exception=>raise(
-        iv_message = 'No import status found for this transport in the target system'
+        iv_message = 'No import status found for this transport in the target system' "#EC NOTEXT
         iv_reason = /atrm/cx_exception=>c_reason-not_found
       ).
     ENDIF.
