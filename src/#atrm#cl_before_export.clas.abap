@@ -99,7 +99,7 @@ CLASS /atrm/cl_before_export IMPLEMENTATION.
     ls_selection-low = 'X'.
     APPEND ls_selection TO lt_selection.
 
-    SUBMIT rs_stree_objects_to_req_get WITH SELECTION-TABLE lt_selection EXPORTING LIST TO MEMORY AND RETURN.
+    SUBMIT rs_stree_objects_to_req_get WITH SELECTION-TABLE lt_selection EXPORTING LIST TO MEMORY AND RETURN. "#EC CI_SUBMIT
     /atrm/cl_utilities=>append_messages_from_memory(
       CHANGING
         messages = messages
