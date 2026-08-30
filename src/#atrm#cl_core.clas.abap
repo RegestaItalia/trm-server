@@ -110,7 +110,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
                    <fs_wb_trkorr_package>    TYPE ty_wb_trkorr_package,
                    <fs_package_wb_transport> TYPE ty_package_wb_transport.
 
-    SELECT DISTINCT trkorr FROM e071 INTO TABLE lt_actual_trkorr WHERE pgmid EQ '*' AND object EQ 'ZTRM'.
+    SELECT DISTINCT trkorr FROM e071 INTO TABLE lt_actual_trkorr WHERE pgmid EQ '*' AND object EQ 'ZTRM'. "#EC CI_NOFIELD
     LOOP AT lt_actual_trkorr INTO lv_actual_trkorr.
       CLEAR ls_trkorr.
       ls_trkorr-trkorr = lv_actual_trkorr.
@@ -369,10 +369,11 @@ CLASS /atrm/cl_core IMPLEMENTATION.
            e070~as4date
            e070~as4time
       FROM /atrm/packages
-      INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass
+      INNER JOIN tdevc ON tdevc~devclass = /atrm/packages~devclass "inner join to filter out packages with deleted sap package (dirty records?)
       INNER JOIN e070 ON e070~trkorr = /atrm/packages~trkorr
       INTO CORRESPONDING FIELDS OF TABLE packages.
     IF package_name IS NOT INITIAL.
+      " assume that package_name and package_registry are unique together, so we can filter out all other packages
       DELETE packages WHERE package_name <> package_name AND package_registry <> package_registry.
     ENDIF.
     LOOP AT packages ASSIGNING <row>.
