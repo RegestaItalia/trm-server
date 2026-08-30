@@ -1,4 +1,5 @@
 "! Transport API
+"! Transport API
 CLASS /atrm/cl_transport DEFINITION
   PUBLIC
   FINAL
@@ -9,7 +10,8 @@ CLASS /atrm/cl_transport DEFINITION
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF /atrm/devclass_range WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
-           tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+           tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY,
+           tyt_trkorr    TYPE STANDARD TABLE OF trkorr WITH DEFAULT KEY.
 
     "! Constructor
     "! @parameter trkorr | Transport request number
@@ -197,6 +199,11 @@ CLASS /atrm/cl_transport DEFINITION
       IMPORTING system      TYPE tmssysnam
       RETURNING VALUE(stat) TYPE tpstat
       RAISING   /atrm/cx_exception.
+CLASS-METHODS import_multiple
+      IMPORTING system        TYPE tmssysnam
+                transports    TYPE tyt_trkorr
+      RETURNING VALUE(imports) TYPE stms_tp_imports
+      RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -215,6 +222,9 @@ ENDCLASS.
 
 
 
+
+
+
 CLASS /atrm/cl_transport IMPLEMENTATION.
 
   METHOD constructor.
@@ -226,6 +236,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_translations.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     DATA: lt_langs   TYPE TABLE OF lxeisolang,
           wa_langs   LIKE LINE OF lt_langs,
           lo_explang TYPE REF TO cl_lxe_log_export,
@@ -310,9 +323,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         /atrm/cx_exception=>raise( ).
       ENDIF.
     ENDLOOP.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD add_objects.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     DATA: lt_e071    LIKE e071,
           ls_log     LIKE LINE OF log,
           lv_message TYPE string.
@@ -352,9 +376,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ). "#EC NOTEXT
       ENDIF.
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD remove_comments.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     DATA: lt_e071    TYPE STANDARD TABLE OF e071,
           ls_e071    LIKE LINE OF lt_e071,
           ls_request TYPE trwbo_request.
@@ -374,8 +409,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDIF.
     ls_request-h-trkorr = gv_trkorr.
     SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
-    CHECK lt_e071[] IS NOT INITIAL.
-    LOOP AT lt_e071 INTO ls_e071.
+    IF lt_e071[] IS NOT INITIAL.
+      LOOP AT lt_e071 INTO ls_e071.
       CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
         EXPORTING
           is_e071_delete              = ls_e071
@@ -402,8 +437,17 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-    ENDLOOP.
-    COMMIT WORK AND WAIT.
+      ENDLOOP.
+      COMMIT WORK AND WAIT.
+    ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD create_workbench.
@@ -473,6 +517,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     CALL FUNCTION 'TR_DELETE_COMM'
       EXPORTING
         wi_dialog = ' '
@@ -482,6 +529,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD enqueue.
@@ -611,6 +666,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD release.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     DATA lv_without_lock TYPE flag.
     IF lock EQ 'X'.
       lv_without_lock = ' '.
@@ -631,10 +689,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD rename.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
     enqueue( ).
+    TRY.
     "LSTR6F02 - e070_update
     DATA: ls_e070  TYPE e070,
           ls_e070c TYPE e070c,
@@ -673,7 +741,6 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    dequeue( ).
 
     lv_msgtext1 = ls_e070-trkorr.
     lv_msgtext2 = sy-uname.
@@ -689,9 +756,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         wi_new_order  = ' '
         wi_trfunction = ls_e070-trfunction
         wi_trkorr     = ls_e070-trkorr.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD set_documentation.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     DATA lt_doc LIKE doc.
     MOVE doc[] TO lt_doc[].
     CALL FUNCTION 'TRINT_DOCU_INTERFACE'
@@ -706,9 +784,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD copy.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     CALL FUNCTION 'TR_COPY_COMM'
       EXPORTING
         wi_dialog                = ' '
@@ -720,6 +809,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD delete_from_tms_queue.
@@ -802,6 +899,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_owner.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
     CALL FUNCTION 'TR_CHANGE_USERNAME'
       EXPORTING
         wi_dialog           = ' '
@@ -821,6 +921,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD get_import_status.
@@ -894,4 +1002,66 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD import_multiple.
+    DATA: lt_requests  TYPE stms_tr_requests,
+          ls_request   TYPE stms_tr_request,
+          lv_trkorr    TYPE trkorr,
+          ls_exception TYPE stmscalert.
+
+    IF transports[] IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No transports supplied for batch import' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-invalid_input
+      ).
+    ENDIF.
+
+    LOOP AT transports INTO lv_trkorr.
+      CHECK lv_trkorr IS NOT INITIAL.
+      READ TABLE lt_requests TRANSPORTING NO FIELDS
+        WITH KEY trkorr = lv_trkorr.
+      CHECK sy-subrc <> 0.
+      CLEAR ls_request.
+      ls_request-trkorr = lv_trkorr.
+      ls_request-tarcli = sy-mandt.
+      APPEND ls_request TO lt_requests.
+    ENDLOOP.
+
+    IF lt_requests[] IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No valid transports supplied for batch import' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-invalid_input
+      ).
+    ENDIF.
+
+    CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
+      EXPORTING
+        iv_system             = system
+        iv_request            = 'SOME'
+        iv_client             = sy-mandt
+        iv_ctc_active         = ' '
+        iv_overtake           = 'X'
+        iv_import_again       = 'X'
+        iv_ignore_originality = 'X'
+        iv_ignore_repairs     = 'X'
+        iv_ignore_transtype   = 'X'
+        iv_ignore_tabletype   = 'X'
+        iv_ignore_predec      = 'X'
+        iv_ignore_cvers       = 'X'
+        iv_test_import        = ' '
+        iv_subset             = 'X'
+        iv_offline            = 'X'
+        iv_monitor            = 'X'
+        iv_verbose            = ' '
+        it_requests           = lt_requests
+      IMPORTING
+        es_exception          = ls_exception
+        et_tp_imports         = imports
+      EXCEPTIONS
+        read_config_failed         = 1
+        table_of_requests_is_empty = 2
+        OTHERS                     = 3.
+    IF sy-subrc <> 0 OR ls_exception-severity = 'E'.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
 ENDCLASS.
