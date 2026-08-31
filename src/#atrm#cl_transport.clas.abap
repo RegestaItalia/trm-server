@@ -349,8 +349,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     enqueue( ).
     TRY.
         DATA: lt_e071    LIKE e071,
-              ls_log     LIKE LINE OF log,
-              lv_message TYPE string.
+              ls_log     LIKE LINE OF log.
         MOVE e071[] TO lt_e071[].
         CALL FUNCTION 'TRINT_REQUEST_CHOICE'
           EXPORTING
@@ -381,8 +380,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         ENDIF.
         IF ls_log IS NOT INITIAL.
           IF ls_log-ag IS NOT INITIAL.
-            MESSAGE ID ls_log-ag TYPE 'I' NUMBER ls_log-msgnr WITH ls_log-var1 ls_log-var2 ls_log-var3 ls_log-var4 INTO lv_message.
-            /atrm/cx_exception=>raise( iv_message = lv_message ).
+            sy-msgid = ls_log-ag.
+            sy-msgty = 'I'.
+            sy-msgno = ls_log-msgnr.
+            sy-msgv1 = ls_log-var1.
+            sy-msgv2 = ls_log-var2.
+            sy-msgv3 = ls_log-var3.
+            sy-msgv4 = ls_log-var4.
+            /atrm/cx_exception=>raise( ).
           ELSE.
             /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ). "#EC NOTEXT
           ENDIF.
