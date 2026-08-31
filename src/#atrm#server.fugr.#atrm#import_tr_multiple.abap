@@ -1,9 +1,9 @@
-FUNCTION /atrm/import_tr.
+FUNCTION /atrm/import_tr_multiple.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
 *"     VALUE(SYSTEM) TYPE  TMSSYSNAM
-*"     VALUE(TRKORR) TYPE  TRKORR
+*"     VALUE(TRKORR) TYPE  /ATRM/TRKORR_T
 *"     VALUE(TEST) TYPE  FLAG
 *"  EXPORTING
 *"     VALUE(TEST_RESULT) TYPE  STRING
@@ -15,11 +15,11 @@ FUNCTION /atrm/import_tr.
   PERFORM check_auth.
 
   TRY.
-      CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-      go_transport->import(
+      /atrm/cl_transport=>import_multiple(
         EXPORTING
-          system = system
-          test   = test
+          system     = system
+          transports = VALUE #( ( 'RSTK908621' ) ( 'RGHK900302' ) ( 'RGHK900303' ) )
+          test       = test
       ).
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
