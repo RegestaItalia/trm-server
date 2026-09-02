@@ -1,7 +1,5 @@
 REPORT ztrm_installer.
 
-TABLES sscrfields.
-
 *******************************************************************
 *              TRM - Transport Request Manager                    *
 *                  https://trmregistry.com                        *
@@ -33,6 +31,8 @@ TABLES sscrfields.
 * OTHER DEALINGS IN THE SOFTWARE.                                 *
 *                                                                 *
 *******************************************************************
+
+TABLES sscrfields.
 
 TYPES: BEGIN OF ty_vscan_f4,
          profile TYPE vscan_prof-profile,
