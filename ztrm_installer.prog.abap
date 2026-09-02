@@ -1,5 +1,7 @@
 REPORT ztrm_installer.
 
+TABLES sscrfields.
+
 *******************************************************************
 *              TRM - Transport Request Manager                    *
 *                  https://trmregistry.com                        *
@@ -36,9 +38,15 @@ TYPES: BEGIN OF ty_vscan_f4,
          profile TYPE vscan_prof-profile,
          text    TYPE vscan_proft-text,
        END OF ty_vscan_f4.
-DATA: vscan                   TYPE STANDARD TABLE OF ty_vscan_f4,
-      json_supported          TYPE flag,
-      vscan_profile_supported TYPE flag.
+DATA: vscan                        TYPE STANDARD TABLE OF ty_vscan_f4,
+      json_supported               TYPE flag,
+      vscan_profile_supported      TYPE flag,
+      install_certificates_visible TYPE flag,
+      suppress_certificate_command TYPE flag.
+
+CONSTANTS: base_url      TYPE string VALUE 'https://trmregistry.com/registry',
+           server_trkorr TYPE trkorr VALUE 'A4HK999999',
+           rest_trkorr   TYPE trkorr VALUE 'A4HK9A0002'.
 
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
   SELECTION-SCREEN SKIP.
@@ -61,13 +69,16 @@ PARAMETERS:
 
 SELECTION-SCREEN SKIP.
 
-SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 12 LINES,
+SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 15 LINES,
 TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
 TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100,
 END OF BLOCK psel.
 
 SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
-  "SELECTION-SCREEN COMMENT 1(77) scs_txt1.
+  SELECTION-SCREEN COMMENT /1(77) cert_err MODIF ID crt.
+  SELECTION-SCREEN PUSHBUTTON /1(25) cert_btn USER-COMMAND cert MODIF ID crt.
+  SELECTION-SCREEN COMMENT /1(1) cert_spc MODIF ID crt.
+
   SELECTION-SCREEN BEGIN OF BLOCK sc_serv WITH FRAME TITLE sc_titl2.
     PARAMETERS:
       p_id     TYPE strustssl-applic DEFAULT 'ANONYM',
@@ -94,12 +105,197 @@ SELECTION-SCREEN BEGIN OF SCREEN 200 AS SUBSCREEN.
   SELECTION-SCREEN END OF BLOCK sc_other.
 SELECTION-SCREEN END OF SCREEN 200.
 
+CLASS lcl_strust DEFINITION FINAL.
+  PUBLIC SECTION.
+    CLASS-METHODS add_certificate
+      IMPORTING
+        application  TYPE ssfappl
+        certificate  TYPE xstring
+        password     TYPE string OPTIONAL
+      RETURNING
+        VALUE(error) TYPE string.
+  PRIVATE SECTION.
+    CLASS-METHODS get_system_error
+      IMPORTING
+        fallback     TYPE string
+      RETURNING
+        VALUE(error) TYPE string.
+ENDCLASS.
+
+CLASS lcl_strust IMPLEMENTATION.
+  METHOD add_certificate.
+    CONSTANTS ssl_client_context TYPE psecontext VALUE 'SSLC'.
+    DATA: pse_name        TYPE ssfpsename,
+          pse_id          TYPE ssfid,
+          profile_file    TYPE localfile,
+          pse_profile     TYPE ssfpab,
+          pse_password    TYPE ssfpabpw,
+          temporary_file  TYPE localfile,
+          distribute      TYPE ssfflag,
+          credential_name TYPE icm_credname,
+          is_locked       TYPE flag,
+          authority_error TYPE REF TO cx_root.
+
+    IF certificate IS INITIAL.
+      error = 'Cannot install an empty certificate'.
+      RETURN.
+    ENDIF.
+    pse_password = password.
+
+    TRY.
+        cl_abap_pse=>authority_check(
+          iv_context  = ssl_client_context
+          iv_applic   = application
+          iv_activity = '02' ).
+      CATCH cx_root INTO authority_error.
+        error = authority_error->get_text( ).
+        RETURN.
+    ENDTRY.
+
+    CALL FUNCTION 'SSFPSE_FILENAME'
+      EXPORTING
+        context       = ssl_client_context
+        applic        = application
+      IMPORTING
+        psename       = pse_name
+        distrib       = distribute
+        profile       = profile_file
+      EXCEPTIONS
+        pse_not_found = 1
+        OTHERS        = 2.
+    IF sy-subrc <> 0.
+      error = get_system_error( 'SSL client PSE was not found' ).
+      RETURN.
+    ENDIF.
+    pse_profile = profile_file.
+
+    CALL FUNCTION 'SSFPSE_ENQUEUE'
+      EXPORTING
+        psename         = pse_name
+      EXCEPTIONS
+        database_failed = 1
+        foreign_lock    = 2
+        internal_error  = 3
+        OTHERS          = 4.
+    IF sy-subrc <> 0.
+      error = get_system_error( 'SSL client PSE could not be locked' ).
+      RETURN.
+    ENDIF.
+    is_locked = 'X'.
+
+    DO 1 TIMES.
+      CALL FUNCTION 'SSFPSE_LOAD'
+        EXPORTING
+          psename           = pse_name
+        IMPORTING
+          id                = pse_id
+          fname             = temporary_file
+        EXCEPTIONS
+          authority_missing = 1
+          database_failed   = 2
+          file_write_failed = 3
+          OTHERS            = 4.
+      IF sy-subrc <> 0.
+        error = get_system_error( 'SSL client PSE could not be loaded' ).
+        EXIT.
+      ENDIF.
+
+      IF temporary_file IS NOT INITIAL.
+        pse_profile = temporary_file.
+      ENDIF.
+
+      CALL FUNCTION 'SSFC_PUT_CERTIFICATE'
+        EXPORTING
+          profile             = pse_profile
+          profilepw           = pse_password
+          certificate         = certificate
+        EXCEPTIONS
+          ssf_krn_error       = 1
+          ssf_krn_nomemory    = 2
+          ssf_krn_nossflib    = 3
+          ssf_krn_invalid_par = 4
+          ssf_krn_certexists  = 5
+          OTHERS              = 6.
+      IF sy-subrc = 5.
+        CLEAR error.
+        EXIT.
+      ELSEIF sy-subrc <> 0.
+        error = get_system_error( 'Certificate could not be added to the PSE' ).
+        EXIT.
+      ENDIF.
+
+      CALL FUNCTION 'SSFPSE_STORE'
+        EXPORTING
+          fname             = temporary_file
+          psepin            = pse_password
+          psename           = pse_name
+          id                = pse_id
+          b_newdn           = abap_false
+          b_distribute      = distribute
+        EXCEPTIONS
+          file_load_failed  = 1
+          storing_failed    = 2
+          authority_missing = 3
+          OTHERS            = 4.
+      IF sy-subrc <> 0.
+        error = get_system_error( 'SSL client PSE could not be saved' ).
+        EXIT.
+      ENDIF.
+
+      credential_name = pse_name.
+      CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
+        EXPORTING
+          global              = 1
+          cred_name           = credential_name
+        EXCEPTIONS
+          icm_op_failed       = 1
+          icm_get_serv_failed = 2
+          icm_auth_failed     = 3
+          OTHERS              = 4.
+      IF sy-subrc <> 0.
+        error = get_system_error( 'Certificate was saved, but ICM could not be refreshed' ).
+      ENDIF.
+    ENDDO.
+
+    IF temporary_file IS NOT INITIAL.
+      TRY.
+          DELETE DATASET temporary_file.
+        CATCH cx_sy_file_open cx_sy_file_authority.
+          IF error IS INITIAL.
+            error = 'Certificate was saved, but the temporary PSE file could not be deleted'.
+          ENDIF.
+      ENDTRY.
+    ENDIF.
+
+    IF is_locked = 'X'.
+      CALL FUNCTION 'SSFPSE_DEQUEUE'
+        EXPORTING
+          psename         = pse_name
+        EXCEPTIONS
+          database_failed = 1
+          foreign_lock    = 2
+          internal_error  = 3
+          OTHERS          = 4.
+      IF sy-subrc <> 0 AND error IS INITIAL.
+        error = get_system_error( 'SSL client PSE could not be unlocked' ).
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_system_error.
+    IF sy-msgid IS NOT INITIAL.
+      MESSAGE ID sy-msgid TYPE 'S' NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO error.
+    ENDIF.
+    IF error IS INITIAL.
+      error = fallback.
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
 CLASS lcl_report DEFINITION.
 
   PUBLIC SECTION.
-    CONSTANTS: base_url      TYPE string VALUE 'https://trmregistry.com/registry',
-               server_trkorr TYPE trkorr VALUE 'A4HK999999',
-               rest_trkorr   TYPE trkorr VALUE 'A4HK9A0002'.
     METHODS run.
     CLASS-METHODS raise_error
       IMPORTING
@@ -111,6 +307,12 @@ CLASS lcl_report DEFINITION.
       RETURNING VALUE(exists) TYPE flag.
     CLASS-METHODS check_vscan_profile
       RETURNING VALUE(exists) TYPE abap_bool.
+    CLASS-METHODS check_registry_certificates
+      EXPORTING
+        missing         TYPE flag
+        technical_error TYPE string.
+    CLASS-METHODS install_registry_certificates
+      RETURNING VALUE(installed) TYPE flag.
   PRIVATE SECTION.
     TYPES: ty_package_name TYPE devclass,
            ty_package_tab  TYPE STANDARD TABLE OF ty_package_name WITH DEFAULT KEY,
@@ -120,7 +322,12 @@ CLASS lcl_report DEFINITION.
              parent   TYPE devclass,
              level    TYPE i,
            END OF ty_pkg_node,
-           ty_pkg_node_tab TYPE STANDARD TABLE OF ty_pkg_node WITH DEFAULT KEY.
+           ty_pkg_node_tab TYPE STANDARD TABLE OF ty_pkg_node WITH DEFAULT KEY,
+           BEGIN OF ty_registry_release,
+             download_link TYPE string,
+             checksum      TYPE string,
+           END OF ty_registry_release,
+           t_tpstdout TYPE STANDARD TABLE OF tpstdout WITH DEFAULT KEY.
     METHODS get_client
       IMPORTING
         with_base_url TYPE c DEFAULT 'X'
@@ -128,7 +335,33 @@ CLASS lcl_report DEFINITION.
           PREFERRED PARAMETER url
       RETURNING
         VALUE(client) TYPE REF TO if_http_client.
-    METHODS display_messages
+    METHODS execute_http_request
+      IMPORTING
+        client TYPE REF TO if_http_client
+      EXPORTING
+        ok     TYPE flag
+        error  TYPE string.
+    METHODS download_release
+      IMPORTING
+        name     TYPE string
+      EXPORTING
+        file     TYPE xstring
+        checksum TYPE string
+        ok       TYPE flag.
+    METHODS load_release_file
+      IMPORTING
+        filename TYPE rlgrap-filename
+      EXPORTING
+        file     TYPE xstring
+        ok       TYPE flag.
+    METHODS install_component
+      IMPORTING
+        name      TYPE string
+        release   TYPE xstring
+        checksum  TYPE string OPTIONAL
+      EXPORTING
+        installed TYPE flag.
+    METHODS write_log
       IMPORTING
         iv_response TYPE string.
     METHODS run_offline
@@ -139,6 +372,16 @@ CLASS lcl_report DEFINITION.
       EXPORTING
         ok_server TYPE flag
         ok_rest   TYPE flag.
+    METHODS validate_installation
+      RETURNING VALUE(valid) TYPE flag.
+    METHODS confirm_installation
+      RETURNING VALUE(confirmed) TYPE flag.
+    METHODS confirm_transport_overwrite
+      IMPORTING
+        transport_request TYPE trkorr
+        component_name    TYPE string
+      RETURNING
+        VALUE(confirmed)  TYPE flag.
     METHODS handle_release
       IMPORTING
         name      TYPE string
@@ -147,7 +390,8 @@ CLASS lcl_report DEFINITION.
         checksum  TYPE string OPTIONAL
       EXPORTING
         installed TYPE flag
-        integrity TYPE string.
+        integrity TYPE string
+        manifest  TYPE xstring.
 
     CLASS-METHODS display_error
       IMPORTING
@@ -155,8 +399,9 @@ CLASS lcl_report DEFINITION.
     CLASS-METHODS get_dir_trans
       EXPORTING dir_trans TYPE pfevalue.
     CLASS-METHODS write_binary_file
-      IMPORTING file_path TYPE string
-                file      TYPE xstring.
+      IMPORTING file_path      TYPE string
+                file           TYPE xstring
+      RETURNING VALUE(written) TYPE flag.
     CLASS-METHODS get_file_sys
       EXPORTING file_sys TYPE filesys.
     CLASS-METHODS delete_from_tms_queue
@@ -170,15 +415,10 @@ CLASS lcl_report DEFINITION.
                 import_again TYPE flag
       EXPORTING subrc        TYPE i.
     CLASS-METHODS import
-      IMPORTING trkorr TYPE trkorr
-                system TYPE tmssysnam
-      EXPORTING subrc  TYPE i.
-    CLASS-METHODS read_queue
-      IMPORTING target   TYPE tmssysnam
-      EXPORTING requests TYPE tmsiqreqs
-                subrc    TYPE i.
-    CLASS-METHODS refresh_tms_txt
-      IMPORTING trkorr TYPE trkorr.
+      IMPORTING trkorr   TYPE trkorr
+                system   TYPE tmssysnam
+      EXPORTING subrc    TYPE i
+                tpstdout TYPE t_tpstdout.
     CLASS-METHODS rebuild_hierarchy
       IMPORTING
         it_packages         TYPE ty_package_tab
@@ -198,6 +438,9 @@ CLASS lcl_report DEFINITION.
         name      TYPE string
         integrity TYPE string
         devclass  TYPE devclass.
+    CLASS-METHODS execute_post_activities
+      IMPORTING
+        manifest TYPE xstring.
     CLASS-METHODS activate_rest_sicf.
 
 ENDCLASS.
@@ -247,6 +490,192 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD check_registry_certificates.
+    DATA: client TYPE REF TO if_http_client,
+          code   TYPE i,
+          reason TYPE string.
+
+    CLEAR: missing, technical_error.
+
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Reaching registry'.
+
+    cl_http_client=>create_by_url(
+      EXPORTING
+        url                = base_url
+        ssl_id             = p_id
+      IMPORTING
+        client             = client
+      EXCEPTIONS
+        argument_not_found = 1
+        plugin_not_active  = 2
+        internal_error     = 3
+        OTHERS             = 4 ).
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    client->request->set_version( if_http_request=>co_protocol_version_1_1 ).
+    client->send(
+      EXPORTING
+        timeout                    = 3
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3
+        OTHERS                     = 4 ).
+    IF sy-subrc = 0.
+      client->receive(
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3
+          OTHERS                     = 4 ).
+    ENDIF.
+    client->get_last_error(
+        IMPORTING
+          code           = code
+          message        = reason
+      ).
+    IF code = 421.
+      missing = 'X'.
+      CONCATENATE '@0A@ HTTP 421' reason INTO technical_error SEPARATED BY space.
+      REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>cr_lf IN technical_error WITH space.
+      REPLACE ALL OCCURRENCES OF cl_abap_char_utilities=>newline IN technical_error WITH space.
+    ENDIF.
+    client->close( ).
+  ENDMETHOD.
+
+  METHOD install_registry_certificates.
+    DATA: encoded_certificates TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+          encoded_certificate  TYPE string,
+          certificate          TYPE xstring,
+          certificate_object   TYPE REF TO cl_abap_x509_certificate,
+          certificate_error    TYPE REF TO cx_abap_x509_certificate,
+          install_error        TYPE string.
+
+* BEGIN AUTO-GENERATED REGISTRY CERTIFICATES
+* Certificate 1 of 3 from trmregistry.com:443
+    CONCATENATE
+      'MIIF1DCCBLygAwIBAgIQAnavQl3+3mYrUCaS9F/mrzANBgkqhkiG9w0BAQsFADA8'
+      'MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRwwGgYDVQQDExNBbWF6b24g'
+      'UlNBIDIwNDggTTAxMB4XDTI2MDgzMDAwMDAwMFoXDTI3MDMxNTIzNTk1OVowGjEY'
+      'MBYGA1UEAxMPdHJtcmVnaXN0cnkuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A'
+      'MIIBCgKCAQEA3Yb6MpZu9fvTufFqoUggfC4ziWBc2G7iPLV+adsLYMplHSLfORF4'
+      'aH5akdIFwf07iV3f5UWJKIdE67JxI9RgWN0EP5j7/hSF5j9vWE89oMSfWBp5nQwM'
+      '4lY6xQUeNF0xQY5ZV9ZAz21A+eCJDBOPbCTVwePSwaC/+2rmitmfk9Z2CLXHYm/m'
+      'hj/qmexQMj/Q/qQuHvLrsydetvBoUJ+mJ51LwKFMSD+anf+t5BQNxZIXCZ+h0qcN'
+      'njelscw456ba2ocx7QKmOSREXR+mibJ0oc9nX4Av1qXV5gT40uedU+U/nzKlZKwS'
+      'PjB2+gvzgx55e4+GqKLrsbVcdR46HH5suQIDAQABo4IC8jCCAu4wHwYDVR0jBBgw'
+      'FoAUgbgOY4qJEhjl+js7UJWf5uWQE4UwHQYDVR0OBBYEFBQxv3cJ9xTpJysrAk4D'
+      'AUVkhNlZMC8GA1UdEQQoMCaCD3RybXJlZ2lzdHJ5LmNvbYITd3d3LnRybXJlZ2lz'
+      'dHJ5LmNvbTATBgNVHSAEDDAKMAgGBmeBDAECATAOBgNVHQ8BAf8EBAMCBaAwEwYD'
+      'VR0lBAwwCgYIKwYBBQUHAwEwOwYDVR0fBDQwMjAwoC6gLIYqaHR0cDovL2NybC5y'
+      'Mm0wMS5hbWF6b250cnVzdC5jb20vcjJtMDEuY3JsMHUGCCsGAQUFBwEBBGkwZzAt'
+      'BggrBgEFBQcwAYYhaHR0cDovL29jc3AucjJtMDEuYW1hem9udHJ1c3QuY29tMDYG'
+      'CCsGAQUFBzAChipodHRwOi8vY3J0LnIybTAxLmFtYXpvbnRydXN0LmNvbS9yMm0w'
+      'MS5jZXIwDAYDVR0TAQH/BAIwADCCAX0GCisGAQQB1nkCBAIEggFtBIIBaQFnAHUA'
+      'TGPcmOWcHauI9h6KPd6uj6tEozd7X5uUw/uhnPzBviYAAAGgUJYtVgAABAMARjBE'
+      'AiB+nUDxu81yZxe/pYllupxzURPjr6t/IH7kSZwldeMkQQIgG3S9H07oEOIpTZc/'
+      'h8sckenSw3/gzOCh6wE+3LVYTboAdgDW1Y2p0BdT82pKoMdXSQKv68fcLNOM2fdk'
+      'yAyJGR6fAgAAAaBQli0cAAAEAwBHMEUCICSUeJ8vbFjjGC4+gniSQwzLK1W6w06Y'
+      'ouThfj6PhBxNAiEA2WbqFAWKzzaQTuhFFXnGgsj4CDImVN0CLm8d0bF3dCkAdgBE'
+      'wr0M6RQOZKXJSgGTClqhuzWXDgDuERaJaCocRNe1ZgAAAaBQli1fAAAEAwBHMEUC'
+      'IQDU79fU01e7mnfm7Plxtp3dZDZ4hRJKLmVdbolpQc+KvwIgeS1a4uQ/cZ90+2j6'
+      'bHVuHD40K82fHWla+Drt0rTkonYwDQYJKoZIhvcNAQELBQADggEBAHnR310jc6VX'
+      'GS1Vh53PW+3hbnhXGYOjMNh/9e+z8ZzInB2ytR8del+XlWMkfL1eYAUpVxDDUpog'
+      's4ooOHTOkvp3TB0zfJd3g3P8zUvzyNCrPy7hMx5lJv/kgTfXLoxSAoWYdWpOFGpU'
+      'YGnZQIjzT7VfXk7aiZSoScxmZTBs1Io0k4RB+xCL/M6WgV3VbDGrFhpJmmjppG/R'
+      'tUDjmK9q6R394Du7lEm5mXdMHQ/KMSP7EfNFm7d2bscsVK3OMtQ0qouWCiVq3C9B'
+      'rNtxfVvqgvbs6beEMU3mY0SnPE297Ml0urf3OPQ19gqHKWEnDiSraBu3nMk4cR/u'
+      'u0nC4wOYQTM='
+      INTO encoded_certificate.
+    APPEND encoded_certificate TO encoded_certificates.
+
+* Certificate 2 of 3 from trmregistry.com:443
+    CONCATENATE
+      'MIIEXjCCA0agAwIBAgITB3MSOAudZoijOx7Zv5zNpo4ODzANBgkqhkiG9w0BAQsF'
+      'ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6'
+      'b24gUm9vdCBDQSAxMB4XDTIyMDgyMzIyMjEyOFoXDTMwMDgyMzIyMjEyOFowPDEL'
+      'MAkGA1UEBhMCVVMxDzANBgNVBAoTBkFtYXpvbjEcMBoGA1UEAxMTQW1hem9uIFJT'
+      'QSAyMDQ4IE0wMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOtxLKnL'
+      'H4gokjIwr4pXD3i3NyWVVYesZ1yX0yLI2qIUZ2t88Gfa4gMqs1YSXca1R/lnCKeT'
+      'epWSGA+0+fkQNpp/L4C2T7oTTsddUx7g3ZYzByDTlrwS5HRQQqEFE3O1T5tEJP4t'
+      'f+28IoXsNiEzl3UGzicYgtzj2cWCB41eJgEmJmcf2T8TzzK6a614ZPyq/w4CPAff'
+      'nAV4coz96nW3AyiE2uhuB4zQUIXvgVSycW7sbWLvj5TDXunEpNCRwC4kkZjK7rol'
+      'jtT2cbb7W2s4Bkg3R42G3PLqBvt2N32e/0JOTViCk8/iccJ4sXqrS1uUN4iB5Nmv'
+      'JK74csVl+0u0UecCAwEAAaOCAVowggFWMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYD'
+      'VR0PAQH/BAQDAgGGMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNV'
+      'HQ4EFgQUgbgOY4qJEhjl+js7UJWf5uWQE4UwHwYDVR0jBBgwFoAUhBjMhTTsvAyU'
+      'lC4IWZzHshBOCggwewYIKwYBBQUHAQEEbzBtMC8GCCsGAQUFBzABhiNodHRwOi8v'
+      'b2NzcC5yb290Y2ExLmFtYXpvbnRydXN0LmNvbTA6BggrBgEFBQcwAoYuaHR0cDov'
+      'L2NydC5yb290Y2ExLmFtYXpvbnRydXN0LmNvbS9yb290Y2ExLmNlcjA/BgNVHR8E'
+      'ODA2MDSgMqAwhi5odHRwOi8vY3JsLnJvb3RjYTEuYW1hem9udHJ1c3QuY29tL3Jv'
+      'b3RjYTEuY3JsMBMGA1UdIAQMMAowCAYGZ4EMAQIBMA0GCSqGSIb3DQEBCwUAA4IB'
+      'AQCtAN4CBSMuBjJitGuxlBbkEUDeK/pZwTXv4KqPK0G50fOHOQAd8j21p0cMBgbG'
+      'kfMHVwLU7b0XwZCav0h1ogdPMN1KakK1DT0VwA/+hFvGPJnMV1Kx2G4S1ZaSk0uU'
+      '5QfoiYIIano01J5k4T2HapKQmmOhS/iPtuo00wW+IMLeBuKMn3OLn005hcrOGTad'
+      'hcmeyfhQP7Z+iKHvyoQGi1C0ClymHETx/chhQGDyYSWqB/THwnN15AwLQo0E5V9E'
+      'SJlbe4mBlqeInUsNYugExNf+tOiybcrswBy8OFsd34XOW3rjSUtsuafd9AWySa3h'
+      'xRRrwszrzX/WWGm6wyB+f7C4'
+      INTO encoded_certificate.
+    APPEND encoded_certificate TO encoded_certificates.
+
+* Certificate 3 of 3 from trmregistry.com:443
+    CONCATENATE
+      'MIIEkjCCA3qgAwIBAgITBn+USionzfP6wq4rAfkI7rnExjANBgkqhkiG9w0BAQsF'
+      'ADCBmDELMAkGA1UEBhMCVVMxEDAOBgNVBAgTB0FyaXpvbmExEzARBgNVBAcTClNj'
+      'b3R0c2RhbGUxJTAjBgNVBAoTHFN0YXJmaWVsZCBUZWNobm9sb2dpZXMsIEluYy4x'
+      'OzA5BgNVBAMTMlN0YXJmaWVsZCBTZXJ2aWNlcyBSb290IENlcnRpZmljYXRlIEF1'
+      'dGhvcml0eSAtIEcyMB4XDTE1MDUyNTEyMDAwMFoXDTM3MTIzMTAxMDAwMFowOTEL'
+      'MAkGA1UEBhMCVVMxDzANBgNVBAoTBkFtYXpvbjEZMBcGA1UEAxMQQW1hem9uIFJv'
+      'b3QgQ0EgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALJ4gHHKeNXj'
+      'ca9HgFB0fW7Y14h29Jlo91ghYPl0hAEvrAIthtOgQ3pOsqTQNroBvo3bSMgHFzZM'
+      '9O6II8c+6zf1tRn4SWiw3te5djgdYZ6k/oI2peVKVuRF4fn9tBb6dNqcmzU5L/qw'
+      'IFAGbHrQgLKm+a/sRxmPUDgH3KKHOVj4utWp+UhnMJbulHheb4mjUcAwhmahRWa6'
+      'VOujw5H5SNz/0egwLX0tdHA114gk957EWW67c4cX8jJGKLhD+rcdqsq08p8kDi1L'
+      '93FcXmn/6pUCyziKrlA4b9v7LWIbxcceVOF34GfID5yHI9Y/QCB/IIDEgEw+OyQm'
+      'jgSubJrIqg0CAwEAAaOCATEwggEtMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/'
+      'BAQDAgGGMB0GA1UdDgQWBBSEGMyFNOy8DJSULghZnMeyEE4KCDAfBgNVHSMEGDAW'
+      'gBScXwDfqgHXMCs4iKK4bUqc8hGRgzB4BggrBgEFBQcBAQRsMGowLgYIKwYBBQUH'
+      'MAGGImh0dHA6Ly9vY3NwLnJvb3RnMi5hbWF6b250cnVzdC5jb20wOAYIKwYBBQUH'
+      'MAKGLGh0dHA6Ly9jcnQucm9vdGcyLmFtYXpvbnRydXN0LmNvbS9yb290ZzIuY2Vy'
+      'MD0GA1UdHwQ2MDQwMqAwoC6GLGh0dHA6Ly9jcmwucm9vdGcyLmFtYXpvbnRydXN0'
+      'LmNvbS9yb290ZzIuY3JsMBEGA1UdIAQKMAgwBgYEVR0gADANBgkqhkiG9w0BAQsF'
+      'AAOCAQEAYjdCXLwQtT6LLOkMm2xF4gcAevnFWAu5CIw+7bMlPLVvUOTNNWqnkzSW'
+      'MiGpSESrnO09tKpzbeR/FoCJbM8oAxiDR3mjEH4wW6w7sGDgd9QIpuEdfF7Au/ma'
+      'eyKdpwAJfqxGF4PcnCZXmTA5YpaP7dreqsXMGz7KQ2hsVxa81Q4gLv7/wmpdLqBK'
+      'bRRYh5TmOTFffHPLkIhqhBGWJ6bt2YFGpn6jcgAKUj6DiAdjd4lpFw85hdKrCEVN'
+      '0FE6/V1dN2RMfjCyVSRCnTawXZwXgWHxyvkQAiSr6w10kY17RSlQOYiypok1JR4U'
+      'akcjMS9cmvqtmg5iUaQqqcT5NJ0hGA=='
+      INTO encoded_certificate.
+    APPEND encoded_certificate TO encoded_certificates.
+* END AUTO-GENERATED REGISTRY CERTIFICATES
+
+    LOOP AT encoded_certificates INTO encoded_certificate.
+      TRY.
+          CREATE OBJECT certificate_object
+            EXPORTING
+              if_certificate = encoded_certificate.
+          certificate = certificate_object->get_certificate( ).
+        CATCH cx_abap_x509_certificate INTO certificate_error.
+          MESSAGE certificate_error TYPE 'I' DISPLAY LIKE 'E'.
+          RETURN.
+      ENDTRY.
+
+      install_error = lcl_strust=>add_certificate(
+        application = p_id
+        certificate = certificate ).
+      IF install_error IS NOT INITIAL.
+        MESSAGE install_error TYPE 'I' DISPLAY LIKE 'E'.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
+    installed = 'X'.
+  ENDMETHOD.
+
   METHOD get_client.
     DATA client_url TYPE string.
     IF with_base_url EQ 'X'.
@@ -284,69 +713,373 @@ CLASS lcl_report IMPLEMENTATION.
     client->request->set_version( if_http_request=>co_protocol_version_1_1 ).
   ENDMETHOD.
 
+  METHOD execute_http_request.
+    DATA: code      TYPE i,
+          code_text TYPE c LENGTH 3,
+          reason    TYPE string.
+
+    CLEAR: ok, error.
+    IF client IS NOT BOUND.
+      error = 'HTTP client could not be created'.
+      RETURN.
+    ENDIF.
+    client->send(
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3
+        OTHERS                     = 4 ).
+    IF sy-subrc = 0.
+      client->receive(
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3
+          OTHERS                     = 4 ).
+    ENDIF.
+    IF sy-subrc <> 0.
+      client->get_last_error( IMPORTING message = error ).
+      IF error IS INITIAL.
+        error = 'HTTP request failed'.
+      ENDIF.
+      RETURN.
+    ENDIF.
+
+    client->response->get_status(
+      IMPORTING
+        code   = code
+        reason = reason ).
+    IF code < 200 OR code >= 300.
+      WRITE code TO code_text LEFT-JUSTIFIED.
+      CONCATENATE 'HTTP' code_text reason INTO error SEPARATED BY space.
+      RETURN.
+    ENDIF.
+    ok = 'X'.
+  ENDMETHOD.
+
+  METHOD download_release.
+    DATA: client      TYPE REF TO if_http_client,
+          endpoint    TYPE string,
+          error       TYPE string,
+          request_ok  TYPE flag,
+          release     TYPE ty_registry_release,
+          response    TYPE string,
+          vscan_check TYPE c.
+
+    CLEAR: file, checksum, ok.
+    IF p_vscan = 'X'.
+      vscan_check = 'A'.
+    ELSE.
+      vscan_check = 'N'.
+    ENDIF.
+
+    CONCATENATE '/package/' name INTO endpoint.
+    client = get_client( endpoint ).
+    IF client IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    client->request->set_method( if_http_request=>co_request_method_get ).
+    execute_http_request(
+      EXPORTING client = client
+      IMPORTING ok = request_ok error = error ).
+    IF request_ok <> 'X'.
+      display_error( error ).
+      write_log( error ).
+      client->close( ).
+      RETURN.
+    ENDIF.
+    response = client->response->get_cdata( ).
+    client->close( ).
+
+    TRY.
+        CALL METHOD ('/UI2/CL_JSON')=>deserialize
+          EXPORTING
+            json = response
+          CHANGING
+            data = release.
+      CATCH cx_sy_dyn_call_error.
+        display_error( 'Invalid response from TRM Registry.' ).
+        write_log( response ).
+        RETURN.
+    ENDTRY.
+    IF release-download_link IS INITIAL OR release-checksum IS INITIAL.
+      display_error( 'Incomplete release information from TRM Registry.' ).
+      write_log( response ).
+      RETURN.
+    ENDIF.
+
+    client = get_client(
+      with_base_url = ' '
+      url           = release-download_link ).
+    IF client IS NOT BOUND.
+      RETURN.
+    ENDIF.
+    client->request->set_method( if_http_request=>co_request_method_get ).
+    client->request->set_header_field(
+      name  = 'Accept'
+      value = 'application/octet-stream' ).
+    execute_http_request(
+      EXPORTING client = client
+      IMPORTING ok = request_ok error = error ).
+    IF request_ok <> 'X'.
+      display_error( error ).
+      write_log( error ).
+      client->close( ).
+      RETURN.
+    ENDIF.
+
+    TRY.
+        CALL METHOD client->response->('GET_DATA')
+          EXPORTING
+            virus_scan_profile = p_vscanp
+            vscan_scan_always  = vscan_check
+          RECEIVING
+            data               = file.
+      CATCH cx_sy_dyn_call_error.
+        file = client->response->get_data(
+          vscan_scan_always = vscan_check ).
+    ENDTRY.
+    client->close( ).
+    IF file IS INITIAL.
+      display_error( 'Downloaded release is empty.' ).
+      RETURN.
+    ENDIF.
+
+    checksum = release-checksum.
+    ok = 'X'.
+  ENDMETHOD.
+
+  METHOD load_release_file.
+    DATA: binary_data TYPE STANDARD TABLE OF x255,
+          file_length TYPE i.
+
+    CLEAR: file, ok.
+    CALL FUNCTION 'GUI_UPLOAD'
+      EXPORTING
+        filename                = filename
+        filetype                = 'BIN'
+      IMPORTING
+        filelength              = file_length
+      TABLES
+        data_tab                = binary_data
+      EXCEPTIONS
+        file_open_error         = 1
+        file_read_error         = 2
+        no_batch                = 3
+        gui_refuse_filetransfer = 4
+        invalid_type            = 5
+        no_authority            = 6
+        unknown_error           = 7
+        bad_data_format         = 8
+        header_not_allowed      = 9
+        separator_not_allowed   = 10
+        header_too_long         = 11
+        unknown_dp_error        = 12
+        access_denied           = 13
+        dp_out_of_memory        = 14
+        disk_full               = 15
+        dp_timeout              = 16
+        OTHERS                  = 17.
+    IF sy-subrc <> 0.
+      write_log( 'Error during binary upload.' ).
+      raise_error( 'Error during binary upload.' ).
+      RETURN.
+    ENDIF.
+    IF file_length <= 0.
+      raise_error( 'The selected release file is empty.' ).
+      RETURN.
+    ENDIF.
+
+    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+      EXPORTING
+        input_length = file_length
+      IMPORTING
+        buffer       = file
+      TABLES
+        binary_tab   = binary_data
+      EXCEPTIONS
+        failed       = 1
+        OTHERS       = 2.
+    IF sy-subrc <> 0 OR file IS INITIAL.
+      write_log( 'Error converting binary table.' ).
+      raise_error( 'Error converting binary table.' ).
+      RETURN.
+    ENDIF.
+    ok = 'X'.
+  ENDMETHOD.
+
+  METHOD install_component.
+    DATA: devclass  TYPE devclass,
+          integrity TYPE string,
+          manifest  TYPE xstring,
+          trkorr    TYPE trkorr.
+
+    CLEAR installed.
+    CASE name.
+      WHEN 'trm-server'.
+        trkorr = server_trkorr.
+        devclass = '$TRM'.
+      WHEN 'trm-rest'.
+        trkorr = rest_trkorr.
+        devclass = '$TRM_REST'.
+      WHEN OTHERS.
+        display_error( 'Unknown component selected for installation.' ).
+        RETURN.
+    ENDCASE.
+
+    CONCATENATE 'Starting installation of' name '...' INTO integrity SEPARATED BY space.
+    write_log( integrity ).
+    CLEAR integrity.
+    handle_release(
+      EXPORTING
+        name      = name
+        release   = release
+        trkorr    = trkorr
+        checksum  = checksum
+      IMPORTING
+        installed = installed
+        integrity = integrity
+        manifest  = manifest ).
+    IF installed <> 'X'.
+      RETURN.
+    ENDIF.
+
+    update_packages_table(
+      name      = name
+      integrity = integrity
+      devclass  = devclass ).
+    IF name = 'trm-rest'.
+      activate_rest_sicf( ).
+    ENDIF.
+    execute_post_activities(
+      manifest = manifest ).
+  ENDMETHOD.
+
+  METHOD validate_installation.
+    CLEAR valid.
+    IF p_srv <> 'X' AND p_rest <> 'X'.
+      write_log( 'Please select at least one component to install.' ).
+      raise_error( 'Please select at least one component to install.' ).
+      RETURN.
+    ENDIF.
+    IF psel-activetab = 'TAB2'.
+      IF p_srv = 'X' AND p_lserv IS INITIAL.
+        write_log( 'Missing trm-server release file!' ).
+        raise_error( 'Missing trm-server release file!' ).
+        RETURN.
+      ENDIF.
+      IF p_rest = 'X' AND p_lrest IS INITIAL.
+        write_log( 'Missing trm-rest release file!' ).
+        raise_error( 'Missing trm-rest release file!' ).
+        RETURN.
+      ENDIF.
+    ENDIF.
+    valid = 'X'.
+  ENDMETHOD.
+
+  METHOD confirm_installation.
+    DATA: answer   TYPE c,
+          question TYPE string,
+          source   TYPE string.
+
+    IF p_srv = 'X' AND p_rest = 'X'.
+      question = 'trm-server and trm-rest'.
+    ELSEIF p_srv = 'X'.
+      question = 'trm-server'.
+    ELSE.
+      question = 'trm-rest'.
+    ENDIF.
+    IF psel-activetab = 'TAB1'.
+      source = 'downloaded from the registry'.
+    ELSE.
+      source = 'loaded from the selected files'.
+    ENDIF.
+    CONCATENATE question 'will be' source 'and imported. Do you want to proceed?'
+      INTO question SEPARATED BY space.
+
+    CALL FUNCTION 'POPUP_TO_CONFIRM'
+      EXPORTING
+        text_question         = question
+        text_button_1         = 'Continue'
+        icon_button_1         = '@0V@'
+        text_button_2         = 'Cancel'
+        icon_button_2         = '@0W@'
+        display_cancel_button = ' '
+      IMPORTING
+        answer                = answer.
+    IF answer = '1'.
+      confirmed = 'X'.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD confirm_transport_overwrite.
+    DATA: answer           TYPE c,
+          existing_request TYPE trkorr,
+          question         TYPE string.
+
+    confirmed = 'X'.
+    SELECT SINGLE trkorr FROM e070 INTO existing_request
+      WHERE trkorr = transport_request.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    CONCATENATE 'Transport' transport_request '(' component_name 'transport number) already exists in'
+      sy-sysid 'Do you want to overwrite?' INTO question SEPARATED BY space.
+    CALL FUNCTION 'POPUP_TO_CONFIRM'
+      EXPORTING
+        text_question         = question
+        text_button_1         = 'Continue'
+        icon_button_1         = '@0V@'
+        text_button_2         = 'Cancel'
+        icon_button_2         = '@0W@'
+        display_cancel_button = ' '
+      IMPORTING
+        answer                = answer.
+    IF answer <> '1'.
+      CLEAR confirmed.
+    ENDIF.
+  ENDMETHOD.
+
   METHOD run.
     DATA:
-      confirm_message  TYPE string,
-      confirm_answer   TYPE c,
       server_version   TYPE string,
       rest_version     TYPE string,
       install_versions TYPE string,
       ok_server        TYPE flag,
       ok_rest          TYPE flag.
 
-    IF p_srv <> 'X' AND p_rest <> 'X'.
-      WRITE / 'Please select at least one component to install'.
-      raise_error( 'Please select at least one component to install.' ).
+    IF validate_installation( ) <> 'X'.
       RETURN.
     ENDIF.
-    IF p_srv EQ 'X'.
-      SELECT COUNT( * ) FROM e070 WHERE trkorr EQ server_trkorr.
-      IF sy-subrc EQ 0.
-        CONCATENATE 'Transport' server_trkorr '(trm-server transport number)' 'already exists in' sy-sysid 'Do you want to overwrite?' INTO confirm_message SEPARATED BY space.
-        CALL FUNCTION 'POPUP_TO_CONFIRM'
-          EXPORTING
-            text_question         = confirm_message
-            text_button_1         = 'Continue'
-            icon_button_1         = '@0V@'
-            text_button_2         = 'Cancel'
-            icon_button_2         = '@0W@'
-            display_cancel_button = ' '
-          IMPORTING
-            answer                = confirm_answer.
-        IF confirm_answer = '2'.
-          WRITE / 'Installation cancelled by user.'.
-          RETURN.
-        ENDIF.
+    IF p_srv = 'X'.
+      IF confirm_transport_overwrite(
+           transport_request = server_trkorr
+           component_name    = 'trm-server' ) <> 'X'.
+        write_log( 'Installation cancelled by user.' ).
+        RETURN.
       ENDIF.
     ENDIF.
-    IF p_rest EQ 'X'.
-      SELECT COUNT( * ) FROM e070 WHERE trkorr EQ rest_trkorr.
-      IF sy-subrc EQ 0.
-        CONCATENATE 'Transport' rest_trkorr '(trm-rest transport number)' 'already exists in' sy-sysid 'Do you want to overwrite?' INTO confirm_message SEPARATED BY space.
-        CALL FUNCTION 'POPUP_TO_CONFIRM'
-          EXPORTING
-            text_question         = confirm_message
-            text_button_1         = 'Continue'
-            icon_button_1         = '@0V@'
-            text_button_2         = 'Cancel'
-            icon_button_2         = '@0W@'
-            display_cancel_button = ' '
-          IMPORTING
-            answer                = confirm_answer.
-        IF confirm_answer = '2'.
-          WRITE / 'Installation cancelled by user.'.
-          RETURN.
-        ENDIF.
+    IF p_rest = 'X'.
+      IF confirm_transport_overwrite(
+           transport_request = rest_trkorr
+           component_name    = 'trm-rest' ) <> 'X'.
+        write_log( 'Installation cancelled by user.' ).
+        RETURN.
       ENDIF.
     ENDIF.
-    IF psel-activetab EQ 'TAB1'.
+    IF confirm_installation( ) <> 'X'.
+      write_log( 'Installation cancelled by user.' ).
+      RETURN.
+    ENDIF.
+
+    IF psel-activetab = 'TAB1'.
       run_online(
         IMPORTING
           ok_server = ok_server
           ok_rest   = ok_rest
       ).
-    ENDIF.
-    IF psel-activetab EQ 'TAB2'.
+    ELSEIF psel-activetab = 'TAB2'.
       run_offline(
         IMPORTING
           ok_server = ok_server
@@ -375,7 +1108,7 @@ CLASS lcl_report IMPLEMENTATION.
         txt2  = ''.
   ENDMETHOD.
 
-  METHOD display_messages.
+  METHOD write_log.
     DATA:
       lt_lines TYPE TABLE OF string,
       lv_line  TYPE string.
@@ -389,203 +1122,64 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD run_offline.
-    DATA: filename  TYPE string,
-          bin       TYPE STANDARD TABLE OF x255,
-          filelen   TYPE i,
-          file      TYPE xstring,
-          integrity TYPE string.
-
-    IF p_srv EQ 'X' AND p_lserv IS INITIAL.
-      raise_error( 'Missing trm-server release file!' ).
-    ENDIF.
-    IF p_rest EQ 'X' AND p_lrest IS INITIAL.
-      raise_error( 'Missing trm-rest release file!' ).
-    ENDIF.
+    DATA: file    TYPE xstring,
+          file_ok TYPE flag.
 
     IF p_srv EQ 'X'.
-      filename = p_lserv.
-
-      CALL FUNCTION 'GUI_UPLOAD'
-        EXPORTING
-          filename                = filename
-          filetype                = 'BIN'
-        IMPORTING
-          filelength              = filelen
-        TABLES
-          data_tab                = bin
-        EXCEPTIONS
-          file_open_error         = 1
-          file_read_error         = 2
-          no_batch                = 3
-          gui_refuse_filetransfer = 4
-          invalid_type            = 5
-          no_authority            = 6
-          unknown_error           = 7
-          bad_data_format         = 8
-          header_not_allowed      = 9
-          separator_not_allowed   = 10
-          header_too_long         = 11
-          unknown_dp_error        = 12
-          access_denied           = 13
-          dp_out_of_memory        = 14
-          disk_full               = 15
-          dp_timeout              = 16
-          OTHERS                  = 17.
-
-      IF sy-subrc <> 0.
-        raise_error( 'Error during binary upload.' ).
+      load_release_file(
+        EXPORTING filename = p_lserv
+        IMPORTING file = file ok = file_ok ).
+      IF file_ok <> 'X'.
+        RETURN.
       ENDIF.
-
-      CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
-        EXPORTING
-          input_length = filelen
-        IMPORTING
-          buffer       = file
-        TABLES
-          binary_tab   = bin
-        EXCEPTIONS
-          failed       = 1
-          OTHERS       = 2.
-
-      IF sy-subrc <> 0.
-        raise_error( 'Error converting binary table.' ).
-      ENDIF.
-
-      WRITE / 'Starting installation of trm-server...'.
-      handle_release(
-        EXPORTING
-          name      = 'trm-server'
-          release   = file
-          trkorr    = server_trkorr
-        IMPORTING
-          installed = ok_server
-          integrity = integrity
-      ).
-      IF ok_server EQ 'X'.
-        update_packages_table(
-          name      = 'trm-server'
-          integrity = integrity
-          devclass  = '$TRM'
-        ).
-      ELSE.
+      install_component(
+        EXPORTING name = 'trm-server' release = file
+        IMPORTING installed = ok_server ).
+      IF ok_server <> 'X'.
         RETURN.
       ENDIF.
     ENDIF.
 
     IF p_rest EQ 'X'.
-      filename = p_lrest.
-      CLEAR: filelen, bin, file.
-      CALL FUNCTION 'GUI_UPLOAD'
-        EXPORTING
-          filename                = filename
-          filetype                = 'BIN'
-        IMPORTING
-          filelength              = filelen
-        TABLES
-          data_tab                = bin
-        EXCEPTIONS
-          file_open_error         = 1
-          file_read_error         = 2
-          no_batch                = 3
-          gui_refuse_filetransfer = 4
-          invalid_type            = 5
-          no_authority            = 6
-          unknown_error           = 7
-          bad_data_format         = 8
-          header_not_allowed      = 9
-          separator_not_allowed   = 10
-          header_too_long         = 11
-          unknown_dp_error        = 12
-          access_denied           = 13
-          dp_out_of_memory        = 14
-          disk_full               = 15
-          dp_timeout              = 16
-          OTHERS                  = 17.
-
-      IF sy-subrc <> 0.
-        raise_error( 'Error during binary upload.' ).
+      CLEAR: file, file_ok.
+      load_release_file(
+        EXPORTING filename = p_lrest
+        IMPORTING file = file ok = file_ok ).
+      IF file_ok <> 'X'.
+        RETURN.
       ENDIF.
-
-      CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
-        EXPORTING
-          input_length = filelen
-        IMPORTING
-          buffer       = file
-        TABLES
-          binary_tab   = bin
-        EXCEPTIONS
-          failed       = 1
-          OTHERS       = 2.
-
-      IF sy-subrc <> 0.
-        raise_error( 'Error converting binary table.' ).
-      ENDIF.
-
-      WRITE / 'Starting installation of trm-rest...'.
-      handle_release(
-        EXPORTING
-          name      = 'trm-rest'
-          release   = file
-          trkorr    = rest_trkorr
-        IMPORTING
-          installed = ok_rest
-          integrity = integrity
-      ).
-      IF ok_rest EQ 'X'.
-        update_packages_table(
-          name      = 'trm-rest'
-          integrity = integrity
-          devclass  = '$TRM_REST'
-        ).
-        activate_rest_sicf( ).
-      ENDIF.
+      install_component(
+        EXPORTING name = 'trm-rest' release = file
+        IMPORTING installed = ok_rest ).
     ENDIF.
   ENDMETHOD.
 
   METHOD run_online.
-    TYPES: BEGIN OF release,
-             download_link TYPE string,
-             checksum      TYPE string,
-           END OF release.
     DATA:
-      vscan_check     TYPE c,
-      code            TYPE i,
-      client          TYPE REF TO if_http_client,
-      reason          TYPE string,
-      response        TYPE string,
-      confirm_message TYPE string,
-      confirm_answer  TYPE c,
-      release         TYPE release,
-      file            TYPE xstring,
-      integrity       TYPE string.
+      code        TYPE i,
+      request_ok  TYPE flag,
+      download_ok TYPE flag,
+      client      TYPE REF TO if_http_client,
+      reason      TYPE string,
+      response    TYPE string,
+      file        TYPE xstring,
+      checksum    TYPE string.
 
-    IF p_vscan EQ 'X'.
-      vscan_check = 'A'.
-    ELSE.
-      vscan_check = 'N'.
-    ENDIF.
-    cl_progress_indicator=>progress_indicate(
-        i_text = 'Checking connection to TRM Registry...'
-        i_output_immediately = 'X' ).
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Reaching registry'.
 
     client = get_client( ).
-    client->send( ).
-    client->receive(
-      EXCEPTIONS
-        http_communication_failure = 1
-        http_invalid_state         = 2
-        http_processing_failed     = 3
-        OTHERS                     = 4 ).
-    IF sy-subrc <> 0.
-      display_error( 'Error in HTTP Client Receive' ).
-
-      client->get_last_error(
-        IMPORTING
-          message = response ).
-
-      display_messages( response ).
-
-      WRITE / 'Also check transaction SMICM -> Goto -> Trace File -> Display End'.
+    execute_http_request(
+      EXPORTING client = client
+      IMPORTING ok = request_ok error = response ).
+    IF request_ok <> 'X'.
+      display_error( response ).
+      write_log( response ).
+      write_log( 'Also check transaction SMICM -> Goto -> Trace File -> Display End' ).
+      IF client IS BOUND.
+        client->close( ).
+      ENDIF.
       RETURN.
     ENDIF.
 * if SSL Handshake fails, make sure to also check https://launchpad.support.sap.com/#/notes/510007
@@ -594,206 +1188,57 @@ CLASS lcl_report IMPLEMENTATION.
         code   = code
         reason = reason ).
     IF code <> 200.
+      write_log( 'TRM Registry is unreachable! Code ' && code ).
       display_error( 'TRM Registry is unreachable!' ).
-    ENDIF.
-
-
-    WRITE / 'Successfully connected to TRM Registry.'.
-    IF p_srv EQ 'X' AND p_rest EQ 'X'.
-      confirm_message = 'trm-server and trm-rest'.
-    ELSEIF p_srv EQ 'X'.
-      confirm_message = 'trm-server'.
-    ELSEIF p_rest EQ 'X'.
-      confirm_message = 'trm-rest'.
-    ELSE.
-      WRITE / 'Installation cancelled by user.'.
+      client->close( ).
       RETURN.
     ENDIF.
-    CONCATENATE confirm_message 'will be downloaded from the registry and imported. Do you want to proceed?' INTO confirm_message SEPARATED BY space.
+    client->close( ).
 
-    CALL FUNCTION 'POPUP_TO_CONFIRM'
-      EXPORTING
-        text_question         = confirm_message
-        text_button_1         = 'Continue'
-        icon_button_1         = '@0V@'
-        text_button_2         = 'Cancel'
-        icon_button_2         = '@0W@'
-        display_cancel_button = ' '
-      IMPORTING
-        answer                = confirm_answer.
-
-    IF confirm_answer = '2'.
-      WRITE / 'Installation cancelled by user.'.
-      RETURN.
-    ENDIF.
+    write_log( 'Successfully connected to TRM Registry.' ).
 
     IF p_srv EQ 'X'.
-      WRITE / 'Starting installation of trm-server...'.
+      write_log( 'Starting installation of trm-server...' ).
 
-      WRITE / 'Downloading trm-server latest release from TRM Registry...'.
-      cl_progress_indicator=>progress_indicate(
-          i_text = 'Downloading trm-server latest release from TRM Registry...'
-          i_output_immediately = 'X' ).
+      write_log( 'Downloading trm-server latest release from TRM Registry...' ).
 
-      " trm-server
-      client = get_client( '/package/trm-server' ).
-      client->request->set_method( if_http_request=>co_request_method_get ).
-      client->send( ).
-      client->receive(
-        EXCEPTIONS
-          http_communication_failure = 1
-          http_invalid_state         = 2
-          http_processing_failed     = 3
-          OTHERS                     = 4 ).
-      IF sy-subrc <> 0.
-        display_error( 'Error in HTTP Client Receive' ).
-        client->get_last_error(
-          IMPORTING
-            message = response ).
-        display_messages( response ).
+      CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+        EXPORTING
+          text = 'Downloading trm-server latest release'.
+
+      download_release(
+        EXPORTING name = 'trm-server'
+        IMPORTING file = file checksum = checksum ok = download_ok ).
+      IF download_ok <> 'X'.
         RETURN.
       ENDIF.
-      CALL METHOD ('/UI2/CL_JSON')=>deserialize
-        EXPORTING
-          json = client->response->get_cdata( )
-        CHANGING
-          data = release.
-      client = get_client(
-        with_base_url = ' '
-        url           = release-download_link
-      ).
-      client->request->set_method( if_http_request=>co_request_method_get ).
-      client->request->set_header_field( name = 'Accept' value = 'application/octet-stream' ).
-      client->send( ).
-      client->receive(
-        EXCEPTIONS
-          http_communication_failure = 1
-          http_invalid_state         = 2
-          http_processing_failed     = 3
-          OTHERS                     = 4 ).
-      IF sy-subrc <> 0.
-        display_error( 'Error in HTTP Client Receive' ).
-        client->get_last_error(
-          IMPORTING
-            message = response ).
-        display_messages( response ).
-        RETURN.
-      ENDIF.
-      TRY.
-          CALL METHOD client->response->('GET_DATA')
-            EXPORTING
-              virus_scan_profile = p_vscanp
-              vscan_scan_always  = vscan_check
-            RECEIVING
-              data               = file.
-        CATCH cx_sy_dyn_call_error.
-          file = client->response->get_data(
-            vscan_scan_always  = vscan_check
-          ).
-      ENDTRY.
-      handle_release(
-        EXPORTING
-          name     = 'trm-server'
-          release  = file
-          trkorr   = server_trkorr
-          checksum = release-checksum
-        IMPORTING
-          installed = ok_server
-            integrity = integrity
-      ).
-      IF ok_server EQ 'X'.
-        update_packages_table(
-          name      = 'trm-server'
-          integrity = integrity
-          devclass  = '$TRM'
-        ).
-      ELSE.
+      install_component(
+        EXPORTING name = 'trm-server' release = file checksum = checksum
+        IMPORTING installed = ok_server ).
+      IF ok_server <> 'X'.
         RETURN.
       ENDIF.
     ENDIF.
 
     IF p_rest EQ 'X'.
-      WRITE / 'Starting installation of trm-rest...'.
+      write_log( 'Starting installation of trm-rest...' ).
 
-      WRITE / 'Downloading trm-rest latest release from TRM Registry...'.
-      cl_progress_indicator=>progress_indicate(
-          i_text = 'Downloading trm-rest latest release from TRM Registry...'
-          i_output_immediately = 'X' ).
+      write_log( 'Downloading trm-rest latest release from TRM Registry...' ).
 
-      " trm-server
-      client = get_client( '/package/trm-rest' ).
-      client->request->set_method( if_http_request=>co_request_method_get ).
-      client->send( ).
-      client->receive(
-        EXCEPTIONS
-          http_communication_failure = 1
-          http_invalid_state         = 2
-          http_processing_failed     = 3
-          OTHERS                     = 4 ).
-      IF sy-subrc <> 0.
-        display_error( 'Error in HTTP Client Receive' ).
-        client->get_last_error(
-          IMPORTING
-            message = response ).
-        display_messages( response ).
+      CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+        EXPORTING
+          text = 'Downloading trm-rest latest release'.
+
+      CLEAR: file, checksum, download_ok.
+      download_release(
+        EXPORTING name = 'trm-rest'
+        IMPORTING file = file checksum = checksum ok = download_ok ).
+      IF download_ok <> 'X'.
         RETURN.
       ENDIF.
-      CALL METHOD ('/UI2/CL_JSON')=>deserialize
-        EXPORTING
-          json = client->response->get_cdata( )
-        CHANGING
-          data = release.
-      client = get_client(
-        with_base_url = ' '
-        url           = release-download_link
-      ).
-      client->request->set_method( if_http_request=>co_request_method_get ).
-      client->request->set_header_field( name = 'Accept' value = 'application/octet-stream' ).
-      client->send( ).
-      client->receive(
-        EXCEPTIONS
-          http_communication_failure = 1
-          http_invalid_state         = 2
-          http_processing_failed     = 3
-          OTHERS                     = 4 ).
-      IF sy-subrc <> 0.
-        display_error( 'Error in HTTP Client Receive' ).
-        client->get_last_error(
-          IMPORTING
-            message = response ).
-        display_messages( response ).
-        RETURN.
-      ENDIF.
-      TRY.
-          CALL METHOD client->response->('GET_DATA')
-            EXPORTING
-              virus_scan_profile = p_vscanp
-              vscan_scan_always  = vscan_check
-            RECEIVING
-              data               = file.
-        CATCH cx_sy_dyn_call_error.
-          file = client->response->get_data(
-            vscan_scan_always  = vscan_check
-          ).
-      ENDTRY.
-      handle_release(
-        EXPORTING
-          name     = 'trm-rest'
-          release  = file
-          trkorr   = rest_trkorr
-          checksum = release-checksum
-        IMPORTING
-          installed = ok_rest
-          integrity = integrity
-      ).
-      IF ok_rest EQ 'X'.
-        update_packages_table(
-          name      = 'trm-rest'
-          integrity = integrity
-          devclass  = '$TRM_REST'
-        ).
-        activate_rest_sicf( ).
-      ENDIF.
+      install_component(
+        EXPORTING name = 'trm-rest' release = file checksum = checksum
+        IMPORTING installed = ok_rest ).
     ENDIF.
   ENDMETHOD.
 
@@ -810,7 +1255,13 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
   METHOD write_binary_file.
     OPEN DATASET file_path FOR OUTPUT IN BINARY MODE.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
     TRANSFER file TO file_path.
+    IF sy-subrc = 0.
+      written = 'X'.
+    ENDIF.
     CLOSE DATASET file_path.
   ENDMETHOD.
   METHOD get_file_sys.
@@ -884,90 +1335,80 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
   METHOD import.
+    DATA: msgid   TYPE syst_msgid,
+          msgno   TYPE syst_msgno,
+          msgty   TYPE syst_msgty,
+          msgv1   TYPE syst_msgv,
+          msgv2   TYPE syst_msgv,
+          msgv3   TYPE syst_msgv,
+          msgv4   TYPE syst_msgv,
+          imports TYPE stms_tp_imports,
+          import  LIKE LINE OF imports.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
       EXPORTING
         iv_system             = system
         iv_request            = trkorr
         iv_client             = sy-mandt
         iv_ctc_active         = ' '
-        iv_overtake           = 'X'
+        iv_overtake           = ' '
         iv_import_again       = 'X'
         iv_ignore_originality = 'X'
-        iv_ignore_repairs     = 'X'
+        iv_ignore_repairs     = ' '
         iv_ignore_transtype   = 'X'
         iv_ignore_tabletype   = 'X'
         iv_ignore_predec      = 'X'
         iv_ignore_cvers       = 'X'
         iv_test_import        = ' '
-        iv_subset             = 'X'
-        iv_offline            = 'X'
+        iv_subset             = ' '
+        iv_offline            = ' '
         iv_monitor            = 'X'
-        iv_verbose            = ' '
-      EXCEPTIONS
-        OTHERS                = 1.
-    IF sy-subrc <> 0.
-      subrc = 1.
-    ELSE.
-      subrc = 0.
-    ENDIF.
-  ENDMETHOD.
-  METHOD read_queue.
-    DATA: ls_bufcnt TYPE tmsbufcnt,
-          ls_alog   TYPE tmsalog,
-          lv_dummy  TYPE string.
-    " 03072024 avoid display alert
-    sy-batch = 'X'.
-
-    CALL FUNCTION 'TMS_UIQ_IQD_READ_QUEUE'
-      EXPORTING
-        iv_system      = target
-        iv_collect     = 'X'
-        iv_read_shadow = 'X'
+        iv_verbose            = 'X'
       IMPORTING
-        et_requests    = requests
-        es_bufcnt      = ls_bufcnt
+        et_tp_imports         = imports
       EXCEPTIONS
-        OTHERS         = 1.
+        error_message         = 1
+        OTHERS                = 2.
+    subrc = sy-subrc.
+    msgty = sy-msgty.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
 
+    READ TABLE imports INDEX 1 INTO import.
     IF sy-subrc <> 0.
       subrc = 1.
       RETURN.
     ENDIF.
-
-    IF ls_bufcnt-alertid IS NOT INITIAL.
-      CALL FUNCTION 'TMS_ALT_ANALYSE_ALERT'
-        EXPORTING
-          iv_alert_id   = ls_bufcnt-alertid
-          iv_no_display = 'X'
-        IMPORTING
-          es_alog       = ls_alog
-        EXCEPTIONS
-          OTHERS        = 1.
-      IF ls_alog-msgty EQ 'E' OR ls_alog-msgty EQ 'A' OR sy-subrc <> 0.
-        MESSAGE ID ls_alog-msgid
-        TYPE ls_alog-msgty
-        NUMBER ls_alog-msgno
-        INTO lv_dummy
-        WITH ls_alog-msgv1 ls_alog-msgv2 ls_alog-msgv3 ls_alog-msgv4.
-        WRITE: /, lv_dummy.
+    tpstdout = import-tp_stdout.
+    IF import-alert-severity = 'E'
+        OR import-alert-msgty = 'E'
+        OR import-alert-msgty = 'A'.
+      IF import-alert-msgid IS NOT INITIAL
+        AND import-alert-msgno IS NOT INITIAL.
+        sy-msgid = import-alert-msgid.
+        sy-msgty = import-alert-msgty.
+        sy-msgno = import-alert-msgno.
+        sy-msgv1 = import-alert-msgv1.
+        sy-msgv2 = import-alert-msgv2.
+        sy-msgv3 = import-alert-msgv3.
+        sy-msgv4 = import-alert-msgv4.
         subrc = 1.
         RETURN.
       ENDIF.
     ENDIF.
-    subrc = 0.
-    CLEAR sy-batch.
-  ENDMETHOD.
-  METHOD refresh_tms_txt.
-    DATA ls_tmsbuftxt TYPE tmsbuftxt.
-    SELECT SINGLE * FROM tmsbuftxt INTO ls_tmsbuftxt WHERE trkorr EQ trkorr.
-    CHECK sy-subrc EQ 0.
-    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text WHERE trkorr EQ trkorr.
-    SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ trkorr.
-    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli WHERE trkorr EQ trkorr.
-    " there's no standard way to update buffer text table other than clearing the buffer as a whole?
-    MODIFY tmsbuftxt FROM ls_tmsbuftxt.
-    COMMIT WORK AND WAIT.
-    " don't raise exception if it fails!!
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgty = msgty.
+      sy-msgno = msgno.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      RETURN.
+    ENDIF.
   ENDMETHOD.
   METHOD rebuild_hierarchy.
     DATA: lt_packages    TYPE ty_package_tab,
@@ -1122,6 +1563,9 @@ CLASS lcl_report IMPLEMENTATION.
                    <trkorr>    TYPE any,
                    <integrity> TYPE any.
 
+    DELETE FROM ('/ATRM/PACKAGES') WHERE package_name EQ name AND package_registry EQ 'public'.
+    COMMIT WORK AND WAIT.
+
     CREATE DATA package TYPE ('/ATRM/PACKAGES').
     ASSIGN package->* TO <package>.
 
@@ -1161,6 +1605,14 @@ CLASS lcl_report IMPLEMENTATION.
     INSERT ('/ATRM/PACKAGES') FROM <package>.
     COMMIT WORK AND WAIT.
   ENDMETHOD.
+  METHOD execute_post_activities.
+*    TYPES: BEGIN OF ty_manifest,
+*             dummy TYPE flag,
+*           END OF ty_manifest.
+*    DATA ls_manifest TYPE ty_manifest.
+*    CALL TRANSFORMATION id SOURCE XML manifest RESULT trm_manifest = ls_manifest.
+    "TODO
+  ENDMETHOD.
   METHOD activate_rest_sicf.
     TRY.
         CALL METHOD ('CL_ICF_TREE')=>activate_node
@@ -1185,42 +1637,45 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD handle_release.
-    TYPES: BEGIN OF manifest,
+    TYPES: BEGIN OF ty_manifest,
              name     TYPE string,
              registry TYPE string,
-           END OF manifest.
+           END OF ty_manifest.
     DATA:
-      release_manifest_json TYPE xstring,
-      release_manifest      TYPE manifest,
-      release_entry         TYPE string,
-      data_file_name        TYPE string,
-      header_file_name      TYPE string,
-      data_file_path        TYPE string,
-      header_file_path      TYPE string,
-      data_file             TYPE xstring,
-      header_file           TYPE xstring,
-      zip                   TYPE REF TO cl_abap_zip,
-      transport_files       TYPE xstring,
-      filesys               TYPE filesys,
-      file_path_separator   TYPE c,
-      dirtrans              TYPE pfevalue,
-      tmssysnam             TYPE tmssysnam,
-      subrc                 TYPE i,
-      tmsrequests           TYPE tmsiqreqs,
-      tmsrequests_line      LIKE LINE OF tmsrequests,
-      in_queue              TYPE c,
-      transport_rc          TYPE i,
-      e071                  TYPE STANDARD TABLE OF tadir,
-      tadir                 TYPE STANDARD TABLE OF tadir,
-      tadir_line            LIKE LINE OF tadir,
-      devclass              TYPE STANDARD TABLE OF tadir,
-      devclass_line         LIKE LINE OF devclass,
-      devclass_exists       TYPE STANDARD TABLE OF tdevc,
-      packages              TYPE ty_package_tab,
-      hierarchy             TYPE ty_pkg_node_tab,
-      node                  LIKE LINE OF hierarchy,
-      sap_package           TYPE scompkdtln,
-      sap_package_instance  TYPE REF TO if_package.
+      release_manifest     TYPE ty_manifest,
+      release_entry        TYPE string,
+      data_file_name       TYPE string,
+      header_file_name     TYPE string,
+      data_file_path       TYPE string,
+      header_file_path     TYPE string,
+      data_file            TYPE xstring,
+      header_file          TYPE xstring,
+      zip                  TYPE REF TO cl_abap_zip,
+      transport_files      TYPE xstring,
+      filesys              TYPE filesys,
+      file_path_separator  TYPE c,
+      dirtrans             TYPE pfevalue,
+      tmssysnam            TYPE tmssysnam,
+      transport_id         TYPE trkorr,
+      subrc                TYPE i,
+      e071                 TYPE STANDARD TABLE OF tadir,
+      tadir                TYPE STANDARD TABLE OF tadir,
+      tadir_line           LIKE LINE OF tadir,
+      devclass             TYPE STANDARD TABLE OF tadir,
+      devclass_line        LIKE LINE OF devclass,
+      devclass_exists      TYPE STANDARD TABLE OF tdevc,
+      packages             TYPE ty_package_tab,
+      hierarchy            TYPE ty_pkg_node_tab,
+      node                 LIKE LINE OF hierarchy,
+      sap_package          TYPE scompkdtln,
+      sap_package_instance TYPE REF TO if_package,
+      tpstdout             TYPE t_tpstdout,
+      tpstdout_line        LIKE LINE OF tpstdout,
+      log                  TYPE string,
+      dummy_message        TYPE string.
+
+    CLEAR: installed, integrity, manifest.
+    transport_id = trkorr.
 
     get_file_sys(
       IMPORTING
@@ -1260,7 +1715,7 @@ CLASS lcl_report IMPLEMENTATION.
         display_error( 'Release checksum does not match!' ).
         RETURN.
       ENDIF.
-      WRITE / 'Release integrity verified.'.
+      write_log( 'Release integrity verified.' ).
     ENDIF.
     CREATE OBJECT zip.
     zip->load(
@@ -1278,20 +1733,20 @@ CLASS lcl_report IMPLEMENTATION.
       EXPORTING
         name = 'manifest.json'
       IMPORTING
-        content = release_manifest_json
+        content = manifest
       EXCEPTIONS
         zip_decompression_error = 1
         zip_index_error         = 2
         OTHERS                  = 3
     ).
-    IF release_manifest_json IS INITIAL OR sy-subrc <> 0.
+    IF manifest IS INITIAL OR sy-subrc <> 0.
       display_error( 'Error in release content: manifest not found' ).
       RETURN.
     ENDIF.
     TRY.
         CALL METHOD ('/UI2/CL_JSON')=>deserialize
           EXPORTING
-            jsonx = release_manifest_json
+            jsonx = manifest
           CHANGING
             data  = release_manifest.
       CATCH cx_sy_dyn_call_error.
@@ -1377,18 +1832,28 @@ CLASS lcl_report IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    WRITE / 'All files extracted from release, ready to import into application server.'.
-    WRITE: /, 'Release data: ', data_file_path, ' Release header: ', header_file_path.
-    cl_progress_indicator=>progress_indicate(
-      i_text = 'Copying release files into application server...'
-      i_output_immediately = 'X' ).
-    write_binary_file( EXPORTING file_path = header_file_path file = header_file ).
-    write_binary_file( EXPORTING file_path = data_file_path file = data_file ).
+    write_log( 'All files extracted from release, ready to import into application server.' ).
+    write_log( 'Release data: ' && data_file_path && ' Release header: ' && header_file_path ).
+
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Copying release files into application server'.
+
+    IF write_binary_file( file_path = header_file_path file = header_file ) <> 'X'.
+      display_error( 'Error writing transport header file.' ).
+      RETURN.
+    ENDIF.
+    IF write_binary_file( file_path = data_file_path file = data_file ) <> 'X'.
+      display_error( 'Error writing transport data file.' ).
+      RETURN.
+    ENDIF.
 
     WRITE: /, 'Forwarding', trkorr, '...'.
-    cl_progress_indicator=>progress_indicate(
-      i_text = 'Forwarding...'
-      i_output_immediately = 'X' ).
+
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Forwarding'.
+
     forward(
       EXPORTING
         trkorr       = trkorr
@@ -1404,62 +1869,42 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
 
     WRITE: /, 'Importing', trkorr, '...'.
-    cl_progress_indicator=>progress_indicate(
-      i_text = 'Importing...'
-      i_output_immediately = 'X' ).
+
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Importing'.
+
     import(
       EXPORTING
-        trkorr = trkorr
-        system = tmssysnam
+        trkorr    = trkorr
+        system    = tmssysnam
       IMPORTING
-         subrc  = subrc
+         subrc    = subrc
+         tpstdout = tpstdout
     ).
+    IF tpstdout[] IS NOT INITIAL.
+      write_log( '=== R3trans output ===' ).
+      LOOP AT tpstdout INTO tpstdout_line.
+        log = tpstdout_line-line.
+        write_log( log ).
+      ENDLOOP.
+      write_log( '======================' ).
+    ENDIF.
     IF subrc <> 0.
-      display_error( 'Error importing transport' ).
+      MESSAGE ID sy-msgid TYPE 'I' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO dummy_message.
+      write_log( dummy_message ).
+      display_error( 'Error importing transport, check logs!' ).
       RETURN.
     ENDIF.
 
-    WRITE: /, 'Waiting for import status update in TMS queue...'.
-    cl_progress_indicator=>progress_indicate(
-      i_text = 'Installing...'
-      i_output_immediately = 'X' ).
-    CLEAR in_queue.
-    WHILE in_queue <> 'X'.
-      CLEAR: tmsrequests[], subrc, transport_rc, tmsrequests_line.
-      WAIT UP TO 3 SECONDS.
-      read_queue(
-        EXPORTING
-          target = tmssysnam
-        IMPORTING
-          requests = tmsrequests
-          subrc    = subrc
-      ).
-      IF subrc <> 0.
-        display_error( 'Error reading queue' ).
-        RETURN.
-      ENDIF.
-      DELETE tmsrequests WHERE trkorr NE trkorr.
-      SORT tmsrequests BY bufpos DESCENDING.
-      IF tmsrequests IS NOT INITIAL.
-        READ TABLE tmsrequests INTO tmsrequests_line INDEX 1.
-        IF tmsrequests_line-impsing <> 'X'.
-          in_queue = 'X'.
-        ENDIF.
-        IF tmsrequests_line-maxrc IS INITIAL.
-          transport_rc = -1.
-        ELSE.
-        ENDIF.
-        transport_rc = tmsrequests_line-maxrc.
-      ENDIF.
-    ENDWHILE.
-    WRITE: /, 'Import of transport', trkorr, 'ended with return code', transport_rc.
-    refresh_tms_txt( EXPORTING trkorr = trkorr ).
+    WRITE: /, 'Import of transport', trkorr, 'completed.'.
 
+    CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+      EXPORTING
+        text = 'Generating SAP packages'.
 
-    cl_progress_indicator=>progress_indicate(
-      i_text = 'Generating SAP packages...'
-      i_output_immediately = 'X' ).
-    SELECT pgmid object obj_name FROM e071 INTO CORRESPONDING FIELDS OF TABLE e071 WHERE trkorr EQ trkorr AND pgmid EQ 'R3TR'.
+    SELECT pgmid object obj_name FROM e071 INTO CORRESPONDING FIELDS OF TABLE e071
+      WHERE trkorr EQ transport_id AND pgmid EQ 'R3TR'.
     IF e071[] IS NOT INITIAL.
       SELECT pgmid object obj_name devclass
         FROM tadir
@@ -1529,9 +1974,11 @@ CLASS lcl_report IMPLEMENTATION.
         sap_package_instance->save( ).
         sap_package_instance->set_changeable( abap_false ).
       ENDLOOP.
-      cl_progress_indicator=>progress_indicate(
-        i_text = 'Adjusting tadir entries...'
-        i_output_immediately = 'X' ).
+
+      CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+        EXPORTING
+          text = 'Adjusting tadir entries'.
+
       LOOP AT tadir INTO tadir_line.
         READ TABLE hierarchy INTO node WITH KEY original = tadir_line-devclass.
         CALL FUNCTION 'TRINT_TADIR_MODIFY'
@@ -1557,20 +2004,27 @@ ENDCLASS.
 DATA report TYPE REF TO lcl_report.
 
 INITIALIZATION.
+  DATA registry_technical_error TYPE string.
   json_supported = lcl_report=>check_json_parser( ).
   vscan_profile_supported = lcl_report=>check_vscan_profile( ).
+  lcl_report=>check_registry_certificates(
+    IMPORTING
+      missing         = install_certificates_visible
+      technical_error = registry_technical_error ).
+  cert_err               = registry_technical_error.
+  cert_btn               = '@48@ Install certificates'.
   sc_titl1               = 'Description'.
   sc_txt1                = 'This report can be used to perform the first installs of trm-server'.
   sc_txt2                = 'and trm-rest.'.
   IF json_supported EQ 'X'.
     sc_txt3              = 'You can either let the report download the latest release from the TRM'.
     sc_txt4              = 'registry or provide a release yourself via file upload.'.
-    sc_txt5              = 'To perform online install, add the required certificates in STRUST.'.
+    sc_txt5              = 'To perform online install, registry certificates must be installed.'.
     online               = '@Y4@ From registry'.
   ELSE.
     sc_txt3              = 'You can provide a release via file upload.'.
   ENDIF.
-  sc_txt6                = '@X1@ TRM Installer v3.0.0 - RegestaItalia'.
+  sc_txt6                = '@X1@ TRM Installer v4.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
@@ -1619,6 +2073,9 @@ AT SELECTION-SCREEN.
     regex = 'http(s?)://'
     with  = ''
     occ   = 1 ).
+  IF sy-ucomm <> 'CERT'.
+    CLEAR suppress_certificate_command.
+  ENDIF.
   CASE sy-ucomm.
     WHEN 'TAB1'.
       psel-dynnr     = 100.
@@ -1626,6 +2083,40 @@ AT SELECTION-SCREEN.
     WHEN 'TAB2'.
       psel-dynnr     = 200.
       psel-activetab = 'TAB2'.
+    WHEN 'CERT'.
+      IF suppress_certificate_command = 'X'.
+        CLEAR: suppress_certificate_command, sy-ucomm, sscrfields-ucomm.
+        RETURN.
+      ENDIF.
+      DATA: confirm_message TYPE string,
+            confirm_answer  TYPE c.
+      CONCATENATE 'Certificates for' base_url 'will be installed.' INTO confirm_message SEPARATED BY space.
+      CALL FUNCTION 'POPUP_TO_CONFIRM'
+        EXPORTING
+          text_question         = confirm_message
+          text_button_1         = 'Continue'
+          icon_button_1         = '@0V@'
+          text_button_2         = 'Cancel'
+          icon_button_2         = '@0W@'
+          display_cancel_button = ' '
+        IMPORTING
+          answer                = confirm_answer.
+      CLEAR: sy-ucomm, sscrfields-ucomm.
+      IF confirm_answer = '2'.
+        WRITE / 'Installation cancelled by user.'.
+        RETURN.
+      ELSEIF confirm_answer = '1'.
+        IF lcl_report=>install_registry_certificates( ) = 'X'.
+          DATA refreshed_registry_error TYPE string.
+          lcl_report=>check_registry_certificates(
+            IMPORTING
+              missing         = install_certificates_visible
+              technical_error = refreshed_registry_error ).
+          cert_err = refreshed_registry_error.
+          suppress_certificate_command = 'X'.
+          MESSAGE 'Registry certificates installed successfully' TYPE 'I'.
+        ENDIF.
+      ENDIF.
   ENDCASE.
 
 AT SELECTION-SCREEN OUTPUT.
@@ -1643,6 +2134,14 @@ AT SELECTION-SCREEN OUTPUT.
   %_p_lserv_%_app_%-text  = 'trm-server package'.
   %_p_lrest_%_app_%-text  = 'trm-rest package'.
   LOOP AT SCREEN.
+    IF screen-group1 EQ 'CRT'.
+      IF install_certificates_visible EQ 'X'.
+        screen-active = 1.
+      ELSE.
+        screen-active = 0.
+      ENDIF.
+      MODIFY SCREEN.
+    ENDIF.
     IF screen-name EQ 'P_PPWD'.
       screen-invisible = 1.
       MODIFY SCREEN.

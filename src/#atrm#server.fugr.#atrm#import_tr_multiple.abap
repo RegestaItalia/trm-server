@@ -18,7 +18,7 @@ FUNCTION /atrm/import_tr_multiple.
       /atrm/cl_transport=>import_multiple(
         EXPORTING
           system     = system
-          transports = VALUE #( ( 'RSTK908621' ) ( 'RGHK900302' ) ( 'RGHK900303' ) )
+          transports = trkorr
           test       = test
       ).
     CATCH /atrm/cx_exception INTO go_exc.
