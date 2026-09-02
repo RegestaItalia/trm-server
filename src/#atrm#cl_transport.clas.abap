@@ -129,6 +129,7 @@ CLASS /atrm/cl_transport DEFINITION
     METHODS import
       IMPORTING system TYPE tmssysnam
                 test   TYPE stms_flag
+      RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
     "! Release the transport
@@ -664,7 +665,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD import.
-    execute_import(
+    import = execute_import(
       system    = system
       transport = gv_trkorr
       test      = test
