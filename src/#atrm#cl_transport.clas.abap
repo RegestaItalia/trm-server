@@ -127,8 +127,8 @@ CLASS /atrm/cl_transport DEFINITION
     "! @parameter test   | Test import
     "! @raising /atrm/cx_exception | Raised if import fails
     METHODS import
-      IMPORTING system TYPE tmssysnam
-                test   TYPE stms_flag
+      IMPORTING system        TYPE tmssysnam
+                test          TYPE stms_flag
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
@@ -346,12 +346,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_objects.
-    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          lt_e071       LIKE e071,
+          ls_log        LIKE LINE OF log.
+    MOVE e071[] TO lt_e071[].
+    DELETE lt_e071 WHERE pgmid EQ 'CORR'. " no CORR allowed
+    CHECK lt_e071[] IS NOT INITIAL. " silently exit
     enqueue( ).
     TRY.
-        DATA: lt_e071    LIKE e071,
-              ls_log     LIKE LINE OF log.
-        MOVE e071[] TO lt_e071[].
         CALL FUNCTION 'TRINT_REQUEST_CHOICE'
           EXPORTING
             iv_suppress_dialog   = 'X'
@@ -598,14 +600,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     sy-batch = 'X'.
     CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
       EXPORTING
-        iv_request      = gv_trkorr
-        iv_target       = target
-        iv_source       = source
-        iv_import_again = import_again
-        iv_monitor      = ' '
-        iv_verbose      = 'X'
+        iv_request                 = gv_trkorr
+        iv_target                  = target
+        iv_source                  = source
+        iv_import_again            = import_again
+        iv_monitor                 = ' '
+        iv_verbose                 = 'X'
       IMPORTING
-        et_tp_forwards  = forwards
+        et_tp_forwards             = forwards
       EXCEPTIONS
         read_config_failed         = 1
         table_of_requests_is_empty = 2
@@ -658,7 +660,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
     IF found IS INITIAL.
       /atrm/cx_exception=>raise(
-        iv_message = 'No forward status found' "#EC NOTEXT
+        iv_message = 'No forward status found'              "#EC NOTEXT
         iv_reason  = /atrm/cx_exception=>c_reason-generic
       ).
     ENDIF.
@@ -673,31 +675,31 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD read_queue.
-    DATA: bufcnt       TYPE tmsbufcnt,
-          alog         TYPE tmsalog,
-          batch        TYPE syst_batch,
-          alert_subrc  TYPE syst_subrc,
-          subrc        TYPE syst_subrc,
-          msgid        TYPE syst_msgid,
-          msgno        TYPE syst_msgno,
-          msgty        TYPE syst_msgty,
-          msgv1        TYPE syst_msgv,
-          msgv2        TYPE syst_msgv,
-          msgv3        TYPE syst_msgv,
-          msgv4        TYPE syst_msgv.
+    DATA: bufcnt      TYPE tmsbufcnt,
+          alog        TYPE tmsalog,
+          batch       TYPE syst_batch,
+          alert_subrc TYPE syst_subrc,
+          subrc       TYPE syst_subrc,
+          msgid       TYPE syst_msgid,
+          msgno       TYPE syst_msgno,
+          msgty       TYPE syst_msgty,
+          msgv1       TYPE syst_msgv,
+          msgv2       TYPE syst_msgv,
+          msgv3       TYPE syst_msgv,
+          msgv4       TYPE syst_msgv.
 
     batch = sy-batch.
     sy-batch = 'X'.
     CALL FUNCTION 'TMS_UIQ_IQD_READ_QUEUE'
       EXPORTING
-        iv_system      = target
-        iv_collect     = 'X'
-        iv_read_shadow = 'X'
-        iv_monitor     = ' '
-        iv_verbose     = 'X'
+        iv_system         = target
+        iv_collect        = 'X'
+        iv_read_shadow    = 'X'
+        iv_monitor        = ' '
+        iv_verbose        = 'X'
       IMPORTING
-        et_requests    = requests
-        es_bufcnt      = bufcnt
+        et_requests       = requests
+        es_bufcnt         = bufcnt
       EXCEPTIONS
         read_queue_failed = 1
         error_message     = 2
@@ -1002,7 +1004,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
     IF found IS INITIAL.
       /atrm/cx_exception=>raise(
-        iv_message = 'No queue maintenance status found' "#EC NOTEXT
+        iv_message = 'No queue maintenance status found'    "#EC NOTEXT
         iv_reason  = /atrm/cx_exception=>c_reason-generic
       ).
     ENDIF.
@@ -1284,7 +1286,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
     IF found IS INITIAL.
       /atrm/cx_exception=>raise(
-        iv_message = 'No import status found' "#EC NOTEXT
+        iv_message = 'No import status found'               "#EC NOTEXT
         iv_reason  = /atrm/cx_exception=>c_reason-generic
       ).
     ENDIF.
