@@ -565,6 +565,7 @@
     </item>
     <item>
      <FUNCNAME>/ATRM/DELETE_TMP_PACKAGE</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Delete temporary package</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
