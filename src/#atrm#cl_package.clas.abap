@@ -13,6 +13,9 @@ CLASS /atrm/cl_package DEFINITION
       RETURNING VALUE(package) TYPE REF TO /atrm/cl_package
       RAISING   /atrm/cx_exception.
 
+    METHODS delete_tmp
+      RAISING /atrm/cx_exception.
+
     METHODS get_subpackages
       RETURNING VALUE(subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
 
@@ -72,14 +75,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     TRY.
         CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
           EXPORTING
-            i_reuse_deleted_object = 'X'
-            i_suppress_dialog      = 'X'
+            i_suppress_dialog = 'X'
           IMPORTING
-            e_package              = lo_package
+            e_package         = lo_package
           CHANGING
-            c_package_data         = ls_data
+            c_package_data    = ls_data
           EXCEPTIONS
-            OTHERS                 = 1.
+            OTHERS            = 1.
       CATCH cx_sy_dyn_call_param_not_found.
         /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dyn_call_param_not_found ).
     ENDTRY.
@@ -132,6 +134,57 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     CREATE OBJECT package EXPORTING devclass = ls_data-devclass.
   ENDMETHOD.
 
+  METHOD delete_tmp.
+    DATA lo_package TYPE REF TO if_package.
+
+    IF gv_devclass(1) <> '$'.
+      /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-package_not_temporary ).
+    ENDIF.
+
+    TRY.
+        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~LOAD_PACKAGE')
+          EXPORTING
+            i_package_name = gv_devclass
+          IMPORTING
+            e_package      = lo_package
+          EXCEPTIONS
+            OTHERS         = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dyn_call_param_not_found ).
+    ENDTRY.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    CALL METHOD lo_package->('SET_CHANGEABLE')
+      EXPORTING
+        i_changeable      = 'X'
+        i_suppress_dialog = 'X'
+      EXCEPTIONS
+        OTHERS            = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    CALL METHOD lo_package->('DELETE')
+      EXPORTING
+        i_suppress_dialog = 'X'
+      EXCEPTIONS
+        OTHERS            = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    CALL METHOD lo_package->('SAVE')
+      EXPORTING
+        i_suppress_dialog      = 'X'
+        i_suppress_corr_insert = 'X'
+      EXCEPTIONS
+        OTHERS                 = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
 
   METHOD get_objects.
     TYPES: BEGIN OF ty_ddls_gen_view,
@@ -362,35 +415,35 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
   METHOD get_subpackages.
     TRY.
-      CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
-        EXPORTING
-          im_package                    = gv_devclass
-          im_also_local_packages        = 'X'
-        IMPORTING
-          et_subpackages                = subpackages
-        EXCEPTIONS
-          no_package_specified          = 1
-          package_has_no_tdevc_record   = 2
-          package_has_no_tadir_record   = 3
-          package_does_not_exist        = 4
-          invalid_superpackage          = 5
-          no_output_parameter_requested = 6
-          OTHERS                        = 7.
-    CATCH cx_dynamic_check.
-      cl_pak_package_queries=>get_all_subpackages(
-       EXPORTING
-         im_package                    = gv_devclass
-       IMPORTING
-          et_subpackages                = subpackages
-        EXCEPTIONS
-         no_package_specified          = 1
-         package_has_no_tdevc_record   = 2
-         package_has_no_tadir_record   = 3
-          package_does_not_exist        = 4
-          invalid_superpackage          = 5
-         no_output_parameter_requested = 6
-         OTHERS                        = 7
-     ).
+        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
+          EXPORTING
+            im_package                    = gv_devclass
+            im_also_local_packages        = 'X'
+          IMPORTING
+            et_subpackages                = subpackages
+          EXCEPTIONS
+            no_package_specified          = 1
+            package_has_no_tdevc_record   = 2
+            package_has_no_tadir_record   = 3
+            package_does_not_exist        = 4
+            invalid_superpackage          = 5
+            no_output_parameter_requested = 6
+            OTHERS                        = 7.
+      CATCH cx_dynamic_check.
+        cl_pak_package_queries=>get_all_subpackages(
+         EXPORTING
+           im_package                    = gv_devclass
+         IMPORTING
+            et_subpackages                = subpackages
+          EXCEPTIONS
+           no_package_specified          = 1
+           package_has_no_tdevc_record   = 2
+           package_has_no_tadir_record   = 3
+            package_does_not_exist        = 4
+            invalid_superpackage          = 5
+           no_output_parameter_requested = 6
+           OTHERS                        = 7
+       ).
     ENDTRY.
   ENDMETHOD.
 

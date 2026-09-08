@@ -38,6 +38,8 @@ FORM handle_exception.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING pa_dynamic.
     WHEN /atrm/cx_exception=>c_reason-program_not_found.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING program_not_found.
+    WHEN /atrm/cx_exception=>c_reason-package_not_temporary.
+      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING package_not_temporary.
     WHEN OTHERS.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING generic.
   ENDCASE.

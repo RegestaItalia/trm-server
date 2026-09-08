@@ -28,6 +28,7 @@ CLASS /atrm/cx_exception DEFINITION
         pa_unexpected_param      TYPE string VALUE 'PA_UNEXPECTED_PARAM',
         pa_exception             TYPE string VALUE 'PA_EXCEPTION',
         program_not_found        TYPE string VALUE 'PROGRAM_NOT_FOUND',
+        package_not_temporary    TYPE string VALUE 'PACKAGE_NOT_TEMPORARY',
       END OF c_reason .
 
     "! Constructor
