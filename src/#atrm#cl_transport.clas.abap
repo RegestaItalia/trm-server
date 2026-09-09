@@ -207,6 +207,11 @@ CLASS /atrm/cl_transport DEFINITION
     METHODS sort_and_compress
       RAISING /atrm/cx_exception.
 
+    "! Lock all objects in the transport
+    "! @raising /atrm/cx_exception | Raised on error
+    METHODS lock
+      RAISING /atrm/cx_exception.
+
     "! Import multiple transports (in batch)
     "! @parameter system       | Target system name
     "! @parameter transports   | List of transport requests
@@ -1316,6 +1321,72 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         OTHERS              = 2.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD lock.
+    DATA: error    TYPE trboolean,
+          messages TYPE ctsgerrmsgs,
+          message  LIKE LINE OF messages,
+          subrc    TYPE syst_subrc,
+          msgid    TYPE syst_msgid,
+          msgno    TYPE syst_msgno,
+          msgty    TYPE syst_msgty,
+          msgv1    TYPE syst_msgv,
+          msgv2    TYPE syst_msgv,
+          msgv3    TYPE syst_msgv,
+          msgv4    TYPE syst_msgv.
+    CALL FUNCTION 'TR_LOCK_REQUEST'
+      EXPORTING
+        iv_trkorr          = gv_trkorr
+        iv_dialog          = ' '
+        iv_success_message = ' '
+      IMPORTING
+        ev_object_error    = error
+        et_messages        = messages
+      EXCEPTIONS
+        error_message      = 1
+        OTHERS             = 2.
+    subrc = sy-subrc.
+    msgty = sy-msgty.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+
+    READ TABLE messages INTO message WITH KEY msgty = 'E'.
+    IF sy-subrc <> 0.
+      READ TABLE messages INTO message WITH KEY msgty = 'A'.
+    ENDIF.
+    IF message-msgid IS NOT INITIAL AND message-msgno IS NOT INITIAL.
+      sy-msgid = message-msgid.
+      sy-msgty = message-msgty.
+      sy-msgno = message-msgno.
+      sy-msgv1 = message-msgv1.
+      sy-msgv2 = message-msgv2.
+      sy-msgv3 = message-msgv3.
+      sy-msgv4 = message-msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgty = msgty.
+      sy-msgno = msgno.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF error EQ 'X'.
+      /atrm/cx_exception=>raise(
+        iv_message = 'Generic error return from lock function.' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
     ENDIF.
   ENDMETHOD.
 
