@@ -202,6 +202,16 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(stat) TYPE tpstat
       RAISING   /atrm/cx_exception.
 
+    "! Sort and compress transport objects
+    "! @raising /atrm/cx_exception | Raised on error
+    METHODS sort_and_compress
+      RAISING /atrm/cx_exception.
+
+    "! Import multiple transports (in batch)
+    "! @parameter system       | Target system name
+    "! @parameter transports   | List of transport requests
+    "! @parameter test         | Test import
+    "! @raising /atrm/cx_exception | Raised if import fails
     CLASS-METHODS import_multiple
       IMPORTING system        TYPE tmssysnam
                 transports    TYPE /atrm/trkorr_t
@@ -335,6 +345,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             /atrm/cx_exception=>raise( ).
           ENDIF.
         ENDLOOP.
+        sort_and_compress( ).
       CATCH /atrm/cx_exception INTO lo_lock_error.
         TRY.
             dequeue( ).
@@ -395,6 +406,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ). "#EC NOTEXT
           ENDIF.
         ENDIF.
+        sort_and_compress( ).
       CATCH /atrm/cx_exception INTO lo_lock_error.
         TRY.
             dequeue( ).
@@ -903,6 +915,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         IF sy-subrc <> 0.
           /atrm/cx_exception=>raise( ).
         ENDIF.
+        sort_and_compress( ).
       CATCH /atrm/cx_exception INTO lo_lock_error.
         TRY.
             dequeue( ).
@@ -1291,4 +1304,19 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       ).
     ENDIF.
   ENDMETHOD.
+
+  METHOD sort_and_compress.
+    CALL FUNCTION 'TRINT_SORT_AND_COMPRESS_COMM'
+      EXPORTING
+        iv_trkorr           = gv_trkorr
+        iv_dialog           = ' '
+        iv_called_by_editor = ' '
+      EXCEPTIONS
+        error_message       = 1
+        OTHERS              = 2.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
 ENDCLASS.
