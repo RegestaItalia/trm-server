@@ -350,7 +350,7 @@ CLASS lcl_report DEFINITION.
         ok       TYPE flag.
     METHODS load_release_file
       IMPORTING
-        filename TYPE rlgrap-filename
+        filename TYPE string
       EXPORTING
         file     TYPE xstring
         ok       TYPE flag.
