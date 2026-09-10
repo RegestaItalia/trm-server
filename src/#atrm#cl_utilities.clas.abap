@@ -114,6 +114,12 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING package TYPE /atrm/packages
       RAISING   /atrm/cx_exception.
 
+    METHODS restore_install_metadata
+      IMPORTING package        TYPE /atrm/packages
+                package_exists TYPE flag
+                installdevc    TYPE tyt_installdevc
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -360,9 +366,9 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
            END OF ty_result.
     DATA: cmd    TYPE ty_cmd,
           result TYPE STANDARD TABLE OF ty_result.
-    cmd = 'R3trans'. "#EC NOTEXT
+    cmd = 'R3trans'.                                        "#EC NOTEXT
     CALL 'SYSTEM' ID 'COMMAND' FIELD cmd
-                  ID 'TAB'     FIELD result. "#EC CI_SYSTEMCALL
+                  ID 'TAB'     FIELD result.         "#EC CI_SYSTEMCALL
     IF sy-subrc <> 12. "Fatal errors have occurred, R3trans sets to 12 when running without options
       /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-r3trans_cmd_error ).
     ENDIF.
@@ -491,6 +497,54 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
             data = package.
       CATCH cx_badi_not_implemented cx_badi_initial_reference.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD restore_install_metadata.
+    DATA: ls_installdevc LIKE LINE OF installdevc,
+          lo_badi        TYPE REF TO /atrm/trm_package_data.
+
+    enqueue( tabname = '/ATRM/PACKAGES' ).
+    enqueue( tabname = '/ATRM/INSTDEVC' ).
+
+    IF package_exists EQ 'X'.
+      MODIFY /atrm/packages FROM package.
+      IF sy-subrc <> 0.
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ELSE.
+      DELETE FROM /atrm/packages
+        WHERE package_name = package-package_name
+          AND package_registry = package-package_registry.
+    ENDIF.
+
+    DELETE FROM /atrm/instdevc
+      WHERE package_name = package-package_name
+        AND package_registry = package-package_registry.
+
+    LOOP AT installdevc INTO ls_installdevc.
+      MODIFY /atrm/instdevc FROM ls_installdevc.
+      IF sy-subrc <> 0.
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTDEVC' ).
+    dequeue( tabname = '/ATRM/PACKAGES' ).
+
+    IF package_exists = 'X'.
+      TRY.
+          GET BADI lo_badi.
+          CALL BADI lo_badi->trm_packages_change
+            EXPORTING
+              data = package.
+        CATCH cx_badi_not_implemented cx_badi_initial_reference.
+      ENDTRY.
+    ENDIF.
   ENDMETHOD.
 
 ENDCLASS.
