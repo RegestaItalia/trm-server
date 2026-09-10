@@ -350,7 +350,7 @@ CLASS lcl_report DEFINITION.
         ok       TYPE flag.
     METHODS load_release_file
       IMPORTING
-        filename TYPE string
+        filename TYPE rlgrap-filename
       EXPORTING
         file     TYPE xstring
         ok       TYPE flag.
@@ -850,13 +850,15 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD load_release_file.
-    DATA: binary_data TYPE STANDARD TABLE OF x255,
-          file_length TYPE i.
+    DATA: filename_string TYPE string,
+          binary_data     TYPE STANDARD TABLE OF x255,
+          file_length     TYPE i.
 
     CLEAR: file, ok.
+    filename_string = filename.
     CALL FUNCTION 'GUI_UPLOAD'
       EXPORTING
-        filename                = filename
+        filename                = filename_string
         filetype                = 'BIN'
       IMPORTING
         filelength              = file_length
