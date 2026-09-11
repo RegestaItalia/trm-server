@@ -279,8 +279,9 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       EXCEPTIONS
         OTHERS             = 1.
     IF sy-subrc <> 0.
-      IF sy-msgid EQ 'TO' AND sy-msgno EQ '123'.
-        " changes to an object that has a namespace not in system
+      IF sy-msgid EQ 'TO' AND ( sy-msgno EQ '123' OR sy-msgno EQ '140' ).
+        " 123: changes to an object that has a namespace not in system
+        " 140: changes to an object without the right namespace
         DATA: trint_devclass  LIKE devclass,
               trint_srcsystem LIKE srcsystem,
               trint_author    LIKE author.
