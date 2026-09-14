@@ -18,13 +18,20 @@ CLASS /atrm/cl_object_devc IMPLEMENTATION.
       BEGIN OF lty_field,
         component TYPE fieldname,
         object    TYPE trobjtype,
-      END OF lty_field.
+      END OF lty_field,
+      ltyt_field       TYPE STANDARD TABLE OF lty_field WITH DEFAULT KEY,
+      ltyt_permission  TYPE STANDARD TABLE OF permission WITH DEFAULT KEY,
+      ltyt_sfw_package TYPE STANDARD TABLE OF sfw_package WITH DEFAULT KEY.
 
     DATA:
-      ls_tdevc      TYPE tdevc,
-      lt_fields     TYPE STANDARD TABLE OF lty_field,
-      ls_field      TYPE lty_field,
-      ls_dependency TYPE /atrm/object_dependency.
+      ls_tdevc       TYPE tdevc,
+      lt_fields      TYPE ltyt_field,
+      ls_field       TYPE lty_field,
+      lt_permissions TYPE ltyt_permission,
+      ls_permission  TYPE permission,
+      lt_sfw_package TYPE ltyt_sfw_package,
+      ls_sfw_package TYPE sfw_package,
+      ls_dependency  TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
       <lv_obj_name> TYPE any.
@@ -74,6 +81,49 @@ CLASS /atrm/cl_object_devc IMPLEMENTATION.
               APPEND ls_dependency TO dependencies.
             CATCH cx_root.
               " optional dependency may not exist in the target system
+          ENDTRY.
+        ENDLOOP.
+
+        SELECT *
+          FROM permission
+          INTO TABLE lt_permissions
+          WHERE client_pak = me->key-obj_name.
+
+        LOOP AT lt_permissions INTO ls_permission.
+          TRY.
+              CLEAR ls_dependency.
+              CALL METHOD get_tadir_dependency
+                EXPORTING
+                  object     = 'PINF'
+                  obj_name   = ls_permission-intf_name
+                RECEIVING
+                  dependency = ls_dependency.
+
+              APPEND ls_dependency TO dependencies.
+            CATCH cx_root.
+              " referenced package interface may no longer exist
+          ENDTRY.
+        ENDLOOP.
+
+        SELECT *
+          FROM sfw_package
+          INTO TABLE lt_sfw_package
+          WHERE devclass = me->key-obj_name
+            AND version = 'A'.
+
+        LOOP AT lt_sfw_package INTO ls_sfw_package.
+          TRY.
+              CLEAR ls_dependency.
+              CALL METHOD get_tadir_dependency
+                EXPORTING
+                  object     = 'SFSW'
+                  obj_name   = ls_sfw_package-switch_id
+                RECEIVING
+                  dependency = ls_dependency.
+
+              APPEND ls_dependency TO dependencies.
+            CATCH cx_root.
+              " referenced switch may no longer exist
           ENDTRY.
         ENDLOOP.
       CATCH cx_root.
