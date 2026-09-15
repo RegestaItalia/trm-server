@@ -46,6 +46,7 @@ CLASS /atrm/cl_abap DEFINITION
            tyt_tokens     TYPE TABLE OF stoken,
            tyt_statements TYPE TABLE OF sstmnt.
     DATA: programs TYPE tyt_programs.
+    DATA: includes TYPE tyt_programs.
     METHODS get_clas_programs
       RETURNING VALUE(rt_programs) TYPE tyt_programs.
     METHODS get_fugr_programs
@@ -55,10 +56,15 @@ CLASS /atrm/cl_abap DEFINITION
     METHODS extract_function_modules
       IMPORTING it_tokens     TYPE tyt_tokens
                 it_statements TYPE tyt_statements.
+    METHODS extract_includes
+      IMPORTING it_tokens     TYPE tyt_tokens
+                it_statements TYPE tyt_statements.
 
     METHODS add_nrob
       CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
     METHODS add_docv
+      CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
+    METHODS add_includes
       CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
 ENDCLASS.
 
@@ -74,6 +80,15 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     FIELD-SYMBOLS <fs_source_code> TYPE ty_source_code.
     super->constructor( key = key ).
     me->object = object.
+
+    IF object = 'FUGR' OR object = 'PROG'.
+      " get_fugr_programs / get_prog_programs need the repository environment, but
+      " the base class only fills it later, inside get_dependencies; read it here
+      " so the program/include list below is not empty. read_senvi is idempotent,
+      " so the later call from get_dependencies (via super) does not refetch it.
+      read_senvi( ).
+    ENDIF.
+
     CASE object.
       WHEN 'CLAS'.
         me->programs = get_clas_programs( ).
@@ -100,6 +115,10 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
         it_tokens     = lt_src_tokens
         it_statements = lt_src_statements
       ).
+      extract_includes(
+        it_tokens     = lt_src_tokens
+        it_statements = lt_src_statements
+      ).
     ENDLOOP.
   ENDMETHOD.
 
@@ -110,6 +129,7 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     ).
     add_nrob( CHANGING ct_dependencies = dependencies ).
     add_docv( CHANGING ct_dependencies = dependencies ).
+    add_includes( CHANGING ct_dependencies = dependencies ).
   ENDMETHOD.
 
   METHOD get_clas_programs.
@@ -141,10 +161,7 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
 
   METHOD get_prog_programs.
     DATA ls_senvi TYPE senvi.
-    READ TABLE senvi TRANSPORTING NO FIELDS WITH KEY type = 'INCL' object = key-obj_name.
-    IF sy-subrc <> 0.
-      APPEND key-obj_name TO rt_programs.
-    ENDIF.
+    APPEND key-obj_name TO rt_programs.
     LOOP AT senvi INTO ls_senvi WHERE type EQ 'INCL'.
       APPEND ls_senvi-object TO rt_programs.
     ENDLOOP.
@@ -236,6 +253,36 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD extract_includes.
+    DATA: lv_keyword   TYPE flag,
+          lv_include   TYPE ty_program,
+          ls_statement TYPE sstmnt,
+          ls_token     TYPE stoken.
+
+    LOOP AT it_statements INTO ls_statement.
+      CLEAR lv_keyword.
+      CLEAR lv_include.
+      CLEAR ls_token.
+      LOOP AT it_tokens INTO ls_token FROM ls_statement-from TO ls_statement-to.
+        IF lv_keyword IS INITIAL.
+          IF ls_token-str EQ 'INCLUDE' AND ls_token-type EQ 'I'.
+            lv_keyword = 'X'.
+          ENDIF.
+        ELSEIF lv_include IS INITIAL.
+          " skip TYPES/DATA "INCLUDE STRUCTURE ..." / "INCLUDE TYPE ...", only the
+          " plain "INCLUDE <program>." program-include statement is a dependency
+          IF ls_token-str EQ 'STRUCTURE' OR ls_token-str EQ 'TYPE'.
+            EXIT.
+          ENDIF.
+          lv_include = ls_token-str.
+        ENDIF.
+      ENDLOOP.
+      CHECK lv_include IS NOT INITIAL.
+      TRANSLATE lv_include TO UPPER CASE.
+      APPEND lv_include TO includes.
+    ENDLOOP.
+  ENDMETHOD.
+
   METHOD add_nrob.
     DATA: ls_function_module TYPE ty_function_module,
           ls_exporting       TYPE ty_param,
@@ -243,7 +290,6 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           lt_nrob            TYPE STANDARD TABLE OF tadir,
           ls_nrob            TYPE tadir,
           ls_dependency      LIKE LINE OF ct_dependencies.
-    FIELD-SYMBOLS <fs_dep> TYPE /atrm/object_dependency.
 
     LOOP AT function_modules INTO ls_function_module WHERE funcname = 'NUMBER_GET_NEXT'.
       READ TABLE ls_function_module-exporting INTO ls_exporting WITH KEY name = 'OBJECT'.
@@ -262,8 +308,6 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     WHERE pgmid EQ 'R3TR' AND object EQ 'NROB' AND obj_name EQ lt_nrob_check-table_line.
 
     LOOP AT lt_nrob INTO ls_nrob.
-      READ TABLE ct_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = ls_nrob.
-      CHECK sy-subrc <> 0.
       CLEAR ls_dependency.
       TRY.
           get_tadir_dependency(
@@ -273,7 +317,12 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
             RECEIVING
               dependency = ls_dependency
           ).
-          APPEND ls_dependency TO ct_dependencies.
+          READ TABLE ct_dependencies
+            WITH KEY tabname = ls_dependency-tabname tabkey = ls_dependency-tabkey
+            TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+            APPEND ls_dependency TO ct_dependencies.
+          ENDIF.
         CATCH /atrm/cx_exception.
       ENDTRY.
     ENDLOOP.
@@ -289,7 +338,6 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           lt_docv            TYPE STANDARD TABLE OF tadir,
           ls_docv            TYPE tadir,
           ls_dependency      LIKE LINE OF ct_dependencies.
-    FIELD-SYMBOLS <fs_dep> TYPE /atrm/object_dependency.
 
     LOOP AT function_modules INTO ls_function_module WHERE funcname = 'POPUP_DISPLAY_TEXT'.
       READ TABLE ls_function_module-exporting INTO ls_exporting WITH KEY name = 'TEXT_OBJECT'.
@@ -317,8 +365,6 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     WHERE pgmid EQ 'R3TR' AND object EQ 'DOCV' AND obj_name EQ lt_docv_check-table_line.
 
     LOOP AT lt_docv INTO ls_docv.
-      READ TABLE ct_dependencies TRANSPORTING NO FIELDS WITH KEY tabname = 'TADIR' tabkey = ls_docv.
-      CHECK sy-subrc <> 0.
       CLEAR ls_dependency.
       TRY.
           get_tadir_dependency(
@@ -328,10 +374,44 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
             RECEIVING
               dependency = ls_dependency
           ).
-          APPEND ls_dependency TO ct_dependencies.
+          READ TABLE ct_dependencies
+            WITH KEY tabname = ls_dependency-tabname tabkey = ls_dependency-tabkey
+            TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+            APPEND ls_dependency TO ct_dependencies.
+          ENDIF.
         CATCH /atrm/cx_exception.
       ENDTRY.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD add_includes.
+    DATA: lv_include    TYPE ty_program,
+          lv_obj_name   TYPE sobj_name,
+          ls_dependency TYPE /atrm/object_dependency.
+
+    LOOP AT includes INTO lv_include.
+      lv_obj_name = lv_include.
+      TRY.
+          CLEAR ls_dependency.
+          get_tadir_dependency(
+            EXPORTING
+              object     = 'PROG'
+              obj_name   = lv_obj_name
+            RECEIVING
+              dependency = ls_dependency
+          ).
+          READ TABLE ct_dependencies
+            WITH KEY tabname = ls_dependency-tabname tabkey = ls_dependency-tabkey
+            TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+            APPEND ls_dependency TO ct_dependencies.
+          ENDIF.
+        CATCH /atrm/cx_exception.
+          " referenced include may no longer exist
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+
 ENDCLASS.
+

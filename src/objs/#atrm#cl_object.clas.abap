@@ -15,6 +15,8 @@ CLASS /atrm/cl_object DEFINITION
       IMPORTING key TYPE /atrm/object.
 
   PROTECTED SECTION.
+    DATA: senvi_read TYPE flag.
+    METHODS read_senvi.
     CLASS-METHODS get_tadir_dependency
       IMPORTING object            TYPE any
                 obj_name          TYPE any
@@ -24,34 +26,34 @@ CLASS /atrm/cl_object DEFINITION
       IMPORTING funcname          TYPE any
       RETURNING VALUE(dependency) TYPE /atrm/object_dependency
       RAISING   /atrm/cx_exception.
-CLASS-METHODS get_cds_dependency
+    CLASS-METHODS get_cds_dependency
       IMPORTING entity     TYPE any
       EXPORTING dependency TYPE /atrm/object_dependency
       RAISING   /atrm/cx_exception.
-CLASS-METHODS append_table_dependencies
-      IMPORTING table_name    TYPE tabname
-                where_clause  TYPE string
-                object_field  TYPE fieldname
-                object_type   TYPE trobjtype
-      CHANGING  dependencies  TYPE /atrm/object_dependency_t.
-CLASS-METHODS append_typed_dependencies
+    CLASS-METHODS append_table_dependencies
+      IMPORTING table_name   TYPE tabname
+                where_clause TYPE string
+                object_field TYPE fieldname
+                object_type  TYPE trobjtype
+      CHANGING  dependencies TYPE /atrm/object_dependency_t.
+    CLASS-METHODS append_typed_dependencies
       IMPORTING table_name        TYPE tabname
                 where_clause      TYPE string
                 object_field      TYPE fieldname
                 object_type_field TYPE fieldname
       CHANGING  dependencies      TYPE /atrm/object_dependency_t.
-CLASS-METHODS get_entity_dependency
+    CLASS-METHODS get_entity_dependency
       IMPORTING entity     TYPE any
       EXPORTING dependency TYPE /atrm/object_dependency
       RAISING   /atrm/cx_exception.
-CLASS-METHODS append_senvi_table_deps
+    CLASS-METHODS append_senvi_table_deps
       IMPORTING table_name   TYPE tabname
                 where_clause TYPE string
                 type_field   TYPE fieldname
                 object_field TYPE fieldname
                 origin       TYPE REF TO /atrm/if_object
       CHANGING  dependencies TYPE /atrm/object_dependency_t.
-CLASS-METHODS append_composite_deps
+    CLASS-METHODS append_composite_deps
       IMPORTING table_name    TYPE tabname
                 where_clause  TYPE string
                 first_field   TYPE fieldname
@@ -59,11 +61,11 @@ CLASS-METHODS append_composite_deps
                 second_offset TYPE i
                 object_type   TYPE trobjtype
       CHANGING  dependencies  TYPE /atrm/object_dependency_t.
-CLASS-METHODS append_lrep_dependencies
+    CLASS-METHODS append_lrep_dependencies
       IMPORTING object_type  TYPE trobjtype
                 object_name  TYPE sobj_name
       CHANGING  dependencies TYPE /atrm/object_dependency_t.
-CLASS-METHODS append_sdok_class_deps
+    CLASS-METHODS append_sdok_class_deps
       IMPORTING table_name   TYPE tabname
                 where_clause TYPE string
                 class_field  TYPE fieldname
@@ -78,6 +80,25 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
   METHOD constructor.
     me->key = key.
+  ENDMETHOD.
+
+
+  METHOD read_senvi.
+    DATA: lv_obj_type TYPE seu_obj,
+          lv_obj_name TYPE sobj_name.
+
+    CHECK senvi_read IS INITIAL.
+    senvi_read = 'X'.
+
+    lv_obj_type = key-object.
+    lv_obj_name = key-obj_name.
+    CALL FUNCTION 'REPOSITORY_ENVIRONMENT_ALL'
+      EXPORTING
+        obj_type        = lv_obj_type
+        object_name     = lv_obj_name
+        deep            = '1'
+      TABLES
+        environment_tab = senvi.
   ENDMETHOD.
 
 
@@ -165,19 +186,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
 
   METHOD /atrm/if_object~get_dependencies.
-    DATA: lv_obj_type TYPE seu_obj,
-          lv_obj_name TYPE sobj_name,
-          ls_senvi    TYPE senvi,
-          lo_map      TYPE REF TO /atrm/cl_senvi_map.
-    lv_obj_type = key-object.
-    lv_obj_name = key-obj_name.
-    CALL FUNCTION 'REPOSITORY_ENVIRONMENT_ALL'
-      EXPORTING
-        obj_type        = lv_obj_type
-        object_name     = lv_obj_name
-        deep            = '1'
-      TABLES
-        environment_tab = senvi.
+    DATA: ls_senvi TYPE senvi,
+          lo_map   TYPE REF TO /atrm/cl_senvi_map.
+
+    read_senvi( ).
 
     LOOP AT senvi INTO ls_senvi.
       CLEAR lo_map.
@@ -197,21 +209,24 @@ CLASS /atrm/cl_object IMPLEMENTATION.
   ENDMETHOD.
   METHOD get_cds_dependency.
     DATA:
-      lr_row      TYPE REF TO data,
-      lv_table    TYPE tabname,
-      lv_name     TYPE sobj_name,
-      lv_where    TYPE string.
+      lr_row   TYPE REF TO data,
+      lv_table TYPE tabname,
+      lv_name  TYPE sobj_name,
+      lv_where TYPE string.
 
     FIELD-SYMBOLS:
-      <ls_row>    TYPE any,
-      <lv_value>  TYPE any.
+      <ls_row>   TYPE any,
+      <lv_value> TYPE any.
 
     lv_name = entity.
 
     TRY.
         CALL METHOD get_tadir_dependency
-          EXPORTING object = 'DDLS' obj_name = lv_name
-          RECEIVING dependency = dependency.
+          EXPORTING
+            object     = 'DDLS'
+            obj_name   = lv_name
+          RECEIVING
+            dependency = dependency.
         RETURN.
       CATCH cx_root.
         " the entity name can differ from the DDLS source name
@@ -230,8 +245,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
         CHECK sy-subrc = 0.
         CHECK <lv_value> IS NOT INITIAL.
         CALL METHOD get_tadir_dependency
-          EXPORTING object = 'DDLS' obj_name = <lv_value>
-          RECEIVING dependency = dependency.
+          EXPORTING
+            object     = 'DDLS'
+            obj_name   = <lv_value>
+          RECEIVING
+            dependency = dependency.
       CATCH cx_root.
         " optional CDS dependency API may not exist in the target system
     ENDTRY.
@@ -242,9 +260,9 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       ls_dependency TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
-      <lt_rows>      TYPE STANDARD TABLE,
-      <ls_row>       TYPE any,
-      <lv_value>     TYPE any.
+      <lt_rows>  TYPE STANDARD TABLE,
+      <ls_row>   TYPE any,
+      <lv_value> TYPE any.
 
     TRY.
         CREATE DATA lr_table TYPE STANDARD TABLE OF (table_name).
@@ -263,20 +281,29 @@ CLASS /atrm/cl_object IMPLEMENTATION.
               CASE object_type.
                 WHEN 'CDS'.
                   CALL METHOD get_cds_dependency
-                    EXPORTING entity = <lv_value>
-                    IMPORTING dependency = ls_dependency.
+                    EXPORTING
+                      entity     = <lv_value>
+                    IMPORTING
+                      dependency = ls_dependency.
                 WHEN 'ENTY'.
                   CALL METHOD get_entity_dependency
-                    EXPORTING entity = <lv_value>
-                    IMPORTING dependency = ls_dependency.
+                    EXPORTING
+                      entity     = <lv_value>
+                    IMPORTING
+                      dependency = ls_dependency.
                 WHEN 'FUNC'.
                   CALL METHOD get_tfdir_dependency
-                    EXPORTING funcname = <lv_value>
-                    RECEIVING dependency = ls_dependency.
+                    EXPORTING
+                      funcname   = <lv_value>
+                    RECEIVING
+                      dependency = ls_dependency.
                 WHEN OTHERS.
                   CALL METHOD get_tadir_dependency
-                    EXPORTING object = object_type obj_name = <lv_value>
-                    RECEIVING dependency = ls_dependency.
+                    EXPORTING
+                      object     = object_type
+                      obj_name   = <lv_value>
+                    RECEIVING
+                      dependency = ls_dependency.
               ENDCASE.
               IF ls_dependency IS NOT INITIAL.
                 APPEND ls_dependency TO dependencies.
@@ -295,10 +322,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       ls_dependency TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
-      <lt_rows>      TYPE STANDARD TABLE,
-      <ls_row>       TYPE any,
-      <lv_type>      TYPE any,
-      <lv_object>    TYPE any.
+      <lt_rows>   TYPE STANDARD TABLE,
+      <ls_row>    TYPE any,
+      <lv_type>   TYPE any,
+      <lv_object> TYPE any.
 
     TRY.
         CREATE DATA lr_table TYPE STANDARD TABLE OF (table_name).
@@ -320,8 +347,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           TRY.
               CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = <lv_type> obj_name = <lv_object>
-                RECEIVING dependency = ls_dependency.
+                EXPORTING
+                  object     = <lv_type>
+                  obj_name   = <lv_object>
+                RECEIVING
+                  dependency = ls_dependency.
               IF ls_dependency IS NOT INITIAL.
                 APPEND ls_dependency TO dependencies.
               ENDIF.
@@ -336,8 +366,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
   METHOD get_entity_dependency.
     TRY.
         CALL METHOD get_cds_dependency
-          EXPORTING entity = entity
-          IMPORTING dependency = dependency.
+          EXPORTING
+            entity     = entity
+          IMPORTING
+            dependency = dependency.
         IF dependency IS NOT INITIAL.
           RETURN.
         ENDIF.
@@ -347,8 +379,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
     TRY.
         CALL METHOD get_tadir_dependency
-          EXPORTING object = 'TABL' obj_name = entity
-          RECEIVING dependency = dependency.
+          EXPORTING
+            object     = 'TABL'
+            obj_name   = entity
+          RECEIVING
+            dependency = dependency.
         RETURN.
       CATCH cx_root.
         " the entity can be a view
@@ -356,8 +391,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
     TRY.
         CALL METHOD get_tadir_dependency
-          EXPORTING object = 'VIEW' obj_name = entity
-          RECEIVING dependency = dependency.
+          EXPORTING
+            object     = 'VIEW'
+            obj_name   = entity
+          RECEIVING
+            dependency = dependency.
       CATCH cx_root.
         " optional entity may not exist in the target system
     ENDTRY.
@@ -398,11 +436,15 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           TRY.
               CLEAR lo_map.
               CALL METHOD /atrm/cl_senvi_map=>get
-                EXPORTING senvi = ls_senvi origin = lo_origin
-                RECEIVING map = lo_map.
+                EXPORTING
+                  senvi  = ls_senvi
+                  origin = lo_origin
+                RECEIVING
+                  map    = lo_map.
               CHECK lo_map IS BOUND.
               CALL METHOD lo_map->map_dependencies
-                CHANGING deps = dependencies.
+                CHANGING
+                  deps = dependencies.
             CATCH cx_root.
               " optional mapped dependency may not exist
           ENDTRY.
@@ -448,8 +490,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           TRY.
               CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = object_type obj_name = lv_object
-                RECEIVING dependency = ls_dependency.
+                EXPORTING
+                  object     = object_type
+                  obj_name   = lv_object
+                RECEIVING
+                  dependency = ls_dependency.
               IF ls_dependency IS NOT INITIAL.
                 APPEND ls_dependency TO dependencies.
               ENDIF.
@@ -579,8 +624,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
             TRY.
                 CALL METHOD get_tadir_dependency
-                  EXPORTING object = lv_trobjtype obj_name = lv_trobjname
-                  RECEIVING dependency = ls_dependency.
+                  EXPORTING
+                    object     = lv_trobjtype
+                    obj_name   = lv_trobjname
+                  RECEIVING
+                    dependency = ls_dependency.
                 IF ls_dependency IS NOT INITIAL.
                   APPEND ls_dependency TO dependencies.
                 ENDIF.
@@ -605,10 +653,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       ls_dependency  TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
-      <lt_classes>   TYPE STANDARD TABLE,
-      <ls_class>     TYPE any,
+      <lt_classes>    TYPE STANDARD TABLE,
+      <ls_class>      TYPE any,
       <ls_definition> TYPE any,
-      <lv_value>     TYPE any.
+      <lv_value>      TYPE any.
 
     TRY.
         CREATE DATA lr_classes TYPE STANDARD TABLE OF (table_name).
@@ -654,8 +702,11 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           TRY.
               CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = lv_object_type obj_name = lv_name
-                RECEIVING dependency = ls_dependency.
+                EXPORTING
+                  object     = lv_object_type
+                  obj_name   = lv_name
+                RECEIVING
+                  dependency = ls_dependency.
               IF ls_dependency IS NOT INITIAL.
                 APPEND ls_dependency TO dependencies.
               ENDIF.
@@ -668,3 +719,4 @@ CLASS /atrm/cl_object IMPLEMENTATION.
     ENDTRY.
   ENDMETHOD.
 ENDCLASS.
+
