@@ -5,7 +5,8 @@ CLASS /atrm/cl_core DEFINITION
 
   PUBLIC SECTION.
 
-    TYPES: tyt_tdevc TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+    TYPES: tyt_tdevc  TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
+           tyt_tdevct TYPE STANDARD TABLE OF tdevct WITH DEFAULT KEY,
            BEGIN OF ty_trm_transport,
              trkorr    TYPE trkorr,
              migration TYPE flag,

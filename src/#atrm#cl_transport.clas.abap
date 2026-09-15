@@ -224,6 +224,12 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
+    METHODS get_entries
+      EXPORTING e071   TYPE tyt_e071
+                tadir  TYPE scts_tadir
+                tdevc  TYPE /atrm/cl_core=>tyt_tdevc
+                tdevct TYPE /atrm/cl_core=>tyt_tdevct.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS execute_import
@@ -1390,4 +1396,45 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD get_entries.
+    DATA lt_packages TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY.
+    DATA lt_keys TYPE scts_tadir.
+    DATA ls_key LIKE LINE OF lt_keys.
+    FIELD-SYMBOLS <ls_e071> TYPE e071.
+
+    e071 = get_e071( ).
+
+    LOOP AT e071 ASSIGNING <ls_e071> WHERE pgmid = 'R3TR'.
+      CLEAR ls_key.
+      ls_key-pgmid = <ls_e071>-pgmid.
+      ls_key-object = <ls_e071>-object.
+      ls_key-obj_name = <ls_e071>-obj_name.
+      APPEND ls_key TO lt_keys.
+      IF <ls_e071>-object = 'DEVC'.
+        APPEND <ls_e071>-obj_name TO lt_packages.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT * FROM tadir
+        INTO CORRESPONDING FIELDS OF TABLE tadir
+        FOR ALL ENTRIES IN lt_keys
+        WHERE pgmid = lt_keys-pgmid
+          AND object = lt_keys-object
+          AND obj_name = lt_keys-obj_name.
+    ENDIF.
+
+    IF lt_packages IS NOT INITIAL.
+      SORT lt_packages.
+      DELETE ADJACENT DUPLICATES FROM lt_packages.
+      SELECT * FROM tdevc
+        INTO CORRESPONDING FIELDS OF TABLE tdevc
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+      SELECT * FROM tdevct
+        INTO CORRESPONDING FIELDS OF TABLE tdevct
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+    ENDIF.
+  ENDMETHOD.
 ENDCLASS.
