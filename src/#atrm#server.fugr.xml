@@ -9,6 +9,62 @@
    </INCLUDES>
    <FUNCTIONS>
     <item>
+     <FUNCNAME>/ATRM/ACQUIRE_ACT_LOCKS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Acquire TRM action locks</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>OWNER_TOKEN</PARAMETER>
+       <TYP>SYSUUID_C32</TYP>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>ACTION_NAME</PARAMETER>
+       <TYP>CHAR40</TYP>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>KEYS</PARAMETER>
+       <TYP>/ATRM/ACT_LOCK_T</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>INVALID_INPUT</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>OWNER_TOKEN</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>ACTION_NAME</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>KEYS</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>/ATRM/ADD_LANG_TR</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Add language transport to transport request</SHORT_TEXT>
@@ -1992,6 +2048,54 @@
      <DOCUMENTATION>
       <RSFDO>
        <PARAMETER>TRKORR</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>/ATRM/RELEASE_ACT_LOCKS</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Release TRM action locks</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>OWNER_TOKEN</PARAMETER>
+       <TYP>SYSUUID_C32</TYP>
+      </RSIMP>
+      <RSIMP>
+       <PARAMETER>KEYS</PARAMETER>
+       <TYP>/ATRM/ACT_LOCK_T</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>INVALID_INPUT</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>OWNER_TOKEN</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>KEYS</PARAMETER>
        <KIND>P</KIND>
       </RSFDO>
       <RSFDO>
