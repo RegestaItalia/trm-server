@@ -9,6 +9,7 @@ TYPES: BEGIN OF ty_row,
          action_name TYPE /atrm/act_lock-action_name,
          created_by TYPE /atrm/act_lock-created_by,
          created_at TYPE /atrm/act_lock-created_at,
+         created_at_display TYPE c LENGTH 19,
          owner_token TYPE /atrm/act_lock-owner_token,
          delete_action TYPE c LENGTH 6,
        END OF ty_row.
@@ -43,6 +44,7 @@ START-OF-SELECTION.
     EXPORTING
       i_callback_program      = sy-repid
       i_callback_user_command = 'ALV_USER_COMMAND'
+      i_callback_pf_status_set = 'ALV_SET_STATUS'
       is_layout               = gs_layout
       it_fieldcat             = gt_fieldcat
       i_save                  = 'A'
@@ -56,6 +58,15 @@ START-OF-SELECTION.
   ENDIF.
 
 FORM load_rows.
+  DATA: lv_date TYPE d,
+        lv_time TYPE t,
+        lv_date_text TYPE c LENGTH 10,
+        lv_time_text TYPE c LENGTH 8,
+        lv_timezone TYPE sy-zonlo.
+  lv_timezone = sy-zonlo.
+  IF lv_timezone IS INITIAL.
+    lv_timezone = 'UTC'.
+  ENDIF.
   CLEAR: gt_locks, gt_rows.
   SELECT * FROM /atrm/act_lock INTO TABLE gt_locks
     WHERE resource_type IN s_type
@@ -68,6 +79,16 @@ FORM load_rows.
   LOOP AT gt_locks INTO gs_lock.
     CLEAR gs_row.
     MOVE-CORRESPONDING gs_lock TO gs_row.
+    IF gs_lock-created_at IS NOT INITIAL.
+      CONVERT TIME STAMP gs_lock-created_at TIME ZONE lv_timezone
+        INTO DATE lv_date TIME lv_time.
+      IF sy-subrc = 0.
+        WRITE lv_date TO lv_date_text.
+        WRITE lv_time TO lv_time_text.
+        CONCATENATE lv_date_text lv_time_text
+          INTO gs_row-created_at_display SEPARATED BY space.
+      ENDIF.
+    ENDIF.
     gs_row-delete_action = '@11@'.
     APPEND gs_row TO gt_rows.
   ENDLOOP.
@@ -92,13 +113,22 @@ FORM build_fieldcat.
   PERFORM add_field USING 'RESOURCE_NAME' 'Resource' 60 space.
   PERFORM add_field USING 'ACTION_NAME' 'Action' 40 space.
   PERFORM add_field USING 'CREATED_BY' 'Owner' 12 space.
-  PERFORM add_field USING 'CREATED_AT' 'Created at' 20 space.
+  PERFORM add_field USING 'CREATED_AT_DISPLAY' 'Created at' 19 space.
   PERFORM add_field USING 'RESOURCE_HASH' 'Hash' 64 space.
+ENDFORM.
+
+FORM alv_set_status USING pt_extab TYPE slis_t_extab.
+  SET PF-STATUS 'LOCK_ADMIN' EXCLUDING pt_extab.
 ENDFORM.
 
 FORM alv_user_command USING pv_ucomm LIKE sy-ucomm
                             ps_selfield TYPE slis_selfield.
   DATA lv_deleted TYPE abap_bool.
+  IF pv_ucomm = 'REFRESH'.
+    PERFORM load_rows.
+    ps_selfield-refresh = 'X'.
+    RETURN.
+  ENDIF.
   IF pv_ucomm <> '&IC1' OR ps_selfield-fieldname <> 'DELETE_ACTION'.
     RETURN.
   ENDIF.
@@ -116,6 +146,7 @@ ENDFORM.
 FORM delete_row USING ps_row TYPE ty_row
                 CHANGING pv_deleted TYPE abap_bool.
   DATA: lv_answer TYPE c LENGTH 1,
+        lv_current_owner TYPE /atrm/act_lock-owner_token,
         lv_message TYPE string,
         lo_error TYPE REF TO /atrm/cx_exception.
   pv_deleted = abap_false.
@@ -155,6 +186,18 @@ FORM delete_row USING ps_row TYPE ty_row
         iv_resource_hash = ps_row-resource_hash
         iv_owner_token = ps_row-owner_token ).
     CATCH /atrm/cx_exception INTO lo_error.
+      IF lo_error->reason( ) = /atrm/cx_exception=>c_reason-not_found.
+        SELECT SINGLE owner_token FROM /atrm/act_lock INTO lv_current_owner
+          WHERE resource_type = ps_row-resource_type
+            AND resource_hash = ps_row-resource_hash.
+        pv_deleted = abap_true.
+        IF sy-subrc <> 0.
+          MESSAGE 'Lock already released; list refreshed' TYPE 'S'.
+        ELSE.
+          MESSAGE 'Lock changed ownership; list refreshed' TYPE 'S' DISPLAY LIKE 'E'.
+        ENDIF.
+        RETURN.
+      ENDIF.
       lv_message = lo_error->get_text( ).
       MESSAGE lv_message TYPE 'S' DISPLAY LIKE 'E'.
       RETURN.
