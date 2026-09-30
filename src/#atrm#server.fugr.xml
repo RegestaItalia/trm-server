@@ -1286,6 +1286,32 @@
      </DOCUMENTATION>
     </item>
     <item>
+     <FUNCNAME>/ATRM/GET_EXCEPTION_LOG</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get last exception log</SHORT_TEXT>
+     <TABLES>
+      <RSTBL>
+       <PARAMETER>LOG</PARAMETER>
+       <DBSTRUCT>TLINE</DBSTRUCT>
+      </RSTBL>
+     </TABLES>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>LOG</PARAMETER>
+       <KIND>P</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
      <FUNCNAME>/ATRM/GET_FILE_SYS</FUNCNAME>
      <REMOTE_CALL>R</REMOTE_CALL>
      <SHORT_TEXT>Get file system type</SHORT_TEXT>
