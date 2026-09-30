@@ -247,6 +247,13 @@ CLASS /atrm/cl_transport DEFINITION
                 attributes       TYPE scts_attrs OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
+METHODS complete_shi3_entries
+      CHANGING e071  TYPE tyt_e071
+               e071k TYPE tyt_e071k
+      RAISING  /atrm/cx_exception.
+METHODS record_fdt0_entries
+      IMPORTING e071 TYPE tyt_e071
+      RAISING   /atrm/cx_exception.
 
     DATA: gv_trkorr TYPE trkorr,
           gt_e071   TYPE tyt_e071,
@@ -370,10 +377,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   METHOD add_objects.
     DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
           lt_e071       LIKE e071,
+          lt_e071k      TYPE tyt_e071k,
           ls_log        LIKE LINE OF log.
     MOVE e071[] TO lt_e071[].
     DELETE lt_e071 WHERE pgmid EQ 'CORR'. " no CORR allowed
     CHECK lt_e071[] IS NOT INITIAL. " silently exit
+    complete_shi3_entries( CHANGING e071 = lt_e071 e071k = lt_e071k ).
     enqueue( ).
     TRY.
         CALL FUNCTION 'TRINT_REQUEST_CHOICE'
@@ -387,6 +396,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             et_log               = log
           TABLES
             it_e071              = lt_e071
+            it_e071k             = lt_e071k
           EXCEPTIONS
             no_objects_appended  = 0
             invalid_request      = 1
@@ -426,6 +436,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         RAISE EXCEPTION lo_lock_error.
     ENDTRY.
     dequeue( ).
+    " BRF+ takes its own locks: record FDT0 applications after dequeue
+    record_fdt0_entries( lt_e071 ).
   ENDMETHOD.
 
   METHOD remove_comments.
@@ -1436,5 +1448,99 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         FOR ALL ENTRIES IN lt_packages
         WHERE devclass = lt_packages-table_line.
     ENDIF.
+  ENDMETHOD.
+  METHOD complete_shi3_entries.
+    DATA: lt_shi3    TYPE tyt_e071,
+          ls_e071    TYPE e071,
+          lv_id      TYPE ttree-id,
+          ls_message TYPE hier_mess,
+          lt_objects TYPE tyt_e071,
+          lt_keys    TYPE tyt_e071k.
+    " STREE_BEFORE_EXPORT fails the release when a hierarchy header is recorded
+    " without its nodes (R3TR TABU keys): build the complete piece list, as SE43 does
+    lt_shi3 = e071.
+    DELETE lt_shi3 WHERE pgmid <> 'R3TR' OR object <> 'SHI3'.
+    CHECK lt_shi3 IS NOT INITIAL.
+    LOOP AT lt_shi3 INTO ls_e071.
+      lv_id = ls_e071-obj_name.
+      CLEAR: ls_message, lt_objects, lt_keys.
+      CALL FUNCTION 'STREE_INSERT_ALL_IN_TRANSPORT'
+        EXPORTING
+          structure_id               = lv_id
+          iv_return_objects_and_keys = 'X'
+        IMPORTING
+          message                    = ls_message
+        TABLES
+          et_objects                 = lt_objects
+          et_keys                    = lt_keys
+        EXCEPTIONS
+          error_message              = 1
+          OTHERS                     = 2.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      IF ls_message-msgid IS NOT INITIAL.
+        sy-msgid = ls_message-msgid.
+        sy-msgty = 'I'.
+        sy-msgno = ls_message-msgno.
+        sy-msgv1 = ls_message-msgv1.
+        sy-msgv2 = ls_message-msgv2.
+        sy-msgv3 = ls_message-msgv3.
+        sy-msgv4 = ls_message-msgv4.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      APPEND LINES OF lt_objects TO e071.
+      APPEND LINES OF lt_keys TO e071k.
+    ENDLOOP.
+    SORT e071 BY pgmid object obj_name.
+    DELETE ADJACENT DUPLICATES FROM e071 COMPARING pgmid object obj_name.
+    SORT e071k BY pgmid object objname mastertype mastername tabkey.
+    DELETE ADJACENT DUPLICATES FROM e071k COMPARING pgmid object objname mastertype mastername tabkey.
+  ENDMETHOD.
+  METHOD record_fdt0_entries.
+    DATA: ls_e071     TYPE e071,
+          lr_row      TYPE REF TO data,
+          lr_instance TYPE REF TO data,
+          lo_instance TYPE REF TO object,
+          lv_name     TYPE sobj_name,
+          lv_where    TYPE string,
+          lx_root     TYPE REF TO cx_root.
+    FIELD-SYMBOLS: <ls_row>      TYPE any,
+                   <lv_id>       TYPE any,
+                   <lo_instance> TYPE any.
+    " FDT0_BEFORE_EXPORT fails the release when the application is not also
+    " recorded under FDT0001/FDT0002: let BRF+ record it.
+    " BRF+ may not exist in the system, so everything is dynamic
+    LOOP AT e071 INTO ls_e071 WHERE pgmid = 'R3TR' AND object = 'FDT0'.
+      TRY.
+          CREATE DATA lr_row TYPE ('FDT_APPL_TADIR').
+          CREATE DATA lr_instance TYPE REF TO ('IF_FDT_ADMIN_DATA').
+        CATCH cx_sy_create_data_error.
+          RETURN. " BRF+ not available
+      ENDTRY.
+      ASSIGN lr_row->* TO <ls_row>.
+      ASSIGN lr_instance->* TO <lo_instance>.
+      lv_name = ls_e071-obj_name.
+      REPLACE ALL OCCURRENCES OF '''' IN lv_name WITH ''''''.
+      CONCATENATE 'NAME = ''' lv_name '''' INTO lv_where.
+      SELECT SINGLE * FROM ('FDT_APPL_TADIR') INTO <ls_row> WHERE (lv_where).
+      CHECK sy-subrc = 0.
+      ASSIGN COMPONENT 'ID' OF STRUCTURE <ls_row> TO <lv_id>.
+      CHECK sy-subrc = 0.
+      TRY.
+          CALL METHOD ('CL_FDT_FACTORY')=>('GET_INSTANCE_GENERIC')
+            EXPORTING
+              iv_id       = <lv_id>
+            IMPORTING
+              eo_instance = <lo_instance>.
+          lo_instance = <lo_instance>.
+          CALL METHOD lo_instance->('IF_FDT_TRANSACTION~TRANSPORT')
+            EXPORTING
+              iv_deep              = abap_true
+              iv_transport_request = gv_trkorr.
+        CATCH cx_root INTO lx_root.
+          /atrm/cx_exception=>raise( io_root = lx_root ).
+      ENDTRY.
+    ENDLOOP.
   ENDMETHOD.
 ENDCLASS.
