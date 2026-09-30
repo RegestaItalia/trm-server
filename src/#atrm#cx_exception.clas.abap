@@ -45,10 +45,15 @@ CLASS /atrm/cx_exception DEFINITION
     METHODS reason
       RETURNING VALUE(rv_reason) TYPE string.
 
-    "! Returns the exception log
+    "! Returns the exception log, followed by the exception stack
     "! @parameter rt_log | Table of log lines associated with the exception
     METHODS log
       RETURNING VALUE(rt_log) TYPE tyt_log.
+
+    "! Returns the exception stack only
+    "! @parameter rt_stack | Call stack at raise time and chain of wrapped exceptions
+    METHODS stack
+      RETURNING VALUE(rt_stack) TYPE tyt_log.
 
     "! Factory method to raise a /atrm/cx_exception with optional context
     "! @parameter iv_message | Optional plain-text message (used if no root exception given)
@@ -66,8 +71,17 @@ CLASS /atrm/cx_exception DEFINITION
     DATA: message TYPE symsg READ-ONLY.
   PROTECTED SECTION.
     DATA: gv_reason TYPE string,
-          gt_log    TYPE tyt_log.
+          gt_log    TYPE tyt_log,
+          gt_stack  TYPE tyt_log.
   PRIVATE SECTION.
+    CLASS-METHODS get_call_stack
+      RETURNING VALUE(rt_stack) TYPE tyt_log.
+    CLASS-METHODS get_caused_by
+      IMPORTING io_root         TYPE REF TO cx_root
+      RETURNING VALUE(rt_stack) TYPE tyt_log.
+    CLASS-METHODS append_line
+      IMPORTING iv_text TYPE string
+      CHANGING  ct_log  TYPE tyt_log.
 
 ENDCLASS.
 
@@ -99,12 +113,23 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
 
   METHOD log.
     rt_log = gt_log.
+    IF gt_stack IS NOT INITIAL.
+      IF rt_log IS NOT INITIAL.
+        APPEND INITIAL LINE TO rt_log.
+      ENDIF.
+      APPEND LINES OF gt_stack TO rt_log.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD stack.
+    rt_stack = gt_stack.
   ENDMETHOD.
 
   METHOD raise.
     DATA: lo_exc      TYPE REF TO /atrm/cx_exception,
           lo_root     TYPE REF TO cx_root,
           lo_trm_root TYPE REF TO /atrm/cx_exception,
+          lt_caused   TYPE tyt_log,
           lv_dummy    TYPE string.
     IF io_root IS BOUND.
       lo_root = io_root.
@@ -133,7 +158,105 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
     CREATE OBJECT lo_exc EXPORTING previous = lo_root.
     lo_exc->gv_reason = iv_reason.
     lo_exc->gt_log = it_log.
+    "keep the diagnostics of a wrapped trm exception: its log and the stack
+    "of where it was originally raised are more useful than the rethrow point
+    IF lo_trm_root IS BOUND.
+      IF lo_exc->gt_log IS INITIAL.
+        lo_exc->gt_log = lo_trm_root->gt_log.
+      ENDIF.
+      lo_exc->gt_stack = lo_trm_root->gt_stack.
+    ENDIF.
+    IF lo_exc->gt_stack IS INITIAL.
+      lo_exc->gt_stack = get_call_stack( ).
+    ENDIF.
+    IF io_root IS BOUND.
+      lt_caused = get_caused_by( io_root ).
+      APPEND LINES OF lt_caused TO lo_exc->gt_stack.
+    ENDIF.
     RAISE EXCEPTION lo_exc.
   ENDMETHOD.
 
+  METHOD get_call_stack.
+    DATA: lt_callstack TYPE abap_callstack,
+          ls_callstack LIKE LINE OF lt_callstack,
+          lv_line      TYPE string,
+          lv_lineno    TYPE c LENGTH 10.
+
+    CALL FUNCTION 'SYSTEM_CALLSTACK'
+      IMPORTING
+        callstack = lt_callstack.
+
+    APPEND 'Exception stack:' TO rt_stack.                  "#EC NOTEXT
+    LOOP AT lt_callstack INTO ls_callstack.
+      "skip the frames of this class (raise, get_call_stack)
+      IF ls_callstack-mainprogram CP '/ATRM/CX_EXCEPTION*'.
+        CONTINUE.
+      ENDIF.
+      lv_lineno = ls_callstack-line.
+      CONDENSE lv_lineno.
+      CONCATENATE '  at' ls_callstack-blocktype ls_callstack-blockname
+        INTO lv_line SEPARATED BY space.
+      CONCATENATE lv_line ' (' ls_callstack-include ':' lv_lineno ')'
+        INTO lv_line.
+      append_line( EXPORTING iv_text = lv_line CHANGING ct_log = rt_stack ).
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD get_caused_by.
+    DATA: lo_exc     TYPE REF TO cx_root,
+          lv_class   TYPE string,
+          lv_text    TYPE string,
+          lv_include TYPE syrepid,
+          lv_source  TYPE i,
+          lv_lineno  TYPE c LENGTH 10,
+          lv_line    TYPE string.
+
+    lo_exc = io_root.
+    WHILE lo_exc IS BOUND.
+      lv_class = cl_abap_classdescr=>get_class_name( lo_exc ).
+      REPLACE FIRST OCCURRENCE OF '\CLASS=' IN lv_class WITH ''.
+      lv_text = lo_exc->get_text( ).
+      CONCATENATE 'Caused by:' lv_class lv_text
+        INTO lv_line SEPARATED BY space.                    "#EC NOTEXT
+      append_line( EXPORTING iv_text = lv_line CHANGING ct_log = rt_stack ).
+      lo_exc->get_source_position(
+        IMPORTING
+          include_name = lv_include
+          source_line  = lv_source
+      ).
+      IF lv_include IS NOT INITIAL.
+        lv_lineno = lv_source.
+        CONDENSE lv_lineno.
+        CONCATENATE '  at' lv_include INTO lv_line SEPARATED BY space.
+        CONCATENATE lv_line ':' lv_lineno INTO lv_line.
+        append_line( EXPORTING iv_text = lv_line CHANGING ct_log = rt_stack ).
+      ENDIF.
+      lo_exc = lo_exc->previous.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD append_line.
+    "log lines are tdline (132 chars): split longer texts into consecutive lines
+    DATA: lv_len    TYPE i,
+          lv_off    TYPE i,
+          lv_chunk  TYPE i,
+          lv_line   TYPE tdline,
+          lv_maxlen TYPE i.
+
+    DESCRIBE FIELD lv_line LENGTH lv_maxlen IN CHARACTER MODE.
+    lv_len = strlen( iv_text ).
+    IF lv_len = 0.
+      APPEND INITIAL LINE TO ct_log.
+      RETURN.
+    ENDIF.
+    WHILE lv_off < lv_len.
+      lv_chunk = lv_len - lv_off.
+      IF lv_chunk > lv_maxlen.
+        lv_chunk = lv_maxlen.
+      ENDIF.
+      lv_line = iv_text+lv_off(lv_chunk).
+      APPEND lv_line TO ct_log.
+      lv_off = lv_off + lv_chunk.
+    ENDWHILE.
+  ENDMETHOD.
 ENDCLASS.
