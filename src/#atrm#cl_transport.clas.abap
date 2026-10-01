@@ -132,10 +132,11 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
-    "! Release the transport
+    "! Release the transport and wait until the update task has completed
+    "! the release (status O, R or N); the export may still be running.
     "! @parameter lock | Whether to lock objects before release
     "! @parameter messages | Messages from the release operation
-    "! @raising /atrm/cx_exception | Raised if release fails
+    "! @raising /atrm/cx_exception | Raised if release fails or the update task does not complete
     METHODS release
       IMPORTING lock     TYPE flag
       EXPORTING messages TYPE ctsgerrmsgs
@@ -229,6 +230,18 @@ CLASS /atrm/cl_transport DEFINITION
                 tadir  TYPE scts_tadir
                 tdevc  TYPE /atrm/cl_core=>tyt_tdevc
                 tdevct TYPE /atrm/cl_core=>tyt_tdevct.
+    "! Wait until the release is really completed.
+    "! TRINT_RELEASE_REQUEST returns once the request is handed to the update
+    "! task; versioning and export run afterwards and can still fail.
+    "! @parameter timeout | Maximum wait in seconds
+    "! @parameter exported | Wait for the export too (R/N); otherwise return once the update task is done (O)
+    "! @parameter status | Final request status
+    "! @raising /atrm/cx_exception | Raised if not completed within timeout
+    METHODS wait_release
+      IMPORTING timeout       TYPE i DEFAULT 600
+                exported      TYPE abap_bool DEFAULT abap_true
+      RETURNING VALUE(status) TYPE trstatus
+      RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -826,6 +839,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         RAISE EXCEPTION lo_lock_error.
     ENDTRY.
     dequeue( ).
+    " the release is completed asynchronously by the update task (versioning):
+    " a failure there leaves the request modifiable and its locks held, so
+    " don't report success before it is done (the export is not awaited)
+    wait_release( exported = abap_false ).
   ENDMETHOD.
 
   METHOD rename.
@@ -1542,5 +1559,36 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           /atrm/cx_exception=>raise( io_root = lx_root ).
       ENDTRY.
     ENDLOOP.
+  ENDMETHOD.
+  METHOD wait_release.
+    DATA: lv_waited  TYPE i,
+          lv_message TYPE string.
+    DO.
+      SELECT SINGLE trstatus FROM e070 INTO status WHERE trkorr = gv_trkorr.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( iv_message = 'Transport not found' "#EC NOTEXT
+                                   iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
+      ENDIF.
+      IF status = 'R' OR status = 'N'.
+        RETURN.
+      ENDIF.
+      " O: the update task is done, tp export still running
+      IF status = 'O' AND exported = abap_false.
+        RETURN.
+      ENDIF.
+      IF lv_waited >= timeout.
+        EXIT.
+      ENDIF.
+      " WAIT also ends the DB LUW, so the next SELECT sees the update task's commit
+      WAIT UP TO 5 SECONDS.
+      lv_waited = lv_waited + 5.
+    ENDDO.
+    IF status = 'O'.
+      lv_message = 'Release started but export not finished, check tp logs'. "#EC NOTEXT
+    ELSE.
+      lv_message = 'Release not completed, check update task (SM13)'. "#EC NOTEXT
+    ENDIF.
+    /atrm/cx_exception=>raise( iv_message = lv_message
+                               iv_reason  = /atrm/cx_exception=>c_reason-generic ).
   ENDMETHOD.
 ENDCLASS.
