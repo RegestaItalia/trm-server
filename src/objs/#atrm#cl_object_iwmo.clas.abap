@@ -16,13 +16,14 @@ CLASS /atrm/cl_object_iwmo IMPLEMENTATION.
   METHOD /atrm/if_object~get_dependencies.
     DATA:
       lv_name    TYPE sobj_name,
-      lv_id      TYPE sobj_name,
-      lv_version TYPE sobj_name,
+      lv_id      TYPE string,
+      lv_version TYPE string,
       lv_where   TYPE string.
 
+    " TADIR name: technical model name (32 characters) + version (4)
     lv_name = me->key-obj_name.
-    lv_id = lv_name(36).
-    lv_version = lv_name+36(4).
+    lv_id = lv_name(32).
+    lv_version = lv_name+32(4).
     REPLACE ALL OCCURRENCES OF '''' IN lv_id WITH ''''''.
     REPLACE ALL OCCURRENCES OF '''' IN lv_version WITH ''''''.
     CONCATENATE 'TECHNICAL_NAME = ''' lv_id

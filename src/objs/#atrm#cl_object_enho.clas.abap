@@ -20,10 +20,6 @@ CLASS /atrm/cl_object_enho IMPLEMENTATION.
                    <lv_type> TYPE any,
                    <lv_name> TYPE any.
 
-    super->/atrm/if_object~get_dependencies(
-      IMPORTING dependencies = dependencies
-    ).
-
     CONCATENATE 'ENHNAME = ''' me->key-obj_name
       ''' AND VERSION = ''A'' AND PGMID = ''R3TR''' INTO lv_where.
 
