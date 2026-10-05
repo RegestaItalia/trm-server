@@ -107,7 +107,8 @@ CLASS /atrm/cl_object_sfpf IMPLEMENTATION.
                 object_type  = 'CLAS'
       CHANGING  dependencies = dependencies ).
 
-    " Form context (asXML): text-module nodes (TEXT_NAME -> SSFO) and their styles (STYLE_NAME -> SSST)
+    " Form context (asXML): text-module nodes (CL_FP_TEXT_MODULE). TEXT_NAME and STYLE_NAME are
+    " structures; a fixed name is in <NAME>, a field reference in <NAMEFIELD> (not a repository object).
     TRY.
         lv_table = 'FPCONTEXT'.
         SELECT SINGLE ('CONTEXT') FROM (lv_table) INTO lv_raw WHERE (lv_where).
@@ -118,7 +119,7 @@ CLASS /atrm/cl_object_sfpf IMPLEMENTATION.
         CLEAR lv_xml.
     ENDTRY.
     IF lv_xml IS NOT INITIAL.
-      FIND ALL OCCURRENCES OF REGEX '<(TEXT_NAME|STYLE_NAME)>([^<]+)</(TEXT_NAME|STYLE_NAME)>' IN lv_xml RESULTS lt_results.
+      FIND ALL OCCURRENCES OF REGEX '<(TEXT_NAME|STYLE_NAME)>\s*<NAME>([^<]+)</NAME>' IN lv_xml RESULTS lt_results.
       LOOP AT lt_results ASSIGNING <ls_result>.
         READ TABLE <ls_result>-submatches ASSIGNING <ls_submatch> INDEX 1.
         CHECK sy-subrc = 0.
