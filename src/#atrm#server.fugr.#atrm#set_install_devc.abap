@@ -6,6 +6,7 @@ FUNCTION /atrm/set_install_devc.
 *"     VALUE(PACKAGE_EXISTS) TYPE  FLAG OPTIONAL
 *"  TABLES
 *"      INSTALLDEVC STRUCTURE  /ATRM/INSTDEVC
+*"      INSTALLTR STRUCTURE  /ATRM/INSTALLTR OPTIONAL
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
@@ -25,6 +26,7 @@ FUNCTION /atrm/set_install_devc.
           package        = package
           package_exists = package_exists
           installdevc    = installdevc[]
+          installtr      = installtr[]
       ).
     ELSE.
       /atrm/cl_utilities=>add_install_devclass(

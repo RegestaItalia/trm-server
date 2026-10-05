@@ -8,6 +8,7 @@ CLASS /atrm/cl_utilities DEFINITION
     TYPES: tyt_ko100       TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
            tyt_tadir       TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY,
            tyt_installdevc TYPE STANDARD TABLE OF /atrm/instdevc WITH DEFAULT KEY,
+           tyt_installtr   TYPE STANDARD TABLE OF /atrm/installtr WITH DEFAULT KEY,
            tyt_trnspacett  TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY.
 
     "! Check if current user is authorized to execute TRM functions
@@ -59,6 +60,16 @@ CLASS /atrm/cl_utilities DEFINITION
     "! @parameter installdevc | Devclasses to add
     CLASS-METHODS add_install_devclass
       IMPORTING installdevc TYPE tyt_installdevc
+      RAISING   /atrm/cx_exception.
+
+    "! Replace the transports recorded for an installed TRM package
+    "! @parameter package_name     | Package name
+    "! @parameter package_registry | Package registry
+    "! @parameter installtr        | Transports imported by the installation
+    CLASS-METHODS set_install_transports
+      IMPORTING package_name     TYPE /atrm/package_name
+                package_registry TYPE /atrm/package_registry
+                installtr        TYPE tyt_installtr
       RAISING   /atrm/cx_exception.
 
     "! Wrapper for TR_TADIR_INTERFACE to register objects in the TADIR table
@@ -114,10 +125,21 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING package TYPE /atrm/packages
       RAISING   /atrm/cx_exception.
 
+    "! Restore (or remove) a package record with its install devclasses and transports, in one LUW
+    "! @parameter package        | Package data
+    "! @parameter package_exists | 'X' to write the package record, ' ' to delete it
+    "! @parameter installdevc    | Install devclasses replacing the current ones
+    "! @parameter installtr      | Install transports replacing the current ones
     METHODS restore_install_metadata
       IMPORTING package        TYPE /atrm/packages
                 package_exists TYPE flag
                 installdevc    TYPE tyt_installdevc
+                installtr      TYPE tyt_installtr OPTIONAL
+      RAISING   /atrm/cx_exception.
+    "! Delete install devclasses from TRM install devclass list
+    "! @parameter installdevc | Devclasses to delete (key fields are used)
+    CLASS-METHODS delete_install_devclass
+      IMPORTING installdevc TYPE tyt_installdevc
       RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
@@ -522,14 +544,18 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
 
   METHOD restore_install_metadata.
     DATA: ls_installdevc LIKE LINE OF installdevc,
+          ls_installtr   LIKE LINE OF installtr,
           lo_badi        TYPE REF TO /atrm/trm_package_data.
 
     enqueue( tabname = '/ATRM/PACKAGES' ).
     enqueue( tabname = '/ATRM/INSTDEVC' ).
+    enqueue( tabname = '/ATRM/INSTALLTR' ).
 
     IF package_exists EQ 'X'.
       MODIFY /atrm/packages FROM package.
       IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
         dequeue( tabname = '/ATRM/INSTDEVC' ).
         dequeue( tabname = '/ATRM/PACKAGES' ).
         /atrm/cx_exception=>raise( ).
@@ -547,6 +573,25 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     LOOP AT installdevc INTO ls_installdevc.
       MODIFY /atrm/instdevc FROM ls_installdevc.
       IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+
+    DELETE FROM /atrm/installtr
+      WHERE package_name = package-package_name
+        AND package_registry = package-package_registry.
+
+    LOOP AT installtr INTO ls_installtr.
+      ls_installtr-package_name = package-package_name.
+      ls_installtr-package_registry = package-package_registry.
+      MODIFY /atrm/installtr FROM ls_installtr.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
         dequeue( tabname = '/ATRM/INSTDEVC' ).
         dequeue( tabname = '/ATRM/PACKAGES' ).
         /atrm/cx_exception=>raise( ).
@@ -554,6 +599,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     ENDLOOP.
 
     COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTALLTR' ).
     dequeue( tabname = '/ATRM/INSTDEVC' ).
     dequeue( tabname = '/ATRM/PACKAGES' ).
 
@@ -568,4 +614,32 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD set_install_transports.
+    DATA ls_installtr LIKE LINE OF installtr.
+    enqueue( tabname = '/ATRM/INSTALLTR' ).
+    DELETE FROM /atrm/installtr
+      WHERE package_name = package_name
+        AND package_registry = package_registry.
+    LOOP AT installtr INTO ls_installtr.
+      ls_installtr-package_name = package_name.
+      ls_installtr-package_registry = package_registry.
+      MODIFY /atrm/installtr FROM ls_installtr.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTALLTR' ).
+  ENDMETHOD.
+  METHOD delete_install_devclass.
+    IF installdevc IS INITIAL.
+      RETURN.
+    ENDIF.
+    enqueue( tabname = '/ATRM/INSTDEVC' ).
+    DELETE /atrm/instdevc FROM TABLE installdevc.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTDEVC' ).
+  ENDMETHOD.
 ENDCLASS.
