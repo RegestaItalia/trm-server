@@ -8,6 +8,7 @@ FUNCTION /atrm/get_binary_file.
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
+*"      NOT_FOUND
 *"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.

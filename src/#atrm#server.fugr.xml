@@ -992,6 +992,9 @@
        <EXCEPTION>INVALID_INPUT</EXCEPTION>
       </RSEXC>
       <RSEXC>
+       <EXCEPTION>NOT_FOUND</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
        <EXCEPTION>GENERIC</EXCEPTION>
       </RSEXC>
      </EXCEPTION>
@@ -1010,6 +1013,10 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>INVALID_INPUT</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>NOT_FOUND</PARAMETER>
        <KIND>X</KIND>
       </RSFDO>
       <RSFDO>

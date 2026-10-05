@@ -167,16 +167,36 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_binary_file.
-    DATA lv_subrc TYPE sysubrc.
-    OPEN DATASET file_path FOR INPUT IN BINARY MODE.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-not_found ).
+    DATA: lv_subrc   TYPE sysubrc,
+          lv_os_msg  TYPE c LENGTH 255,
+          lv_message TYPE string,
+          lo_file    TYPE REF TO cx_sy_file_access_error.
+    TRY.
+        OPEN DATASET file_path FOR INPUT IN BINARY MODE MESSAGE lv_os_msg.
+        lv_subrc = sy-subrc.
+      CATCH cx_sy_file_access_error INTO lo_file.
+        /atrm/cx_exception=>raise( io_root = lo_file ).
+    ENDTRY.
+    IF lv_subrc <> 0.
+      "file does not exist or cannot be opened at OS level
+      CONCATENATE 'File' file_path 'not found' INTO lv_message SEPARATED BY space. "#EC NOTEXT
+      IF lv_os_msg IS NOT INITIAL.
+        CONCATENATE lv_message ' (' lv_os_msg ')' INTO lv_message.
+      ENDIF.
+      /atrm/cx_exception=>raise( iv_message = lv_message
+                                iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
     ENDIF.
-    READ DATASET file_path INTO file.
-    lv_subrc = sy-subrc.
+    TRY.
+        READ DATASET file_path INTO file.
+        lv_subrc = sy-subrc.
+      CATCH cx_sy_file_access_error INTO lo_file.
+        CLOSE DATASET file_path.
+        /atrm/cx_exception=>raise( io_root = lo_file ).
+    ENDTRY.
     CLOSE DATASET file_path.
     IF lv_subrc <> 0.
-      /atrm/cx_exception=>raise( ).
+      CONCATENATE 'Couldn''t read file' file_path INTO lv_message SEPARATED BY space. "#EC NOTEXT
+      /atrm/cx_exception=>raise( iv_message = lv_message ).
     ENDIF.
   ENDMETHOD.
 
