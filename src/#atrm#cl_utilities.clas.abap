@@ -141,6 +141,13 @@ CLASS /atrm/cl_utilities DEFINITION
     CLASS-METHODS delete_install_devclass
       IMPORTING installdevc TYPE tyt_installdevc
       RAISING   /atrm/cx_exception.
+    "! Get the system ID of the system reached through an RFC destination
+    "! @parameter rfcdest | RFC destination (NONE = current system)
+    "! @parameter dest    | System ID
+    CLASS-METHODS get_dest
+      IMPORTING rfcdest     TYPE rfcdest DEFAULT 'NONE'
+      RETURNING VALUE(dest) TYPE sysysid
+      RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -641,5 +648,17 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     DELETE /atrm/instdevc FROM TABLE installdevc.
     COMMIT WORK AND WAIT.
     dequeue( tabname = '/ATRM/INSTDEVC' ).
+  ENDMETHOD.
+  METHOD get_dest.
+    DATA ls_rfcsi TYPE rfcsi.
+    CALL FUNCTION 'RFC_SYSTEM_INFO' DESTINATION rfcdest
+      IMPORTING
+        rfcsi_export = ls_rfcsi
+      EXCEPTIONS
+        OTHERS       = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    dest = ls_rfcsi-rfcsysid.
   ENDMETHOD.
 ENDCLASS.
