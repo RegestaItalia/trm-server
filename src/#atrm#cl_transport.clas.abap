@@ -584,9 +584,27 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
-    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          ls_request    TYPE trwbo_request.
     enqueue( ).
     TRY.
+        " Object locks of the request (e.g. a locked TRM landscape transport) block TR_DELETE_COMM
+        CALL FUNCTION 'TR_READ_REQUEST'
+          EXPORTING
+            iv_trkorr         = gv_trkorr
+            iv_read_e070      = 'X'
+            iv_read_objs_keys = 'X'
+          CHANGING
+            cs_request        = ls_request
+          EXCEPTIONS
+            OTHERS            = 1.
+        IF sy-subrc EQ 0.
+          CALL FUNCTION 'TRINT_UNLOCK_REQUEST'
+            CHANGING
+              cs_request = ls_request
+            EXCEPTIONS
+              OTHERS     = 1.
+        ENDIF.
         CALL FUNCTION 'TR_DELETE_COMM'
           EXPORTING
             wi_dialog = ' '
