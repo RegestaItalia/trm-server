@@ -1908,6 +1908,48 @@
      <ENTRY>View and manually delete TRM action locks</ENTRY>
      <LENGTH>41</LENGTH>
     </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_ACTION</KEY>
+     <ENTRY>Action</ENTRY>
+     <LENGTH>14</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_HASH</KEY>
+     <ENTRY>Resource hash</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_NAME</KEY>
+     <ENTRY>Resource name</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_OWNER</KEY>
+     <ENTRY>Created by</ENTRY>
+     <LENGTH>18</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_TIME</KEY>
+     <ENTRY>Created at (timestamp)</ENTRY>
+     <LENGTH>30</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_TOKEN</KEY>
+     <ENTRY>Owner token</ENTRY>
+     <LENGTH>19</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>S_TYPE</KEY>
+     <ENTRY>Resource type</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
    </TPOOL>
   </asx:values>
  </asx:abap>

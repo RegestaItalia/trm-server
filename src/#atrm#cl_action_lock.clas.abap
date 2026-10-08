@@ -203,7 +203,8 @@ CLASS /atrm/cl_action_lock IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD force_delete.
-    DATA: lo_root TYPE REF TO cx_root.
+    DATA: lo_error TYPE REF TO /atrm/cx_exception,
+          lo_root TYPE REF TO cx_root.
     IF iv_resource_type IS INITIAL OR iv_resource_hash IS INITIAL OR iv_owner_token IS INITIAL.
       /atrm/cx_exception=>raise(
         iv_reason = /atrm/cx_exception=>c_reason-invalid_input
@@ -221,6 +222,10 @@ CLASS /atrm/cl_action_lock IMPLEMENTATION.
             iv_message = 'Action lock changed or was already removed' ).
         ENDIF.
         COMMIT WORK AND WAIT.
+      CATCH /atrm/cx_exception INTO lo_error.
+        ROLLBACK WORK.
+        dequeue_table( ).
+        RAISE EXCEPTION lo_error.
       CATCH cx_root INTO lo_root.
         ROLLBACK WORK.
         dequeue_table( ).
