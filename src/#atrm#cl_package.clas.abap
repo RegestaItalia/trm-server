@@ -524,14 +524,18 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDLOOP.
 
     LOOP AT e071_dirty INTO e071_dirty_line.
-      " only write header transports
-      READ TABLE e071_dirty TRANSPORTING NO FIELDS WITH KEY trkorr = e071_dirty_line-strkorr pgmid = e071_dirty_line-pgmid object = e071_dirty_line-object obj_name = e071_dirty_line-obj_name.
-      CHECK sy-subrc NE 0.
       CLEAR dirty_line.
-      dirty_line-trkorr = e071_dirty_line-trkorr.
+      " report tasks under their request (a modifiable request has no own E071 entries yet)
+      IF e071_dirty_line-strkorr IS NOT INITIAL.
+        dirty_line-trkorr = e071_dirty_line-strkorr.
+      ELSE.
+        dirty_line-trkorr = e071_dirty_line-trkorr.
+      ENDIF.
       dirty_line-pgmid = e071_dirty_line-pgmid.
       dirty_line-object = e071_dirty_line-object.
       dirty_line-obj_name = e071_dirty_line-obj_name.
+      READ TABLE dirty TRANSPORTING NO FIELDS WITH KEY trkorr = dirty_line-trkorr pgmid = dirty_line-pgmid object = dirty_line-object obj_name = dirty_line-obj_name.
+      CHECK sy-subrc NE 0.
       APPEND dirty_line TO dirty.
     ENDLOOP.
 
