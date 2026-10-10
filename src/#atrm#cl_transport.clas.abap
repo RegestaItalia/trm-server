@@ -132,10 +132,11 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
-    "! Release the transport
+    "! Release the transport and wait until the update task has completed
+    "! the release (status O, R or N); the export may still be running.
     "! @parameter lock | Whether to lock objects before release
     "! @parameter messages | Messages from the release operation
-    "! @raising /atrm/cx_exception | Raised if release fails
+    "! @raising /atrm/cx_exception | Raised if release fails or the update task does not complete
     METHODS release
       IMPORTING lock     TYPE flag
       EXPORTING messages TYPE ctsgerrmsgs
@@ -224,6 +225,24 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
+    METHODS get_entries
+      EXPORTING e071   TYPE tyt_e071
+                tadir  TYPE scts_tadir
+                tdevc  TYPE /atrm/cl_core=>tyt_tdevc
+                tdevct TYPE /atrm/cl_core=>tyt_tdevct.
+    "! Wait until the release is really completed.
+    "! TRINT_RELEASE_REQUEST returns once the request is handed to the update
+    "! task; versioning and export run afterwards and can still fail.
+    "! @parameter timeout | Maximum wait in seconds
+    "! @parameter exported | Wait for the export too (R/N); otherwise return once the update task is done (O)
+    "! @parameter status | Final request status
+    "! @raising /atrm/cx_exception | Raised if not completed within timeout
+    METHODS wait_release
+      IMPORTING timeout       TYPE i DEFAULT 600
+                exported      TYPE abap_bool DEFAULT abap_true
+      RETURNING VALUE(status) TYPE trstatus
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS execute_import
@@ -240,6 +259,13 @@ CLASS /atrm/cl_transport DEFINITION
                 type             TYPE trfunction
                 attributes       TYPE scts_attrs OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
+      RAISING   /atrm/cx_exception.
+METHODS complete_shi3_entries
+      CHANGING e071  TYPE tyt_e071
+               e071k TYPE tyt_e071k
+      RAISING  /atrm/cx_exception.
+METHODS record_fdt0_entries
+      IMPORTING e071 TYPE tyt_e071
       RAISING   /atrm/cx_exception.
 
     DATA: gv_trkorr TYPE trkorr,
@@ -364,10 +390,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   METHOD add_objects.
     DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
           lt_e071       LIKE e071,
+          lt_e071k      TYPE tyt_e071k,
           ls_log        LIKE LINE OF log.
     MOVE e071[] TO lt_e071[].
     DELETE lt_e071 WHERE pgmid EQ 'CORR'. " no CORR allowed
     CHECK lt_e071[] IS NOT INITIAL. " silently exit
+    complete_shi3_entries( CHANGING e071 = lt_e071 e071k = lt_e071k ).
     enqueue( ).
     TRY.
         CALL FUNCTION 'TRINT_REQUEST_CHOICE'
@@ -381,6 +409,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             et_log               = log
           TABLES
             it_e071              = lt_e071
+            it_e071k             = lt_e071k
           EXCEPTIONS
             no_objects_appended  = 0
             invalid_request      = 1
@@ -420,6 +449,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         RAISE EXCEPTION lo_lock_error.
     ENDTRY.
     dequeue( ).
+    " BRF+ takes its own locks: record FDT0 applications after dequeue
+    record_fdt0_entries( lt_e071 ).
   ENDMETHOD.
 
   METHOD remove_comments.
@@ -553,9 +584,27 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
-    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          ls_request    TYPE trwbo_request.
     enqueue( ).
     TRY.
+        " Object locks of the request (e.g. a locked TRM landscape transport) block TR_DELETE_COMM
+        CALL FUNCTION 'TR_READ_REQUEST'
+          EXPORTING
+            iv_trkorr         = gv_trkorr
+            iv_read_e070      = 'X'
+            iv_read_objs_keys = 'X'
+          CHANGING
+            cs_request        = ls_request
+          EXCEPTIONS
+            OTHERS            = 1.
+        IF sy-subrc EQ 0.
+          CALL FUNCTION 'TRINT_UNLOCK_REQUEST'
+            CHANGING
+              cs_request = ls_request
+            EXCEPTIONS
+              OTHERS     = 1.
+        ENDIF.
         CALL FUNCTION 'TR_DELETE_COMM'
           EXPORTING
             wi_dialog = ' '
@@ -808,6 +857,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         RAISE EXCEPTION lo_lock_error.
     ENDTRY.
     dequeue( ).
+    " the release is completed asynchronously by the update task (versioning):
+    " a failure there leaves the request modifiable and its locks held, so
+    " don't report success before it is done (the export is not awaited)
+    wait_release( exported = abap_false ).
   ENDMETHOD.
 
   METHOD rename.
@@ -1390,4 +1443,170 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD get_entries.
+    DATA lt_packages TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY.
+    DATA lt_keys TYPE scts_tadir.
+    DATA ls_key LIKE LINE OF lt_keys.
+    FIELD-SYMBOLS <ls_e071> TYPE e071.
+
+    e071 = get_e071( ).
+
+    LOOP AT e071 ASSIGNING <ls_e071> WHERE pgmid = 'R3TR'.
+      CLEAR ls_key.
+      ls_key-pgmid = <ls_e071>-pgmid.
+      ls_key-object = <ls_e071>-object.
+      ls_key-obj_name = <ls_e071>-obj_name.
+      APPEND ls_key TO lt_keys.
+      IF <ls_e071>-object = 'DEVC'.
+        APPEND <ls_e071>-obj_name TO lt_packages.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT * FROM tadir
+        INTO CORRESPONDING FIELDS OF TABLE tadir
+        FOR ALL ENTRIES IN lt_keys
+        WHERE pgmid = lt_keys-pgmid
+          AND object = lt_keys-object
+          AND obj_name = lt_keys-obj_name.
+    ENDIF.
+
+    IF lt_packages IS NOT INITIAL.
+      SORT lt_packages.
+      DELETE ADJACENT DUPLICATES FROM lt_packages.
+      SELECT * FROM tdevc
+        INTO CORRESPONDING FIELDS OF TABLE tdevc
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+      SELECT * FROM tdevct
+        INTO CORRESPONDING FIELDS OF TABLE tdevct
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+    ENDIF.
+  ENDMETHOD.
+  METHOD complete_shi3_entries.
+    DATA: lt_shi3    TYPE tyt_e071,
+          ls_e071    TYPE e071,
+          lv_id      TYPE ttree-id,
+          ls_message TYPE hier_mess,
+          lt_objects TYPE tyt_e071,
+          lt_keys    TYPE tyt_e071k.
+    " STREE_BEFORE_EXPORT fails the release when a hierarchy header is recorded
+    " without its nodes (R3TR TABU keys): build the complete piece list, as SE43 does
+    lt_shi3 = e071.
+    DELETE lt_shi3 WHERE pgmid <> 'R3TR' OR object <> 'SHI3'.
+    CHECK lt_shi3 IS NOT INITIAL.
+    LOOP AT lt_shi3 INTO ls_e071.
+      lv_id = ls_e071-obj_name.
+      CLEAR: ls_message, lt_objects, lt_keys.
+      CALL FUNCTION 'STREE_INSERT_ALL_IN_TRANSPORT'
+        EXPORTING
+          structure_id               = lv_id
+          iv_return_objects_and_keys = 'X'
+        IMPORTING
+          message                    = ls_message
+        TABLES
+          et_objects                 = lt_objects
+          et_keys                    = lt_keys
+        EXCEPTIONS
+          error_message              = 1
+          OTHERS                     = 2.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      IF ls_message-msgid IS NOT INITIAL.
+        sy-msgid = ls_message-msgid.
+        sy-msgty = 'I'.
+        sy-msgno = ls_message-msgno.
+        sy-msgv1 = ls_message-msgv1.
+        sy-msgv2 = ls_message-msgv2.
+        sy-msgv3 = ls_message-msgv3.
+        sy-msgv4 = ls_message-msgv4.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      APPEND LINES OF lt_objects TO e071.
+      APPEND LINES OF lt_keys TO e071k.
+    ENDLOOP.
+    SORT e071 BY pgmid object obj_name.
+    DELETE ADJACENT DUPLICATES FROM e071 COMPARING pgmid object obj_name.
+    SORT e071k BY pgmid object objname mastertype mastername tabkey.
+    DELETE ADJACENT DUPLICATES FROM e071k COMPARING pgmid object objname mastertype mastername tabkey.
+  ENDMETHOD.
+  METHOD record_fdt0_entries.
+    DATA: ls_e071     TYPE e071,
+          lr_row      TYPE REF TO data,
+          lr_instance TYPE REF TO data,
+          lo_instance TYPE REF TO object,
+          lv_name     TYPE sobj_name,
+          lv_where    TYPE string,
+          lx_root     TYPE REF TO cx_root.
+    FIELD-SYMBOLS: <ls_row>      TYPE any,
+                   <lv_id>       TYPE any,
+                   <lo_instance> TYPE any.
+    " FDT0_BEFORE_EXPORT fails the release when the application is not also
+    " recorded under FDT0001/FDT0002: let BRF+ record it.
+    " BRF+ may not exist in the system, so everything is dynamic
+    LOOP AT e071 INTO ls_e071 WHERE pgmid = 'R3TR' AND object = 'FDT0'.
+      TRY.
+          CREATE DATA lr_row TYPE ('FDT_APPL_TADIR').
+          CREATE DATA lr_instance TYPE REF TO ('IF_FDT_ADMIN_DATA').
+        CATCH cx_sy_create_data_error.
+          RETURN. " BRF+ not available
+      ENDTRY.
+      ASSIGN lr_row->* TO <ls_row>.
+      ASSIGN lr_instance->* TO <lo_instance>.
+      lv_name = ls_e071-obj_name.
+      REPLACE ALL OCCURRENCES OF '''' IN lv_name WITH ''''''.
+      CONCATENATE 'NAME = ''' lv_name '''' INTO lv_where.
+      SELECT SINGLE * FROM ('FDT_APPL_TADIR') INTO <ls_row> WHERE (lv_where).
+      CHECK sy-subrc = 0.
+      ASSIGN COMPONENT 'ID' OF STRUCTURE <ls_row> TO <lv_id>.
+      CHECK sy-subrc = 0.
+      TRY.
+          CALL METHOD ('CL_FDT_FACTORY')=>('GET_INSTANCE_GENERIC')
+            EXPORTING
+              iv_id       = <lv_id>
+            IMPORTING
+              eo_instance = <lo_instance>.
+          lo_instance = <lo_instance>.
+          CALL METHOD lo_instance->('IF_FDT_TRANSACTION~TRANSPORT')
+            EXPORTING
+              iv_deep              = abap_true
+              iv_transport_request = gv_trkorr.
+        CATCH cx_root INTO lx_root.
+          /atrm/cx_exception=>raise( io_root = lx_root ).
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+  METHOD wait_release.
+    DATA: lv_waited  TYPE i,
+          lv_message TYPE string.
+    DO.
+      SELECT SINGLE trstatus FROM e070 INTO status WHERE trkorr = gv_trkorr.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( iv_message = 'Transport not found' "#EC NOTEXT
+                                   iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
+      ENDIF.
+      IF status = 'R' OR status = 'N'.
+        RETURN.
+      ENDIF.
+      " O: the update task is done, tp export still running
+      IF status = 'O' AND exported = abap_false.
+        RETURN.
+      ENDIF.
+      IF lv_waited >= timeout.
+        EXIT.
+      ENDIF.
+      " WAIT also ends the DB LUW, so the next SELECT sees the update task's commit
+      WAIT UP TO 5 SECONDS.
+      lv_waited = lv_waited + 5.
+    ENDDO.
+    IF status = 'O'.
+      lv_message = 'Release started but export not finished, check tp logs'. "#EC NOTEXT
+    ELSE.
+      lv_message = 'Release not completed, check update task (SM13)'. "#EC NOTEXT
+    ENDIF.
+    /atrm/cx_exception=>raise( iv_message = lv_message
+                               iv_reason  = /atrm/cx_exception=>c_reason-generic ).
+  ENDMETHOD.
 ENDCLASS.

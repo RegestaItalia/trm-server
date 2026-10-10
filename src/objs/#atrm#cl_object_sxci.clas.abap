@@ -19,7 +19,8 @@ CLASS /atrm/cl_object_sxci IMPLEMENTATION.
       lv_exit_name TYPE rsexscrn-exit_name,
       lv_impl_class TYPE seoclsname,
       lv_interface TYPE seoclsname,
-      lv_enhancement TYPE sobj_name,
+      lv_name TYPE string,
+      lv_where TYPE string,
       ls_dependency TYPE /atrm/object_dependency.
 
     TRY.
@@ -73,26 +74,33 @@ CLASS /atrm/cl_object_sxci IMPLEMENTATION.
               " optional dependency may not exist in the target system
           ENDTRY.
         ENDIF.
-
-        SELECT SINGLE mig_enhname
-          FROM sxc_attr
-          INTO lv_enhancement
-          WHERE imp_name = lv_impl_name
-            AND version = 'A'.
-        IF lv_enhancement IS NOT INITIAL.
-          TRY.
-              CLEAR ls_dependency.
-              CALL METHOD get_tadir_dependency
-                EXPORTING object = 'ENHO' obj_name = lv_enhancement
-                RECEIVING dependency = ls_dependency.
-              APPEND ls_dependency TO dependencies.
-            CATCH cx_root.
-              " optional dependency may not exist in the target system
-          ENDTRY.
-        ENDIF.
       CATCH cx_root.
         " optional classic BAdI API may not exist in the target system
     ENDTRY.
+
+    lv_name = me->key-obj_name.
+    REPLACE ALL OCCURRENCES OF `'` IN lv_name WITH `''`.
+
+    " Migration enhancement implementation (active rows have VERSION blank or A)
+    CONCATENATE `IMP_NAME = '` lv_name `' AND ( VERSION = ' ' OR VERSION = 'A' )` INTO lv_where.
+    append_table_dependencies(
+      EXPORTING table_name   = 'SXC_ATTR'
+                where_clause = lv_where
+                object_field = 'MIG_ENHNAME'
+                object_type  = 'ENHO'
+      CHANGING  dependencies = dependencies ).
+
+    " Subscreen implementing program
+    CONCATENATE `IMP_NAME = '` lv_name `'` INTO lv_where.
+    append_table_dependencies(
+      EXPORTING table_name   = 'SXC_SCRN'
+                where_clause = lv_where
+                object_field = 'SCR_P_PROG'
+                object_type  = 'PROG'
+      CHANGING  dependencies = dependencies ).
+
+    SORT dependencies BY tabname tabkey.
+    DELETE ADJACENT DUPLICATES FROM dependencies COMPARING tabname tabkey.
   ENDMETHOD.
 
 ENDCLASS.
