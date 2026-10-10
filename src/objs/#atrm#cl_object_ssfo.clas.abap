@@ -52,8 +52,7 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
         lo_factory = lo_ixml->create_stream_factory( ).
         lo_stream = lo_factory->create_ostream_cstring( string = lv_xml ).
         lo_renderer = lo_ixml->create_renderer( document = lo_doc
-                                               ostream = lo_stream
-                                               stream_factory = lo_factory ).
+                                               ostream = lo_stream ).
         IF lo_renderer->render( ) <> 0.
           RETURN.
         ENDIF.
