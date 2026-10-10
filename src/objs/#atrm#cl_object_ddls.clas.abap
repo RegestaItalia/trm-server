@@ -10,6 +10,8 @@ ENDCLASS.
 
 CLASS /atrm/cl_object_ddls IMPLEMENTATION.
   METHOD /atrm/if_object~get_dependencies.
+    TYPES ty_targets TYPE STANDARD TABLE OF string WITH DEFAULT KEY.
+
     DATA: lv_name       TYPE string,
           lv_where      TYPE string,
           lv_table      TYPE tabname,
@@ -20,7 +22,7 @@ CLASS /atrm/cl_object_ddls IMPLEMENTATION.
           lt_results    TYPE match_result_tab,
           ls_result     TYPE match_result,
           ls_submatch   TYPE submatch_result,
-          lt_targets    TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
+          lt_targets    TYPE ty_targets,
           lr_rows       TYPE REF TO data,
           ls_dependency TYPE /atrm/object_dependency.
 
@@ -50,15 +52,15 @@ CLASS /atrm/cl_object_ddls IMPLEMENTATION.
     CHECK lv_source IS NOT INITIAL.
 
     " Remove comments, normalize case
-    REPLACE ALL OCCURRENCES OF PCRE `/\*[\s\S]*?\*/` IN lv_source WITH ` `.
-    REPLACE ALL OCCURRENCES OF PCRE `//[^\n]*` IN lv_source WITH ` `.
+    REPLACE ALL OCCURRENCES OF REGEX `/\*([^*]|\*+[^*/])*\*+/` IN lv_source WITH ` `.
+    REPLACE ALL OCCURRENCES OF REGEX `//[^\n]*` IN lv_source WITH ` `.
     TRANSLATE lv_source TO UPPER CASE.
 
     " Data sources, joins, association and composition targets
-    FIND ALL OCCURRENCES OF PCRE `\b(?:FROM|JOIN|TO|OF)\s+(?:PARENT\s+)?([/A-Z0-9_]+)`
+    FIND ALL OCCURRENCES OF REGEX `(^|[^/A-Z0-9_])(FROM|JOIN|TO|OF)[[:space:]]+(PARENT[[:space:]]+)?([/A-Z0-9_]+)`
       IN lv_source RESULTS lt_results.
     LOOP AT lt_results INTO ls_result.
-      READ TABLE ls_result-submatches INTO ls_submatch INDEX 1.
+      READ TABLE ls_result-submatches INTO ls_submatch INDEX 4.
       CHECK sy-subrc = 0 AND ls_submatch-length > 0.
       lv_target = lv_source+ls_submatch-offset(ls_submatch-length).
       CHECK lv_target <> me->key-obj_name.

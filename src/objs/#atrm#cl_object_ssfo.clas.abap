@@ -30,6 +30,8 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
       lo_ixml    TYPE REF TO if_ixml,
       lo_doc     TYPE REF TO if_ixml_document,
       lo_stream  TYPE REF TO if_ixml_ostream,
+      lo_factory TYPE REF TO if_ixml_stream_factory,
+      lo_renderer TYPE REF TO if_ixml_renderer,
       lv_xml     TYPE string,
       lt_results TYPE match_result_tab,
       lv_value   TYPE string.
@@ -47,8 +49,14 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
         lo_doc = lo_ixml->create_document( ).
         lo_form->xml_download( EXPORTING parent   = lo_doc
                                CHANGING  document = lo_doc ).
-        lo_stream = lo_ixml->create_stream_factory( )->create_ostream_cstring( string = lv_xml ).
-        lo_doc->render( ostream = lo_stream ).
+        lo_factory = lo_ixml->create_stream_factory( ).
+        lo_stream = lo_factory->create_ostream_cstring( string = lv_xml ).
+        lo_renderer = lo_ixml->create_renderer( document = lo_doc
+                                               ostream = lo_stream
+                                               stream_factory = lo_factory ).
+        IF lo_renderer->render( ) <> 0.
+          RETURN.
+        ENDIF.
       CATCH cx_root.
         RETURN.
     ENDTRY.
