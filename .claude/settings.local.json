@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__arc-1__SAPWrite",
+      "mcp__arc-1__SAPActivate",
+      "mcp__arc-1__SAPTransport"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "arc-1"
+  ]
+}
