@@ -279,9 +279,11 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       EXCEPTIONS
         OTHERS             = 1.
     IF sy-subrc <> 0.
-      IF sy-msgid EQ 'TO' AND ( sy-msgno EQ '123' OR sy-msgno EQ '140' ).
+      IF sy-msgid EQ 'TO' AND ( sy-msgno EQ '123' OR sy-msgno EQ '140' OR sy-msgno EQ '131' OR sy-msgno EQ '124' ).
         " 123: changes to an object that has a namespace not in system
         " 140: changes to an object without the right namespace
+        " 131: test objects cannot be created in foreign namespaces
+        " 124: object cannot be assigned to package (e.g. namespaced object in a customer package)
         DATA: trint_devclass  LIKE devclass,
               trint_srcsystem LIKE srcsystem,
               trint_author    LIKE author.
