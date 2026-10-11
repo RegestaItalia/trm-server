@@ -14,7 +14,12 @@ ENDCLASS.
 CLASS /atrm/cl_object_cgrc IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
-    " empty implementation
+    CALL METHOD append_lrep_dependencies
+      EXPORTING
+        object_type = 'CGRC'
+        object_name = me->key-obj_name
+      CHANGING
+        dependencies = dependencies.
   ENDMETHOD.
 
 ENDCLASS.

@@ -215,7 +215,7 @@ CLASS lcl_trm_transport IMPLEMENTATION.
       FIELD-SYMBOLS: <fs_trkorr_doktl>      TYPE ty_doktl,
                      <fs_trkorr_doktl_line> TYPE ty_doktl_line,
                      <fs_doc>               TYPE ty_documentation.
-      SELECT langu dokversion line doktext FROM doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE id EQ 'TA' AND object EQ trkorr.
+      SELECT langu dokversion line doktext FROM doktl INTO CORRESPONDING FIELDS OF TABLE lt_doktl WHERE id EQ 'TA' AND object EQ trkorr ORDER BY langu dokversion line.
       LOOP AT lt_doktl INTO ls_doktl.
         UNASSIGN <fs_trkorr_doktl>.
         UNASSIGN <fs_trkorr_doktl_line>.

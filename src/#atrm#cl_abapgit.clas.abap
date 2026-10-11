@@ -55,7 +55,7 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
     IF lo_repo IS NOT BOUND.
       /atrm/cx_exception=>raise(
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
-        iv_message = 'Repository for package ' && devclass && ' not found'
+        iv_message = 'Repository for package ' && devclass && ' not found' "#EC NOTEXT
       ).
     ENDIF.
     dot_abapgit = lo_repo->get_dot_abapgit( )->serialize( ).

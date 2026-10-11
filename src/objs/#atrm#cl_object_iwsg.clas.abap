@@ -14,7 +14,31 @@ ENDCLASS.
 CLASS /atrm/cl_object_iwsg IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
-    " empty implementation
+    DATA:
+      lv_name  TYPE sobj_name,
+      lv_where TYPE string.
+
+    lv_name = me->key-obj_name.
+    REPLACE ALL OCCURRENCES OF '''' IN lv_name WITH ''''''.
+    CONCATENATE 'SRV_IDENTIFIER = ''' lv_name '''' INTO lv_where.
+
+    CALL METHOD append_table_dependencies
+      EXPORTING
+        table_name   = '/IWFND/I_MED_SRG'
+        where_clause = lv_where
+        object_field = 'MODEL_IDENTIFIER'
+        object_type  = 'IWOM'
+      CHANGING
+        dependencies = dependencies.
+
+    CALL METHOD append_table_dependencies
+      EXPORTING
+        table_name   = '/IWFND/I_MED_SRG'
+        where_clause = lv_where
+        object_field = 'EXT_SERVICE_ID'
+        object_type  = 'IWSV'
+      CHANGING
+        dependencies = dependencies.
   ENDMETHOD.
 
 ENDCLASS.

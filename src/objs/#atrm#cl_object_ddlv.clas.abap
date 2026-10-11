@@ -14,7 +14,7 @@ ENDCLASS.
 CLASS /atrm/cl_object_ddlv IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
-    " empty implementation
+    " object cannot have dependencies
   ENDMETHOD.
 
 ENDCLASS.

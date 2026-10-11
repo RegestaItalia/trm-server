@@ -14,7 +14,11 @@ ENDCLASS.
 CLASS /atrm/cl_object_sdat IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
-    " empty implementation
+    DATA: lv_name TYPE sobj_name, lv_where TYPE string.
+    lv_name = me->key-obj_name.
+    REPLACE ALL OCCURRENCES OF '''' IN lv_name WITH ''''''.
+    CONCATENATE 'TABNAME = ''' lv_name '''' INTO lv_where.
+    CALL METHOD append_table_dependencies EXPORTING table_name = 'TDDAT_SAP' where_clause = lv_where object_field = 'TABNAME' object_type = 'TABL' CHANGING dependencies = dependencies.
   ENDMETHOD.
 
 ENDCLASS.

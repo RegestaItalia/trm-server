@@ -8,6 +8,7 @@ CLASS /atrm/cl_utilities DEFINITION
     TYPES: tyt_ko100       TYPE STANDARD TABLE OF ko100 WITH DEFAULT KEY,
            tyt_tadir       TYPE STANDARD TABLE OF tadir WITH DEFAULT KEY,
            tyt_installdevc TYPE STANDARD TABLE OF /atrm/instdevc WITH DEFAULT KEY,
+           tyt_installtr   TYPE STANDARD TABLE OF /atrm/installtr WITH DEFAULT KEY,
            tyt_trnspacett  TYPE STANDARD TABLE OF trnspacett WITH DEFAULT KEY.
 
     "! Check if current user is authorized to execute TRM functions
@@ -59,6 +60,16 @@ CLASS /atrm/cl_utilities DEFINITION
     "! @parameter installdevc | Devclasses to add
     CLASS-METHODS add_install_devclass
       IMPORTING installdevc TYPE tyt_installdevc
+      RAISING   /atrm/cx_exception.
+
+    "! Replace the transports recorded for an installed TRM package
+    "! @parameter package_name     | Package name
+    "! @parameter package_registry | Package registry
+    "! @parameter installtr        | Transports imported by the installation
+    CLASS-METHODS set_install_transports
+      IMPORTING package_name     TYPE /atrm/package_name
+                package_registry TYPE /atrm/package_registry
+                installtr        TYPE tyt_installtr
       RAISING   /atrm/cx_exception.
 
     "! Wrapper for TR_TADIR_INTERFACE to register objects in the TADIR table
@@ -114,6 +125,30 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING package TYPE /atrm/packages
       RAISING   /atrm/cx_exception.
 
+    "! Restore (or remove) a package record with its install devclasses and transports, in one LUW
+    "! @parameter package        | Package data
+    "! @parameter package_exists | 'X' to write the package record, ' ' to delete it
+    "! @parameter installdevc    | Install devclasses replacing the current ones
+    "! @parameter installtr      | Install transports replacing the current ones
+    METHODS restore_install_metadata
+      IMPORTING package        TYPE /atrm/packages
+                package_exists TYPE flag
+                installdevc    TYPE tyt_installdevc
+                installtr      TYPE tyt_installtr OPTIONAL
+      RAISING   /atrm/cx_exception.
+    "! Delete install devclasses from TRM install devclass list
+    "! @parameter installdevc | Devclasses to delete (key fields are used)
+    CLASS-METHODS delete_install_devclass
+      IMPORTING installdevc TYPE tyt_installdevc
+      RAISING   /atrm/cx_exception.
+    "! Get the system ID of the system reached through an RFC destination
+    "! @parameter rfcdest | RFC destination (NONE = current system)
+    "! @parameter dest    | System ID
+    CLASS-METHODS get_dest
+      IMPORTING rfcdest     TYPE rfcdest DEFAULT 'NONE'
+      RETURNING VALUE(dest) TYPE sysysid
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS enqueue
@@ -131,9 +166,10 @@ ENDCLASS.
 CLASS /atrm/cl_utilities IMPLEMENTATION.
 
   METHOD check_functions_authorization.
-    CLEAR authorized.
-    SELECT COUNT( * ) FROM /atrm/users WHERE uname = sy-uname.
-    IF sy-dbcnt EQ 1.
+    AUTHORITY-CHECK OBJECT 'ZTRM_AUTH' ID 'ACTVT' FIELD '16'.
+    IF sy-subrc <> 0.
+      CLEAR authorized.
+    ELSE.
       authorized = 'X'.
     ENDIF.
   ENDMETHOD.
@@ -155,31 +191,54 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD dequeue.
     CALL FUNCTION 'DEQUEUE_E_TABLE'
       EXPORTING
-        mode_rstable   = mode_rstable
-        tabname        = tabname
-      EXCEPTIONS
-        foreign_lock   = 1
-        system_failure = 2
-        OTHERS         = 3.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dequeue_error ).
-    ENDIF.
+        mode_rstable = mode_rstable
+        tabname      = tabname.
   ENDMETHOD.
 
   METHOD get_binary_file.
-    OPEN DATASET file_path FOR INPUT IN BINARY MODE.
-    READ DATASET file_path INTO file.
+    DATA: lv_subrc   TYPE sysubrc,
+          lv_os_msg  TYPE c LENGTH 255,
+          lv_message TYPE string,
+          lo_file    TYPE REF TO cx_sy_file_access_error.
+    TRY.
+        OPEN DATASET file_path FOR INPUT IN BINARY MODE MESSAGE lv_os_msg.
+        lv_subrc = sy-subrc.
+      CATCH cx_sy_file_access_error INTO lo_file.
+        /atrm/cx_exception=>raise( io_root = lo_file ).
+    ENDTRY.
+    IF lv_subrc <> 0.
+      "file does not exist or cannot be opened at OS level
+      CONCATENATE 'File' file_path 'not found' INTO lv_message SEPARATED BY space. "#EC NOTEXT
+      IF lv_os_msg IS NOT INITIAL.
+        CONCATENATE lv_message ' (' lv_os_msg ')' INTO lv_message.
+      ENDIF.
+      /atrm/cx_exception=>raise( iv_message = lv_message
+                                iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
+    ENDIF.
+    TRY.
+        READ DATASET file_path INTO file.
+        lv_subrc = sy-subrc.
+      CATCH cx_sy_file_access_error INTO lo_file.
+        CLOSE DATASET file_path.
+        /atrm/cx_exception=>raise( io_root = lo_file ).
+    ENDTRY.
     CLOSE DATASET file_path.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
+    IF lv_subrc <> 0.
+      CONCATENATE 'Couldn''t read file' file_path INTO lv_message SEPARATED BY space. "#EC NOTEXT
+      /atrm/cx_exception=>raise( iv_message = lv_message ).
     ENDIF.
   ENDMETHOD.
 
   METHOD write_binary_file.
+    DATA lv_subrc TYPE sysubrc.
     OPEN DATASET file_path FOR OUTPUT IN BINARY MODE.
-    TRANSFER file TO file_path.
-    CLOSE DATASET file_path.
     IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    TRANSFER file TO file_path.
+    lv_subrc = sy-subrc.
+    CLOSE DATASET file_path.
+    IF lv_subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
   ENDMETHOD.
@@ -202,7 +261,7 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
   METHOD get_file_sys.
     SELECT SINGLE filesys INTO file_sys FROM opsystem WHERE opsys = sy-opsys.
     IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( iv_message = 'File system not found'
+      /atrm/cx_exception=>raise( iv_message = 'File system not found' "#EC NOTEXT
                                 iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
     ENDIF.
   ENDMETHOD.
@@ -269,8 +328,11 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       EXCEPTIONS
         OTHERS             = 1.
     IF sy-subrc <> 0.
-      IF sy-msgid EQ 'TO' AND sy-msgno EQ '123'.
-        " changes to an object that has a namespace not in system
+      IF sy-msgid EQ 'TO' AND ( sy-msgno EQ '123' OR sy-msgno EQ '140' OR sy-msgno EQ '131' OR sy-msgno EQ '124' ).
+        " 123: changes to an object that has a namespace not in system
+        " 140: changes to an object without the right namespace
+        " 131: test objects cannot be created in foreign namespaces
+        " 124: object cannot be assigned to package (e.g. namespaced object in a customer package)
         DATA: trint_devclass  LIKE devclass,
               trint_srcsystem LIKE srcsystem,
               trint_author    LIKE author.
@@ -356,9 +418,9 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
            END OF ty_result.
     DATA: cmd    TYPE ty_cmd,
           result TYPE STANDARD TABLE OF ty_result.
-    cmd = 'R3trans'.
+    cmd = 'R3trans'.                                        "#EC NOTEXT
     CALL 'SYSTEM' ID 'COMMAND' FIELD cmd
-                  ID 'TAB'     FIELD result.
+                  ID 'TAB'     FIELD result.         "#EC CI_SYSTEMCALL
     IF sy-subrc <> 12. "Fatal errors have occurred, R3trans sets to 12 when running without options
       /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-r3trans_cmd_error ).
     ENDIF.
@@ -372,17 +434,19 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           ls_ascii     LIKE LINE OF lt_ascii_tab,
           lv_lines     TYPE i,
           ls_message   LIKE LINE OF messages.
-    FIELD-SYMBOLS <fs_msg> TYPE symsg.
     CALL FUNCTION 'LIST_FROM_MEMORY'
       TABLES
         listobject = lt_list_tab
       EXCEPTIONS
         not_found  = 1
         OTHERS     = 2.
-    CALL FUNCTION 'LIST_FREE_MEMORY'
-      EXCEPTIONS
-        error_message = 1
-        OTHERS        = 2.
+    IF sy-subrc <> 0.
+      CALL FUNCTION 'LIST_FREE_MEMORY'
+        EXCEPTIONS
+          error_message = 0
+          OTHERS        = 0.
+      RETURN.
+    ENDIF.
     CALL FUNCTION 'LIST_TO_ASCI'
       TABLES
         listasci           = lt_ascii_tab
@@ -392,8 +456,15 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
         list_index_invalid = 2
         error_message      = 3
         OTHERS             = 4.
+    IF sy-subrc <> 0.
+      CLEAR lt_ascii_tab.
+    ENDIF.
+    CALL FUNCTION 'LIST_FREE_MEMORY'
+      EXCEPTIONS
+        error_message = 0
+        OTHERS        = 0.
     DESCRIBE TABLE lt_ascii_tab LINES lv_lines.
-    IF lv_lines GE 3. " remove report header
+    IF lv_lines GE 3.
       READ TABLE lt_ascii_tab INTO ls_ascii INDEX 2.
       IF '-' CO ls_ascii-line.
         DELETE lt_ascii_tab FROM 1 TO 3.
@@ -463,10 +534,85 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           lo_badi TYPE REF TO /atrm/trm_package_data.
     enqueue( tabname = '/ATRM/PACKAGES' ).
     MODIFY /atrm/packages FROM package.
-    COMMIT WORK AND WAIT.
     subrc = sy-subrc.
-    dequeue( tabname = '/ATRM/PACKAGES' ).
     IF subrc EQ 0.
+      COMMIT WORK AND WAIT.
+    ENDIF.
+    dequeue( tabname = '/ATRM/PACKAGES' ).
+    IF subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    TRY.
+        GET BADI lo_badi.
+        CALL BADI lo_badi->trm_packages_change
+          EXPORTING
+            data = package.
+      CATCH cx_badi_not_implemented cx_badi_initial_reference.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD restore_install_metadata.
+    DATA: ls_installdevc LIKE LINE OF installdevc,
+          ls_installtr   LIKE LINE OF installtr,
+          lo_badi        TYPE REF TO /atrm/trm_package_data.
+
+    enqueue( tabname = '/ATRM/PACKAGES' ).
+    enqueue( tabname = '/ATRM/INSTDEVC' ).
+    enqueue( tabname = '/ATRM/INSTALLTR' ).
+
+    IF package_exists EQ 'X'.
+      MODIFY /atrm/packages FROM package.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ELSE.
+      DELETE FROM /atrm/packages
+        WHERE package_name = package-package_name
+          AND package_registry = package-package_registry.
+    ENDIF.
+
+    DELETE FROM /atrm/instdevc
+      WHERE package_name = package-package_name
+        AND package_registry = package-package_registry.
+
+    LOOP AT installdevc INTO ls_installdevc.
+      MODIFY /atrm/instdevc FROM ls_installdevc.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+
+    DELETE FROM /atrm/installtr
+      WHERE package_name = package-package_name
+        AND package_registry = package-package_registry.
+
+    LOOP AT installtr INTO ls_installtr.
+      ls_installtr-package_name = package-package_name.
+      ls_installtr-package_registry = package-package_registry.
+      MODIFY /atrm/installtr FROM ls_installtr.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        dequeue( tabname = '/ATRM/INSTDEVC' ).
+        dequeue( tabname = '/ATRM/PACKAGES' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTALLTR' ).
+    dequeue( tabname = '/ATRM/INSTDEVC' ).
+    dequeue( tabname = '/ATRM/PACKAGES' ).
+
+    IF package_exists = 'X'.
       TRY.
           GET BADI lo_badi.
           CALL BADI lo_badi->trm_packages_change
@@ -477,4 +623,44 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
 
+  METHOD set_install_transports.
+    DATA ls_installtr LIKE LINE OF installtr.
+    enqueue( tabname = '/ATRM/INSTALLTR' ).
+    DELETE FROM /atrm/installtr
+      WHERE package_name = package_name
+        AND package_registry = package_registry.
+    LOOP AT installtr INTO ls_installtr.
+      ls_installtr-package_name = package_name.
+      ls_installtr-package_registry = package_registry.
+      MODIFY /atrm/installtr FROM ls_installtr.
+      IF sy-subrc <> 0.
+        ROLLBACK WORK.
+        dequeue( tabname = '/ATRM/INSTALLTR' ).
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+    ENDLOOP.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTALLTR' ).
+  ENDMETHOD.
+  METHOD delete_install_devclass.
+    IF installdevc IS INITIAL.
+      RETURN.
+    ENDIF.
+    enqueue( tabname = '/ATRM/INSTDEVC' ).
+    DELETE /atrm/instdevc FROM TABLE installdevc.
+    COMMIT WORK AND WAIT.
+    dequeue( tabname = '/ATRM/INSTDEVC' ).
+  ENDMETHOD.
+  METHOD get_dest.
+    DATA ls_rfcsi TYPE rfcsi.
+    CALL FUNCTION 'RFC_SYSTEM_INFO' DESTINATION rfcdest
+      IMPORTING
+        rfcsi_export = ls_rfcsi
+      EXCEPTIONS
+        OTHERS       = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+    dest = ls_rfcsi-rfcsysid.
+  ENDMETHOD.
 ENDCLASS.

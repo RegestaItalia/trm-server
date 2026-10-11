@@ -1,8 +1,12 @@
 FUNCTION /atrm/set_install_devc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(PACKAGE) TYPE  /ATRM/PACKAGES OPTIONAL
+*"     VALUE(PACKAGE_EXISTS) TYPE  FLAG OPTIONAL
 *"  TABLES
 *"      INSTALLDEVC STRUCTURE  /ATRM/INSTDEVC
+*"      INSTALLTR STRUCTURE  /ATRM/INSTALLTR OPTIONAL
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED
 *"      INVALID_INPUT
@@ -10,13 +14,26 @@ FUNCTION /atrm/set_install_devc.
 *"      DEQUEUE_ERROR
 *"      GENERIC
 *"----------------------------------------------------------------------
+  DATA lo_utilities TYPE REF TO /atrm/cl_utilities.
+
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>add_install_devclass(
-      EXPORTING
-        installdevc = installdevc[]
-    ).
+    IF package IS SUPPLIED.
+      CREATE OBJECT lo_utilities.
+      lo_utilities->restore_install_metadata(
+        EXPORTING
+          package        = package
+          package_exists = package_exists
+          installdevc    = installdevc[]
+          installtr      = installtr[]
+      ).
+    ELSE.
+      /atrm/cl_utilities=>add_install_devclass(
+        EXPORTING
+          installdevc = installdevc[]
+      ).
+    ENDIF.
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

@@ -1,4 +1,5 @@
 "! Transport API
+"! Transport API
 CLASS /atrm/cl_transport DEFINITION
   PUBLIC
   FINAL
@@ -10,11 +11,6 @@ CLASS /atrm/cl_transport DEFINITION
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
-    CONSTANTS:
-      c_migrate_nr_range_nr TYPE nrnr   VALUE '00',
-      c_migrate_object      TYPE nrobj  VALUE '/ATRM/TRNR',
-      c_migrate_subobj      TYPE nrsobj VALUE space,
-      c_migrate_toyear      TYPE nryear VALUE '0000'.
 
     "! Constructor
     "! @parameter trkorr | Transport request number
@@ -126,17 +122,21 @@ CLASS /atrm/cl_transport DEFINITION
                 import_again TYPE flag
       RAISING   /atrm/cx_exception.
 
-    "! Import the transport into a system
+    "! Import the transport into a system asynchronously
     "! @parameter system | Target system name
+    "! @parameter test   | Test import
     "! @raising /atrm/cx_exception | Raised if import fails
     METHODS import
-      IMPORTING system TYPE tmssysnam
+      IMPORTING system        TYPE tmssysnam
+                test          TYPE stms_flag
+      RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
-    "! Release the transport
+    "! Release the transport and wait until the update task has completed
+    "! the release (status O, R or N); the export may still be running.
     "! @parameter lock | Whether to lock objects before release
     "! @parameter messages | Messages from the release operation
-    "! @raising /atrm/cx_exception | Raised if release fails
+    "! @raising /atrm/cx_exception | Raised if release fails or the update task does not complete
     METHODS release
       IMPORTING lock     TYPE flag
       EXPORTING messages TYPE ctsgerrmsgs
@@ -203,8 +203,56 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(stat) TYPE tpstat
       RAISING   /atrm/cx_exception.
 
+    "! Sort and compress transport objects
+    "! @raising /atrm/cx_exception | Raised on error
+    METHODS sort_and_compress
+      RAISING /atrm/cx_exception.
+
+    "! Lock all objects in the transport
+    "! @raising /atrm/cx_exception | Raised on error
+    METHODS lock
+      RAISING /atrm/cx_exception.
+
+    "! Import multiple transports (in batch)
+    "! @parameter system       | Target system name
+    "! @parameter transports   | List of transport requests
+    "! @parameter test         | Test import
+    "! @raising /atrm/cx_exception | Raised if import fails
+    CLASS-METHODS import_multiple
+      IMPORTING system        TYPE tmssysnam
+                transports    TYPE /atrm/trkorr_t
+                test          TYPE stms_flag
+      RETURNING VALUE(import) TYPE stms_tp_import
+      RAISING   /atrm/cx_exception.
+
+    METHODS get_entries
+      EXPORTING e071   TYPE tyt_e071
+                tadir  TYPE scts_tadir
+                tdevc  TYPE /atrm/cl_core=>tyt_tdevc
+                tdevct TYPE /atrm/cl_core=>tyt_tdevct.
+    "! Wait until the release is really completed.
+    "! TRINT_RELEASE_REQUEST returns once the request is handed to the update
+    "! task; versioning and export run afterwards and can still fail.
+    "! @parameter timeout | Maximum wait in seconds
+    "! @parameter exported | Wait for the export too (R/N); otherwise return once the update task is done (O)
+    "! @parameter status | Final request status
+    "! @raising /atrm/cx_exception | Raised if not completed within timeout
+    METHODS wait_release
+      IMPORTING timeout       TYPE i DEFAULT 600
+                exported      TYPE abap_bool DEFAULT abap_true
+      RETURNING VALUE(status) TYPE trstatus
+      RAISING   /atrm/cx_exception.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
+    CLASS-METHODS execute_import
+      IMPORTING system        TYPE tmssysnam
+                transport     TYPE trkorr
+                test          TYPE stms_flag
+                requests      TYPE stms_tr_requests OPTIONAL
+      RETURNING VALUE(import) TYPE stms_tp_import
+      RAISING   /atrm/cx_exception.
+
     CLASS-METHODS create
       IMPORTING text             TYPE as4text
                 target           TYPE tr_target
@@ -212,11 +260,21 @@ CLASS /atrm/cl_transport DEFINITION
                 attributes       TYPE scts_attrs OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
+METHODS complete_shi3_entries
+      CHANGING e071  TYPE tyt_e071
+               e071k TYPE tyt_e071k
+      RAISING  /atrm/cx_exception.
+METHODS record_fdt0_entries
+      IMPORTING e071 TYPE tyt_e071
+      RAISING   /atrm/cx_exception.
 
     DATA: gv_trkorr TYPE trkorr,
           gt_e071   TYPE tyt_e071,
           gt_e071k  TYPE tyt_e071k.
 ENDCLASS.
+
+
+
 
 
 
@@ -231,184 +289,232 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_translations.
-    DATA: lt_langs   TYPE TABLE OF lxeisolang,
-          wa_langs   LIKE LINE OF lt_langs,
-          lo_explang TYPE REF TO cl_lxe_log_export,
-          lt_date    TYPE lxe_tt_date,
-          lv_ret_cnt TYPE i,
-          lt_objct   TYPE lxe_tt_objct,
-          lt_user    TYPE lxe_tt_user,
-          lt_comp    TYPE lxe_tt_comp.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        DATA: lt_langs   TYPE TABLE OF lxeisolang,
+              wa_langs   LIKE LINE OF lt_langs,
+              lo_explang TYPE REF TO cl_lxe_log_export,
+              lt_date    TYPE lxe_tt_date,
+              lv_ret_cnt TYPE i,
+              lt_objct   TYPE lxe_tt_objct,
+              lt_user    TYPE lxe_tt_user,
+              lt_comp    TYPE lxe_tt_comp.
 
-    IF devclass[] IS INITIAL.
-      /atrm/cx_exception=>raise( iv_message = 'No input packages defined'
-                                iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
-    ENDIF.
+        IF devclass[] IS INITIAL.
+          /atrm/cx_exception=>raise( iv_message = 'No input packages defined' "#EC NOTEXT
+                                    iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
+        ENDIF.
 
-    SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ cl_lxe_constants=>c_trl_area_local.
+        SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ cl_lxe_constants=>c_trl_area_local.
 
-    LOOP AT lt_langs INTO wa_langs.
-      CALL FUNCTION 'LXE_T002_CHECK_LANGUAGE'
-        EXPORTING
-          language           = wa_langs
-        EXCEPTIONS
-          language_not_in_cp = 1
-          unknown            = 2
-          OTHERS             = 3.
+        LOOP AT lt_langs INTO wa_langs.
+          CALL FUNCTION 'LXE_T002_CHECK_LANGUAGE'
+            EXPORTING
+              language           = wa_langs
+            EXCEPTIONS
+              language_not_in_cp = 1
+              unknown            = 2
+              OTHERS             = 3.
 
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
+          IF sy-subrc <> 0.
+            /atrm/cx_exception=>raise( ).
+          ENDIF.
 
-      CLEAR lo_explang.
+          CLEAR lo_explang.
 
-      CREATE OBJECT lo_explang TYPE cl_lxe_log_export_local
-        EXPORTING
-          custmnr = cl_lxe_constants=>c_trl_area_local
-          isolang = wa_langs.
+          CREATE OBJECT lo_explang TYPE cl_lxe_log_export_local
+            EXPORTING
+              custmnr = cl_lxe_constants=>c_trl_area_local
+              isolang = wa_langs.
 
-      DATA ls_date LIKE LINE OF lt_date.
-      ls_date-sign = 'I'.
-      ls_date-option = 'LE'.
-      ls_date-low = sy-datum.
-      APPEND ls_date TO lt_date.
+          DATA ls_date LIKE LINE OF lt_date.
+          ls_date-sign = 'I'.
+          ls_date-option = 'LE'.
+          ls_date-low = sy-datum.
+          APPEND ls_date TO lt_date.
 
-      CLEAR lv_ret_cnt.
-      lv_ret_cnt = lo_explang->log_select( st_objct = lt_objct[]
-                                           st_user  = lt_user[]
-                                           st_date  = lt_date[] ).
-      CHECK lv_ret_cnt NE 0.
+          CLEAR lv_ret_cnt.
+          lv_ret_cnt = lo_explang->log_select( st_objct = lt_objct[]
+                                               st_user  = lt_user[]
+                                               st_date  = lt_date[] ).
+          CHECK lv_ret_cnt NE 0.
 
-      CLEAR lv_ret_cnt.
-      lv_ret_cnt = lo_explang->apply_filters( st_packg  = devclass[]
-                                              st_comp   = lt_comp[]
-                                              piecelist = ' '
-                                              check_ex  = 'X'
-                                              chckorlg  = ' '
-                                              clientdp  = ' ' ).
+          CLEAR lv_ret_cnt.
+          lv_ret_cnt = lo_explang->apply_filters( st_packg  = devclass[]
+                                                  st_comp   = lt_comp[]
+                                                  piecelist = ' '
+                                                  check_ex  = 'X'
+                                                  chckorlg  = ' '
+                                                  clientdp  = ' ' ).
 
-      CHECK lv_ret_cnt NE 0.
+          CHECK lv_ret_cnt NE 0.
 
-      CALL METHOD lo_explang->export_objects
-        EXPORTING
-          tr_auto                      = ''
-          tr_request                   = gv_trkorr
-          force                        = ''
-          forcekey                     = ''
-          object_transport             = ''
-          tr_system                    = ''
-          tr_project                   = ''
-          tr_mixed                     = 'X'
-          t_transport                  = ''
-          tr_text                      = ''
-          tr_release                   = ''
-          rfc_destination              = ''
-        EXCEPTIONS
-          create_request_failed        = 1
-          write_to_request_failed      = 2
-          release_request_failed       = 3
-          invalid_request              = 4
-          no_correct_objects_available = 5
-          OTHERS                       = 6.
+          CALL METHOD lo_explang->export_objects
+            EXPORTING
+              tr_auto                      = ''
+              tr_request                   = gv_trkorr
+              force                        = ''
+              forcekey                     = ''
+              object_transport             = ''
+              tr_system                    = ''
+              tr_project                   = ''
+              tr_mixed                     = 'X'
+              t_transport                  = ''
+              tr_text                      = ''
+              tr_release                   = ''
+              rfc_destination              = ''
+            EXCEPTIONS
+              create_request_failed        = 1
+              write_to_request_failed      = 2
+              release_request_failed       = 3
+              invalid_request              = 4
+              no_correct_objects_available = 5
+              OTHERS                       = 6.
 
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
-    ENDLOOP.
+          IF sy-subrc <> 0.
+            /atrm/cx_exception=>raise( ).
+          ENDIF.
+        ENDLOOP.
+        sort_and_compress( ).
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD add_objects.
-    DATA: lt_e071    LIKE e071,
-          ls_log     LIKE LINE OF log,
-          lv_message TYPE string.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          lt_e071       LIKE e071,
+          lt_e071k      TYPE tyt_e071k,
+          ls_log        LIKE LINE OF log.
     MOVE e071[] TO lt_e071[].
-    CALL FUNCTION 'TRINT_REQUEST_CHOICE'
-      EXPORTING
-        iv_suppress_dialog   = 'X'
-        iv_request_types     = 'FTCOK'
-        iv_lock_objects      = lock
-        iv_with_error_log    = 'X'
-        iv_request           = gv_trkorr
-      IMPORTING
-        et_log               = log
-      TABLES
-        it_e071              = lt_e071
-      EXCEPTIONS
-        no_objects_appended  = 0
-        invalid_request      = 1
-        invalid_request_type = 2
-        user_not_owner       = 3
-        enqueue_error        = 4
-        cancelled_by_user    = 5
-        recursive_call       = 6
-        OTHERS               = 7.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-    READ TABLE log INTO ls_log WITH KEY severity = 'E'.
-    IF sy-subrc <> 0.
-      READ TABLE log INTO ls_log WITH KEY severity = 'A'.
-    ENDIF.
-    IF ls_log IS NOT INITIAL.
-      IF ls_log-ag IS NOT INITIAL.
-        MESSAGE ID ls_log-ag TYPE 'I' NUMBER ls_log-msgnr WITH ls_log-var1 ls_log-var2 ls_log-var3 ls_log-var4 INTO lv_message.
-        /atrm/cx_exception=>raise( iv_message = lv_message ).
-      ELSE.
-        /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ).
-      ENDIF.
-    ENDIF.
+    DELETE lt_e071 WHERE pgmid EQ 'CORR'. " no CORR allowed
+    CHECK lt_e071[] IS NOT INITIAL. " silently exit
+    complete_shi3_entries( CHANGING e071 = lt_e071 e071k = lt_e071k ).
+    enqueue( ).
+    TRY.
+        CALL FUNCTION 'TRINT_REQUEST_CHOICE'
+          EXPORTING
+            iv_suppress_dialog   = 'X'
+            iv_request_types     = 'FTCOK'
+            iv_lock_objects      = lock
+            iv_with_error_log    = 'X'
+            iv_request           = gv_trkorr
+          IMPORTING
+            et_log               = log
+          TABLES
+            it_e071              = lt_e071
+            it_e071k             = lt_e071k
+          EXCEPTIONS
+            no_objects_appended  = 0
+            invalid_request      = 1
+            invalid_request_type = 2
+            user_not_owner       = 3
+            enqueue_error        = 4
+            cancelled_by_user    = 5
+            recursive_call       = 6
+            OTHERS               = 7.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+        READ TABLE log INTO ls_log WITH KEY severity = 'E'.
+        IF sy-subrc <> 0.
+          READ TABLE log INTO ls_log WITH KEY severity = 'A'.
+        ENDIF.
+        IF ls_log IS NOT INITIAL.
+          IF ls_log-ag IS NOT INITIAL.
+            sy-msgid = ls_log-ag.
+            sy-msgty = 'I'.
+            sy-msgno = ls_log-msgnr.
+            sy-msgv1 = ls_log-var1.
+            sy-msgv2 = ls_log-var2.
+            sy-msgv3 = ls_log-var3.
+            sy-msgv4 = ls_log-var4.
+            /atrm/cx_exception=>raise( ).
+          ELSE.
+            /atrm/cx_exception=>raise( iv_message = 'Unknown error, check logs.' ). "#EC NOTEXT
+          ENDIF.
+        ENDIF.
+        sort_and_compress( ).
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
+    " BRF+ takes its own locks: record FDT0 applications after dequeue
+    record_fdt0_entries( lt_e071 ).
   ENDMETHOD.
 
   METHOD remove_comments.
-    DATA: lt_e071    TYPE STANDARD TABLE OF e071,
-          ls_e071    LIKE LINE OF lt_e071,
-          ls_request TYPE trwbo_request.
-    CALL FUNCTION 'TR_SORT_AND_COMPRESS_COMM'
-      EXPORTING
-        iv_trkorr                      = gv_trkorr
-        iv_dialog                      = ' '
-      EXCEPTIONS
-        trkorr_not_found               = 1
-        order_released                 = 2
-        error_while_modifying_obj_list = 3
-        tr_enqueue_failed              = 4
-        no_authorization               = 5
-        OTHERS                         = 6.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-    ls_request-h-trkorr = gv_trkorr.
-    SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
-    CHECK lt_e071[] IS NOT INITIAL.
-    LOOP AT lt_e071 INTO ls_e071.
-      CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
-        EXPORTING
-          is_e071_delete              = ls_e071
-          iv_dialog_flag              = ' '
-        CHANGING
-          cs_request                  = ls_request
-        EXCEPTIONS
-          e_database_access_error     = 1
-          e_empty_lockkey             = 2
-          e_bad_target_request        = 3
-          e_wrong_source_client       = 4
-          n_no_deletion_of_c_objects  = 5
-          n_no_deletion_of_corr_entry = 6
-          n_object_entry_doesnt_exist = 7
-          n_request_already_released  = 8
-          n_request_from_other_system = 9
-          r_action_aborted_by_user    = 10
-          r_foreign_lock              = 11
-          w_bigger_lock_in_same_order = 12
-          w_duplicate_entry           = 13
-          w_no_authorization          = 14
-          w_user_not_owner            = 15
-          OTHERS                      = 16.
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
-    ENDLOOP.
-    COMMIT WORK AND WAIT.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        DATA: lt_e071    TYPE STANDARD TABLE OF e071,
+              ls_e071    LIKE LINE OF lt_e071,
+              ls_request TYPE trwbo_request.
+        CALL FUNCTION 'TR_SORT_AND_COMPRESS_COMM'
+          EXPORTING
+            iv_trkorr                      = gv_trkorr
+            iv_dialog                      = ' '
+          EXCEPTIONS
+            trkorr_not_found               = 1
+            order_released                 = 2
+            error_while_modifying_obj_list = 3
+            tr_enqueue_failed              = 4
+            no_authorization               = 5
+            OTHERS                         = 6.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+        ls_request-h-trkorr = gv_trkorr.
+        SELECT * FROM e071 INTO TABLE lt_e071 WHERE pgmid EQ '*' AND object EQ object AND trkorr EQ gv_trkorr.
+        IF lt_e071[] IS NOT INITIAL.
+          LOOP AT lt_e071 INTO ls_e071.
+            CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
+              EXPORTING
+                is_e071_delete              = ls_e071
+                iv_dialog_flag              = ' '
+              CHANGING
+                cs_request                  = ls_request
+              EXCEPTIONS
+                e_database_access_error     = 1
+                e_empty_lockkey             = 2
+                e_bad_target_request        = 3
+                e_wrong_source_client       = 4
+                n_no_deletion_of_c_objects  = 5
+                n_no_deletion_of_corr_entry = 6
+                n_object_entry_doesnt_exist = 7
+                n_request_already_released  = 8
+                n_request_from_other_system = 9
+                r_action_aborted_by_user    = 10
+                r_foreign_lock              = 11
+                w_bigger_lock_in_same_order = 12
+                w_duplicate_entry           = 13
+                w_no_authorization          = 14
+                w_user_not_owner            = 15
+                OTHERS                      = 16.
+            IF sy-subrc <> 0.
+              /atrm/cx_exception=>raise( ).
+            ENDIF.
+          ENDLOOP.
+          COMMIT WORK AND WAIT.
+        ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD create_workbench.
@@ -478,15 +584,44 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete.
-    CALL FUNCTION 'TR_DELETE_COMM'
-      EXPORTING
-        wi_dialog = ' '
-        wi_trkorr = gv_trkorr
-      EXCEPTIONS
-        OTHERS    = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          ls_request    TYPE trwbo_request.
+    enqueue( ).
+    TRY.
+        " Object locks of the request (e.g. a locked TRM landscape transport) block TR_DELETE_COMM
+        CALL FUNCTION 'TR_READ_REQUEST'
+          EXPORTING
+            iv_trkorr         = gv_trkorr
+            iv_read_e070      = 'X'
+            iv_read_objs_keys = 'X'
+          CHANGING
+            cs_request        = ls_request
+          EXCEPTIONS
+            OTHERS            = 1.
+        IF sy-subrc EQ 0.
+          CALL FUNCTION 'TRINT_UNLOCK_REQUEST'
+            CHANGING
+              cs_request = ls_request
+            EXCEPTIONS
+              OTHERS     = 1.
+        ENDIF.
+        CALL FUNCTION 'TR_DELETE_COMM'
+          EXPORTING
+            wi_dialog = ' '
+            wi_trkorr = gv_trkorr
+          EXCEPTIONS
+            OTHERS    = 1.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD enqueue.
@@ -512,259 +647,437 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD forward.
-    DATA: lt_stdout    TYPE STANDARD TABLE OF tpstdout,
-          ls_stdout    LIKE LINE OF lt_stdout,
-          lt_log       TYPE /atrm/cx_exception=>tyt_log,
-          ls_exception TYPE stmscalert.
+    DATA: forwards TYPE stms_tp_forwards,
+          result   TYPE stms_tp_forward,
+          stdout   TYPE /atrm/cx_exception=>tyt_log,
+          tpstdout TYPE tpstdout,
+          batch    TYPE syst_batch,
+          found    TYPE flag,
+          subrc    TYPE syst_subrc,
+          msgid    TYPE syst_msgid,
+          msgno    TYPE syst_msgno,
+          msgty    TYPE syst_msgty,
+          msgv1    TYPE syst_msgv,
+          msgv2    TYPE syst_msgv,
+          msgv3    TYPE syst_msgv,
+          msgv4    TYPE syst_msgv.
+
+    batch = sy-batch.
+    sy-batch = 'X'.
     CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
       EXPORTING
-        iv_request      = gv_trkorr
-        iv_target       = target
-        iv_source       = source
-        iv_import_again = import_again
-        iv_monitor      = space
+        iv_request                 = gv_trkorr
+        iv_target                  = target
+        iv_source                  = source
+        iv_import_again            = import_again
+        iv_monitor                 = ' '
+        iv_verbose                 = 'X'
       IMPORTING
-        es_exception    = ls_exception
-      TABLES
-        tt_stdout       = lt_stdout
+        et_tp_forwards             = forwards
       EXCEPTIONS
-        OTHERS          = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ELSEIF ls_exception-msgty EQ 'E' OR ls_exception-msgty EQ 'A'.
-      LOOP AT lt_stdout INTO ls_stdout.
-        APPEND ls_stdout-line TO lt_log.
+        read_config_failed         = 1
+        table_of_requests_is_empty = 2
+        error_message              = 3
+        OTHERS                     = 4.
+
+    subrc = sy-subrc.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgty = sy-msgty.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+    sy-batch = batch.
+
+    READ TABLE forwards INTO result INDEX 1.
+    IF sy-subrc = 0.
+      found = 'X'.
+      LOOP AT result-tp_stdout INTO tpstdout.
+        APPEND tpstdout-line TO stdout.
       ENDLOOP.
-      syst-msgid = ls_exception-msgid.
-      syst-msgno = ls_exception-msgno.
-      syst-msgty = ls_exception-msgty.
-      syst-msgv1 = ls_exception-msgv1.
-      syst-msgv2 = ls_exception-msgv2.
-      syst-msgv3 = ls_exception-msgv3.
-      syst-msgv4 = ls_exception-msgv4.
-      /atrm/cx_exception=>raise( it_log = lt_log ).
+      IF result-alert-severity = 'E'
+        OR result-alert-msgty = 'E'
+        OR result-alert-msgty = 'A'.
+        IF result-alert-msgid IS NOT INITIAL
+          AND result-alert-msgno IS NOT INITIAL.
+          sy-msgid = result-alert-msgid.
+          sy-msgno = result-alert-msgno.
+          sy-msgty = result-alert-msgty.
+          sy-msgv1 = result-alert-msgv1.
+          sy-msgv2 = result-alert-msgv2.
+          sy-msgv3 = result-alert-msgv3.
+          sy-msgv4 = result-alert-msgv4.
+        ENDIF.
+        /atrm/cx_exception=>raise( it_log = stdout ).
+      ENDIF.
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgno = msgno.
+      sy-msgty = msgty.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF found IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No forward status found'              "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
     ENDIF.
   ENDMETHOD.
 
   METHOD import.
-    CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
-      EXPORTING
-        iv_system             = system
-        iv_request            = gv_trkorr
-        iv_client             = sy-mandt
-        iv_ctc_active         = ' '
-        iv_overtake           = 'X'
-        iv_import_again       = 'X'
-        iv_ignore_originality = 'X'
-        iv_ignore_repairs     = 'X'
-        iv_ignore_transtype   = 'X'
-        iv_ignore_tabletype   = 'X'
-        iv_ignore_predec      = 'X'
-        iv_ignore_cvers       = 'X'
-        iv_test_import        = ' '
-        iv_subset             = 'X'
-        iv_offline            = 'X'
-        iv_monitor            = 'X'
-        iv_verbose            = ' '
-      EXCEPTIONS
-        OTHERS                = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    import = execute_import(
+      system    = system
+      transport = gv_trkorr
+      test      = test
+    ).
   ENDMETHOD.
 
   METHOD read_queue.
-    DATA: ls_bufcnt TYPE tmsbufcnt,
-          ls_alog   TYPE tmsalog,
-          lv_dummy  TYPE string.
-    " 03072024 avoid display alert
-    sy-batch = 'X'.
+    DATA: bufcnt      TYPE tmsbufcnt,
+          alog        TYPE tmsalog,
+          batch       TYPE syst_batch,
+          alert_subrc TYPE syst_subrc,
+          subrc       TYPE syst_subrc,
+          msgid       TYPE syst_msgid,
+          msgno       TYPE syst_msgno,
+          msgty       TYPE syst_msgty,
+          msgv1       TYPE syst_msgv,
+          msgv2       TYPE syst_msgv,
+          msgv3       TYPE syst_msgv,
+          msgv4       TYPE syst_msgv.
 
+    batch = sy-batch.
+    sy-batch = 'X'.
     CALL FUNCTION 'TMS_UIQ_IQD_READ_QUEUE'
       EXPORTING
-        iv_system      = target
-        iv_collect     = 'X'
-        iv_read_shadow = 'X'
+        iv_system         = target
+        iv_collect        = 'X'
+        iv_read_shadow    = 'X'
+        iv_monitor        = ' '
+        iv_verbose        = 'X'
       IMPORTING
-        et_requests    = requests
-        es_bufcnt      = ls_bufcnt
+        et_requests       = requests
+        es_bufcnt         = bufcnt
       EXCEPTIONS
-        OTHERS         = 1.
+        read_queue_failed = 1
+        error_message     = 2
+        OTHERS            = 3.
 
-    IF sy-subrc <> 0.
+    subrc = sy-subrc.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgty = sy-msgty.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+    sy-batch = batch.
+
+    IF bufcnt-alertid IS NOT INITIAL.
+      CALL FUNCTION 'TMS_ALT_ANALYSE_ALERT'
+        EXPORTING
+          iv_alert_id   = bufcnt-alertid
+          iv_no_display = 'X'
+        IMPORTING
+          es_alog       = alog
+        EXCEPTIONS
+          error_message = 1
+          OTHERS        = 2.
+      alert_subrc = sy-subrc.
+      IF alert_subrc = 0
+        AND ( alog-msgty = 'E' OR alog-msgty = 'A' ).
+        sy-msgid = alog-msgid.
+        sy-msgno = alog-msgno.
+        sy-msgty = alog-msgty.
+        sy-msgv1 = alog-msgv1.
+        sy-msgv2 = alog-msgv2.
+        sy-msgv3 = alog-msgv3.
+        sy-msgv4 = alog-msgv4.
+        /atrm/cx_exception=>raise(
+          iv_reason = /atrm/cx_exception=>c_reason-tms_alert
+        ).
+      ENDIF.
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgno = msgno.
+      sy-msgty = msgty.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    IF ls_bufcnt-alertid IS NOT INITIAL.
-      CALL FUNCTION 'TMS_ALT_ANALYSE_ALERT'
-        EXPORTING
-          iv_alert_id   = ls_bufcnt-alertid
-          iv_no_display = 'X'
-        IMPORTING
-          es_alog       = ls_alog
-        EXCEPTIONS
-          OTHERS        = 1.
-      IF ls_alog-msgty EQ 'E' OR ls_alog-msgty EQ 'A' OR sy-subrc <> 0.
-        MESSAGE ID ls_alog-msgid
-        TYPE ls_alog-msgty
-        NUMBER ls_alog-msgno
-        INTO lv_dummy
-        WITH ls_alog-msgv1 ls_alog-msgv2 ls_alog-msgv3 ls_alog-msgv4.
-        /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-tms_alert ).
-      ENDIF.
+    IF alert_subrc <> 0.
+      /atrm/cx_exception=>raise(
+        iv_reason = /atrm/cx_exception=>c_reason-tms_alert
+      ).
     ENDIF.
   ENDMETHOD.
 
   METHOD release.
-    DATA lv_without_lock TYPE flag.
-    IF lock EQ 'X'.
-      lv_without_lock = ' '.
-    ELSE.
-      lv_without_lock = 'X'.
-    ENDIF.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        DATA lv_without_lock TYPE flag.
+        IF lock EQ 'X'.
+          lv_without_lock = ' '.
+        ELSE.
+          lv_without_lock = 'X'.
+        ENDIF.
 
-    CALL FUNCTION 'TRINT_RELEASE_REQUEST'
-      EXPORTING
-        iv_trkorr                = gv_trkorr
-        iv_dialog                = ' '
-        iv_success_message       = ' '
-        iv_display_export_log    = ' '
-        iv_without_objects_check = 'X'
-        iv_without_locking       = lv_without_lock
-      EXCEPTIONS
-        OTHERS                   = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+        CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+          EXPORTING
+            iv_trkorr                = gv_trkorr
+            iv_dialog                = ' '
+            iv_success_message       = ' '
+            iv_display_export_log    = ' '
+            iv_without_objects_check = 'X'
+            iv_without_locking       = lv_without_lock
+          EXCEPTIONS
+            OTHERS                   = 1.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
+    " the release is completed asynchronously by the update task (versioning):
+    " a failure there leaves the request modifiable and its locks held, so
+    " don't report success before it is done (the export is not awaited)
+    wait_release( exported = abap_false ).
   ENDMETHOD.
 
   METHOD rename.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
     enqueue( ).
-    "LSTR6F02 - e070_update
-    DATA: ls_e070  TYPE e070,
-          ls_e070c TYPE e070c,
-          ls_e07t  TYPE e07t.
-    DATA: lv_msgtext1 LIKE sy-msgv3,
-          lv_msgtext2 LIKE sy-msgv3,
-          lv_msgtext3 LIKE sy-msgv3.
+    TRY.
+        "LSTR6F02 - e070_update
+        DATA: ls_e070  TYPE e070,
+              ls_e070c TYPE e070c,
+              ls_e07t  TYPE e07t.
+        DATA: lv_msgtext1 LIKE sy-msgv3,
+              lv_msgtext2 LIKE sy-msgv3,
+              lv_msgtext3 LIKE sy-msgv3.
 
-    SELECT SINGLE * INTO ls_e070
-           FROM e070
-           WHERE trkorr = gv_trkorr.
-    SELECT SINGLE * INTO ls_e070c "read additional fields - note 2231381
-           FROM e070c
-           WHERE trkorr = gv_trkorr.
+        SELECT SINGLE * INTO ls_e070
+               FROM e070
+               WHERE trkorr = gv_trkorr.
+        SELECT SINGLE * INTO ls_e070c "read additional fields - note 2231381
+               FROM e070c
+               WHERE trkorr = gv_trkorr.
 
-    ls_e07t-trkorr = gv_trkorr.
-    ls_e07t-langu = sy-langu.
-    ls_e07t-as4text = as4text.
+        ls_e07t-trkorr = gv_trkorr.
+        ls_e07t-langu = sy-langu.
+        ls_e07t-as4text = as4text.
 
-    CALL FUNCTION 'TRINT_UPDATE_COMM_HEADER'
-      EXPORTING
-        wi_e070      = ls_e070
-        wi_e07t      = ls_e07t
-        wi_save_user = ' '
-        wi_sel_e070  = 'X'
-        wi_sel_e07t  = 'X'
-        wi_user      = sy-uname
-        wi_e070c     = ls_e070c
-        wi_sel_e070c = 'X'
-      IMPORTING
-        we_e070      = ls_e070
-        we_e070c     = ls_e070c
-      EXCEPTIONS
-        OTHERS       = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+        CALL FUNCTION 'TRINT_UPDATE_COMM_HEADER'
+          EXPORTING
+            wi_e070      = ls_e070
+            wi_e07t      = ls_e07t
+            wi_save_user = ' '
+            wi_sel_e070  = 'X'
+            wi_sel_e07t  = 'X'
+            wi_user      = sy-uname
+            wi_e070c     = ls_e070c
+            wi_sel_e070c = 'X'
+          IMPORTING
+            we_e070      = ls_e070
+            we_e070c     = ls_e070c
+          EXCEPTIONS
+            OTHERS       = 1.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
 
+
+        lv_msgtext1 = ls_e070-trkorr.
+        lv_msgtext2 = sy-uname.
+        lv_msgtext3 = ' '.
+
+        CALL FUNCTION 'TRINT_APPEND_COMM_SYSLOG_ENTRY'
+          EXPORTING
+            wi_msgid      = 'TR'
+            wi_msgno      = '018'
+            wi_msgv2      = lv_msgtext1
+            wi_msgv3      = lv_msgtext2
+            wi_msgv4      = lv_msgtext3
+            wi_new_order  = ' '
+            wi_trfunction = ls_e070-trfunction
+            wi_trkorr     = ls_e070-trkorr.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
     dequeue( ).
-
-    lv_msgtext1 = ls_e070-trkorr.
-    lv_msgtext2 = sy-uname.
-    lv_msgtext3 = ' '.
-
-    CALL FUNCTION 'TRINT_APPEND_COMM_SYSLOG_ENTRY'
-      EXPORTING
-        wi_msgid      = 'TR'
-        wi_msgno      = '018'
-        wi_msgv2      = lv_msgtext1
-        wi_msgv3      = lv_msgtext2
-        wi_msgv4      = lv_msgtext3
-        wi_new_order  = ' '
-        wi_trfunction = ls_e070-trfunction
-        wi_trkorr     = ls_e070-trkorr.
   ENDMETHOD.
 
   METHOD set_documentation.
-    DATA lt_doc LIKE doc.
-    MOVE doc[] TO lt_doc[].
-    CALL FUNCTION 'TRINT_DOCU_INTERFACE'
-      EXPORTING
-        iv_object           = gv_trkorr
-        iv_action           = 'M'
-        iv_modify_appending = ''
-      TABLES
-        tt_line             = lt_doc
-      EXCEPTIONS
-        OTHERS              = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        DATA lt_doc LIKE doc.
+        MOVE doc[] TO lt_doc[].
+        CALL FUNCTION 'TRINT_DOCU_INTERFACE'
+          EXPORTING
+            iv_object           = gv_trkorr
+            iv_action           = 'M'
+            iv_modify_appending = ''
+          TABLES
+            tt_line             = lt_doc
+          EXCEPTIONS
+            OTHERS              = 1.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD copy.
-    CALL FUNCTION 'TR_COPY_COMM'
-      EXPORTING
-        wi_dialog                = ' '
-        wi_trkorr_from           = trkorr
-        wi_trkorr_to             = gv_trkorr
-        wi_without_documentation = doc
-      EXCEPTIONS
-        OTHERS                   = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        CALL FUNCTION 'TR_COPY_COMM'
+          EXPORTING
+            wi_dialog                = ' '
+            wi_trkorr_from           = trkorr
+            wi_trkorr_to             = gv_trkorr
+            wi_without_documentation = doc
+          EXCEPTIONS
+            OTHERS                   = 1.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+        sort_and_compress( ).
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD delete_from_tms_queue.
-    DATA: ls_tmsbuffer    TYPE tmsbuffer,
-          lt_tp_maintains TYPE stms_tp_maintains,
-          ls_tp_maintains LIKE LINE OF lt_tp_maintains,
-          ls_tpstdout     TYPE tpstdout,
-          lt_log          TYPE /atrm/cx_exception=>tyt_log,
-          ls_exception    TYPE stmscalert.
+    DATA: tmsbuffer TYPE tmsbuffer,
+          maintains TYPE stms_tp_maintains,
+          result    TYPE stms_tp_maintain,
+          stdout    TYPE /atrm/cx_exception=>tyt_log,
+          tpstdout  TYPE tpstdout,
+          batch     TYPE syst_batch,
+          found     TYPE flag,
+          subrc     TYPE syst_subrc,
+          msgid     TYPE syst_msgid,
+          msgno     TYPE syst_msgno,
+          msgty     TYPE syst_msgty,
+          msgv1     TYPE syst_msgv,
+          msgv2     TYPE syst_msgv,
+          msgv3     TYPE syst_msgv,
+          msgv4     TYPE syst_msgv.
 
-    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ gv_trkorr.
+    SELECT domnam sysnam trkorr tarcli FROM tmsbuffer
+      INTO CORRESPONDING FIELDS OF tmsbuffer
+      UP TO 1 ROWS
+      WHERE sysnam EQ system
+        AND trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
     CHECK sy-subrc EQ 0.
 
+    batch = sy-batch.
+    sy-batch = 'X'.
     CALL FUNCTION 'TMS_MGR_MAINTAIN_TR_QUEUE'
       EXPORTING
         iv_command                 = 'DELFROMBUFFER'
-        iv_system                  = ls_tmsbuffer-sysnam
-        iv_domain                  = ls_tmsbuffer-domnam
-        iv_request                 = ls_tmsbuffer-trkorr
-        iv_tarcli                  = ls_tmsbuffer-tarcli
+        iv_system                  = tmsbuffer-sysnam
+        iv_domain                  = tmsbuffer-domnam
+        iv_request                 = tmsbuffer-trkorr
+        iv_tarcli                  = tmsbuffer-tarcli
         iv_monitor                 = ' '
-        iv_verbose                 = ' '
+        iv_verbose                 = 'X'
       IMPORTING
-        et_tp_maintains            = lt_tp_maintains
-        es_exception               = ls_exception
+        et_tp_maintains            = maintains
       EXCEPTIONS
         read_config_failed         = 1
         table_of_requests_is_empty = 2
-        OTHERS                     = 3.
+        error_message              = 3
+        OTHERS                     = 4.
 
-    IF sy-subrc <> 0 OR ( ls_exception-error <> 'OK' AND ls_exception-error <> space ).
-      IF lt_tp_maintains[] IS NOT INITIAL.
-        READ TABLE lt_tp_maintains INTO ls_tp_maintains INDEX 1.
-        LOOP AT ls_tp_maintains-tp_stdout INTO ls_tpstdout.
-          APPEND ls_tpstdout-line TO lt_log.
-        ENDLOOP.
-        /atrm/cx_exception=>raise( it_log = lt_log ).
-      ELSE.
-        /atrm/cx_exception=>raise( ).
+    subrc = sy-subrc.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgty = sy-msgty.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+    sy-batch = batch.
+
+    READ TABLE maintains INTO result INDEX 1.
+    IF sy-subrc = 0.
+      found = 'X'.
+      LOOP AT result-tp_stdout INTO tpstdout.
+        APPEND tpstdout-line TO stdout.
+      ENDLOOP.
+      IF result-alert-severity = 'E'
+        OR result-alert-msgty = 'E'
+        OR result-alert-msgty = 'A'.
+        IF result-alert-msgid IS NOT INITIAL
+          AND result-alert-msgno IS NOT INITIAL.
+          sy-msgid = result-alert-msgid.
+          sy-msgno = result-alert-msgno.
+          sy-msgty = result-alert-msgty.
+          sy-msgv1 = result-alert-msgv1.
+          sy-msgv2 = result-alert-msgv2.
+          sy-msgv3 = result-alert-msgv3.
+          sy-msgv4 = result-alert-msgv4.
+        ENDIF.
+        /atrm/cx_exception=>raise( it_log = stdout ).
       ENDIF.
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgno = msgno.
+      sy-msgty = msgty.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF found IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No queue maintenance status found'    "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
     ENDIF.
   ENDMETHOD.
 
@@ -772,9 +1085,15 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA ls_tmsbuftxt TYPE tmsbuftxt.
     SELECT SINGLE * FROM tmsbuftxt INTO ls_tmsbuftxt WHERE trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
-    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text WHERE trkorr EQ gv_trkorr.
+    SELECT SINGLE as4text FROM e07t INTO ls_tmsbuftxt-text
+      WHERE trkorr EQ gv_trkorr
+        AND langu EQ sy-langu.
     SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
-    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli WHERE trkorr EQ gv_trkorr.
+    SELECT client FROM e070c INTO ls_tmsbuftxt-srccli
+      UP TO 1 ROWS
+      WHERE trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
     " there's no standard way to update buffer text table other than clearing the buffer as a whole?
     MODIFY tmsbuftxt FROM ls_tmsbuftxt.
     COMMIT WORK AND WAIT.
@@ -796,33 +1115,54 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD set_owner.
-    CALL FUNCTION 'TR_CHANGE_USERNAME'
-      EXPORTING
-        wi_dialog           = ' '
-        wi_trkorr           = gv_trkorr
-        wi_user             = user
-      EXCEPTIONS
-        already_released    = 1
-        e070_update_error   = 2
-        file_access_error   = 3
-        not_exist_e070      = 4
-        user_does_not_exist = 5
-        tr_enqueue_failed   = 6
-        no_authorization    = 7
-        wrong_client        = 8
-        unallowed_user      = 9
-        OTHERS              = 10.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    enqueue( ).
+    TRY.
+        CALL FUNCTION 'TR_CHANGE_USERNAME'
+          EXPORTING
+            wi_dialog           = ' '
+            wi_trkorr           = gv_trkorr
+            wi_user             = user
+          EXCEPTIONS
+            already_released    = 1
+            e070_update_error   = 2
+            file_access_error   = 3
+            not_exist_e070      = 4
+            user_does_not_exist = 5
+            tr_enqueue_failed   = 6
+            no_authorization    = 7
+            wrong_client        = 8
+            unallowed_user      = 9
+            OTHERS              = 10.
+        IF sy-subrc <> 0.
+          /atrm/cx_exception=>raise( ).
+        ENDIF.
+      CATCH /atrm/cx_exception INTO lo_lock_error.
+        TRY.
+            dequeue( ).
+          CATCH /atrm/cx_exception.
+        ENDTRY.
+        RAISE EXCEPTION lo_lock_error.
+    ENDTRY.
+    dequeue( ).
   ENDMETHOD.
 
   METHOD get_import_status.
     DATA: ls_tmsbuffer TYPE tmsbuffer,
           lt_stats     TYPE tpstats.
 
-    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ gv_trkorr.
-    CHECK sy-subrc EQ 0.
+    SELECT * FROM tmsbuffer INTO ls_tmsbuffer
+      UP TO 1 ROWS
+      WHERE sysnam EQ system
+        AND trkorr EQ gv_trkorr
+      ORDER BY PRIMARY KEY.
+    ENDSELECT.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise(
+        iv_message = 'Transport was not found in the target system buffer' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-not_found
+      ).
+    ENDIF.
     CALL FUNCTION 'TMS_IMU_FILTER_TPSTAT'
       EXPORTING
         iv_system   = ls_tmsbuffer-sysnam
@@ -837,7 +1177,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         et_tpstat   = lt_stats.
     IF lt_stats[] IS INITIAL.
       /atrm/cx_exception=>raise(
-        iv_message = 'No import status found for this transport in the target system'
+        iv_message = 'No import status found for this transport in the target system' "#EC NOTEXT
         iv_reason = /atrm/cx_exception=>c_reason-not_found
       ).
     ENDIF.
@@ -878,4 +1218,395 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD import_multiple.
+    DATA: requests TYPE stms_tr_requests,
+          request  TYPE stms_tr_request,
+          trkorr   TYPE trkorr.
+
+    IF transports[] IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No transports supplied for batch import' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-invalid_input
+      ).
+    ENDIF.
+
+    LOOP AT transports INTO trkorr.
+      CHECK trkorr IS NOT INITIAL.
+      READ TABLE requests TRANSPORTING NO FIELDS
+        WITH KEY trkorr = trkorr.
+      CHECK sy-subrc <> 0.
+      CLEAR request.
+      request-trkorr = trkorr.
+      request-tarcli = sy-mandt.
+      APPEND request TO requests.
+    ENDLOOP.
+
+    IF requests[] IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No valid transports supplied for batch import' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-invalid_input
+      ).
+    ENDIF.
+
+    import = execute_import(
+      system    = system
+      transport = 'SOME'
+      test      = test
+      requests  = requests
+    ).
+  ENDMETHOD.
+
+
+  METHOD execute_import.
+    DATA: imports  TYPE stms_tp_imports,
+          stdout   TYPE /atrm/cx_exception=>tyt_log,
+          tpstdout TYPE tpstdout,
+          batch    TYPE syst_batch,
+          subset   TYPE stms_flag,
+          offline  TYPE stms_flag,
+          found    TYPE flag,
+          subrc    TYPE syst_subrc,
+          msgid    TYPE syst_msgid,
+          msgno    TYPE syst_msgno,
+          msgty    TYPE syst_msgty,
+          msgv1    TYPE syst_msgv,
+          msgv2    TYPE syst_msgv,
+          msgv3    TYPE syst_msgv,
+          msgv4    TYPE syst_msgv.
+
+    IF transport = 'SOME'.
+      subset = 'X'.
+    ENDIF.
+    IF test IS INITIAL.
+      offline = 'X'.
+    ENDIF.
+
+    batch = sy-batch.
+    sy-batch = 'X'.
+    CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
+      EXPORTING
+        iv_system                  = system
+        iv_request                 = transport
+        iv_client                  = sy-mandt
+        iv_ctc_active              = ' '
+        iv_overtake                = ' '
+        iv_import_again            = 'X'
+        iv_ignore_originality      = 'X'
+        iv_ignore_repairs          = ' '
+        iv_ignore_transtype        = ' '
+        iv_ignore_tabletype        = ' '
+        iv_ignore_predec           = 'X'
+        iv_ignore_cvers            = 'X'
+        iv_test_import             = test
+        iv_subset                  = subset
+        iv_offline                 = offline
+        iv_monitor                 = ' '
+        iv_verbose                 = 'X'
+        it_requests                = requests
+      IMPORTING
+        et_tp_imports              = imports
+      EXCEPTIONS
+        read_config_failed         = 1
+        table_of_requests_is_empty = 2
+        error_message              = 3
+        OTHERS                     = 4.
+
+    subrc = sy-subrc.
+    msgty = sy-msgty.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+    sy-batch = batch.
+
+    READ TABLE imports INTO import INDEX 1.
+    IF sy-subrc = 0.
+      found = 'X'.
+      LOOP AT import-tp_stdout INTO tpstdout.
+        APPEND tpstdout-line TO stdout.
+      ENDLOOP.
+      IF import-alert-severity = 'E'
+        OR import-alert-msgty = 'E'
+        OR import-alert-msgty = 'A'.
+        IF import-alert-msgid IS NOT INITIAL
+          AND import-alert-msgno IS NOT INITIAL.
+          sy-msgid = import-alert-msgid.
+          sy-msgty = import-alert-msgty.
+          sy-msgno = import-alert-msgno.
+          sy-msgv1 = import-alert-msgv1.
+          sy-msgv2 = import-alert-msgv2.
+          sy-msgv3 = import-alert-msgv3.
+          sy-msgv4 = import-alert-msgv4.
+        ENDIF.
+        /atrm/cx_exception=>raise( it_log = stdout ).
+      ENDIF.
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgty = msgty.
+      sy-msgno = msgno.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF found IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = 'No import status found'               "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD sort_and_compress.
+    CALL FUNCTION 'TRINT_SORT_AND_COMPRESS_COMM'
+      EXPORTING
+        iv_trkorr           = gv_trkorr
+        iv_dialog           = ' '
+        iv_called_by_editor = ' '
+      EXCEPTIONS
+        error_message       = 1
+        OTHERS              = 2.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD lock.
+    DATA: error    TYPE trboolean,
+          messages TYPE ctsgerrmsgs,
+          message  LIKE LINE OF messages,
+          subrc    TYPE syst_subrc,
+          msgid    TYPE syst_msgid,
+          msgno    TYPE syst_msgno,
+          msgty    TYPE syst_msgty,
+          msgv1    TYPE syst_msgv,
+          msgv2    TYPE syst_msgv,
+          msgv3    TYPE syst_msgv,
+          msgv4    TYPE syst_msgv.
+    CALL FUNCTION 'TR_LOCK_REQUEST'
+      EXPORTING
+        iv_trkorr          = gv_trkorr
+        iv_dialog          = ' '
+        iv_success_message = ' '
+      IMPORTING
+        ev_object_error    = error
+        et_messages        = messages
+      EXCEPTIONS
+        error_message      = 1
+        OTHERS             = 2.
+    subrc = sy-subrc.
+    msgty = sy-msgty.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+
+    READ TABLE messages INTO message WITH KEY msgty = 'E'.
+    IF sy-subrc <> 0.
+      READ TABLE messages INTO message WITH KEY msgty = 'A'.
+    ENDIF.
+    IF message-msgid IS NOT INITIAL AND message-msgno IS NOT INITIAL.
+      sy-msgid = message-msgid.
+      sy-msgty = message-msgty.
+      sy-msgno = message-msgno.
+      sy-msgv1 = message-msgv1.
+      sy-msgv2 = message-msgv2.
+      sy-msgv3 = message-msgv3.
+      sy-msgv4 = message-msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgty = msgty.
+      sy-msgno = msgno.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF error EQ 'X'.
+      /atrm/cx_exception=>raise(
+        iv_message = 'Generic error return from lock function.' "#EC NOTEXT
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_entries.
+    DATA lt_packages TYPE STANDARD TABLE OF devclass WITH DEFAULT KEY.
+    DATA lt_keys TYPE scts_tadir.
+    DATA ls_key LIKE LINE OF lt_keys.
+    FIELD-SYMBOLS <ls_e071> TYPE e071.
+
+    e071 = get_e071( ).
+
+    LOOP AT e071 ASSIGNING <ls_e071> WHERE pgmid = 'R3TR'.
+      CLEAR ls_key.
+      ls_key-pgmid = <ls_e071>-pgmid.
+      ls_key-object = <ls_e071>-object.
+      ls_key-obj_name = <ls_e071>-obj_name.
+      APPEND ls_key TO lt_keys.
+      IF <ls_e071>-object = 'DEVC'.
+        APPEND <ls_e071>-obj_name TO lt_packages.
+      ENDIF.
+    ENDLOOP.
+
+    IF lt_keys IS NOT INITIAL.
+      SELECT * FROM tadir
+        INTO CORRESPONDING FIELDS OF TABLE tadir
+        FOR ALL ENTRIES IN lt_keys
+        WHERE pgmid = lt_keys-pgmid
+          AND object = lt_keys-object
+          AND obj_name = lt_keys-obj_name.
+    ENDIF.
+
+    IF lt_packages IS NOT INITIAL.
+      SORT lt_packages.
+      DELETE ADJACENT DUPLICATES FROM lt_packages.
+      SELECT * FROM tdevc
+        INTO CORRESPONDING FIELDS OF TABLE tdevc
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+      SELECT * FROM tdevct
+        INTO CORRESPONDING FIELDS OF TABLE tdevct
+        FOR ALL ENTRIES IN lt_packages
+        WHERE devclass = lt_packages-table_line.
+    ENDIF.
+  ENDMETHOD.
+  METHOD complete_shi3_entries.
+    DATA: lt_shi3    TYPE tyt_e071,
+          ls_e071    TYPE e071,
+          lv_id      TYPE ttree-id,
+          ls_message TYPE hier_mess,
+          lt_objects TYPE tyt_e071,
+          lt_keys    TYPE tyt_e071k.
+    " STREE_BEFORE_EXPORT fails the release when a hierarchy header is recorded
+    " without its nodes (R3TR TABU keys): build the complete piece list, as SE43 does
+    lt_shi3 = e071.
+    DELETE lt_shi3 WHERE pgmid <> 'R3TR' OR object <> 'SHI3'.
+    CHECK lt_shi3 IS NOT INITIAL.
+    LOOP AT lt_shi3 INTO ls_e071.
+      lv_id = ls_e071-obj_name.
+      CLEAR: ls_message, lt_objects, lt_keys.
+      CALL FUNCTION 'STREE_INSERT_ALL_IN_TRANSPORT'
+        EXPORTING
+          structure_id               = lv_id
+          iv_return_objects_and_keys = 'X'
+        IMPORTING
+          message                    = ls_message
+        TABLES
+          et_objects                 = lt_objects
+          et_keys                    = lt_keys
+        EXCEPTIONS
+          error_message              = 1
+          OTHERS                     = 2.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      IF ls_message-msgid IS NOT INITIAL.
+        sy-msgid = ls_message-msgid.
+        sy-msgty = 'I'.
+        sy-msgno = ls_message-msgno.
+        sy-msgv1 = ls_message-msgv1.
+        sy-msgv2 = ls_message-msgv2.
+        sy-msgv3 = ls_message-msgv3.
+        sy-msgv4 = ls_message-msgv4.
+        /atrm/cx_exception=>raise( ).
+      ENDIF.
+      APPEND LINES OF lt_objects TO e071.
+      APPEND LINES OF lt_keys TO e071k.
+    ENDLOOP.
+    SORT e071 BY pgmid object obj_name.
+    DELETE ADJACENT DUPLICATES FROM e071 COMPARING pgmid object obj_name.
+    SORT e071k BY pgmid object objname mastertype mastername tabkey.
+    DELETE ADJACENT DUPLICATES FROM e071k COMPARING pgmid object objname mastertype mastername tabkey.
+  ENDMETHOD.
+  METHOD record_fdt0_entries.
+    DATA: ls_e071     TYPE e071,
+          lr_row      TYPE REF TO data,
+          lr_instance TYPE REF TO data,
+          lo_instance TYPE REF TO object,
+          lv_name     TYPE sobj_name,
+          lv_where    TYPE string,
+          lx_root     TYPE REF TO cx_root.
+    FIELD-SYMBOLS: <ls_row>      TYPE any,
+                   <lv_id>       TYPE any,
+                   <lo_instance> TYPE any.
+    " FDT0_BEFORE_EXPORT fails the release when the application is not also
+    " recorded under FDT0001/FDT0002: let BRF+ record it.
+    " BRF+ may not exist in the system, so everything is dynamic
+    LOOP AT e071 INTO ls_e071 WHERE pgmid = 'R3TR' AND object = 'FDT0'.
+      TRY.
+          CREATE DATA lr_row TYPE ('FDT_APPL_TADIR').
+          CREATE DATA lr_instance TYPE REF TO ('IF_FDT_ADMIN_DATA').
+        CATCH cx_sy_create_data_error.
+          RETURN. " BRF+ not available
+      ENDTRY.
+      ASSIGN lr_row->* TO <ls_row>.
+      ASSIGN lr_instance->* TO <lo_instance>.
+      lv_name = ls_e071-obj_name.
+      REPLACE ALL OCCURRENCES OF '''' IN lv_name WITH ''''''.
+      CONCATENATE 'NAME = ''' lv_name '''' INTO lv_where.
+      SELECT SINGLE * FROM ('FDT_APPL_TADIR') INTO <ls_row> WHERE (lv_where).
+      CHECK sy-subrc = 0.
+      ASSIGN COMPONENT 'ID' OF STRUCTURE <ls_row> TO <lv_id>.
+      CHECK sy-subrc = 0.
+      TRY.
+          CALL METHOD ('CL_FDT_FACTORY')=>('GET_INSTANCE_GENERIC')
+            EXPORTING
+              iv_id       = <lv_id>
+            IMPORTING
+              eo_instance = <lo_instance>.
+          lo_instance = <lo_instance>.
+          CALL METHOD lo_instance->('IF_FDT_TRANSACTION~TRANSPORT')
+            EXPORTING
+              iv_deep              = abap_true
+              iv_transport_request = gv_trkorr.
+        CATCH cx_root INTO lx_root.
+          /atrm/cx_exception=>raise( io_root = lx_root ).
+      ENDTRY.
+    ENDLOOP.
+  ENDMETHOD.
+  METHOD wait_release.
+    DATA: lv_waited  TYPE i,
+          lv_message TYPE string.
+    DO.
+      SELECT SINGLE trstatus FROM e070 INTO status WHERE trkorr = gv_trkorr.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( iv_message = 'Transport not found' "#EC NOTEXT
+                                   iv_reason  = /atrm/cx_exception=>c_reason-not_found ).
+      ENDIF.
+      IF status = 'R' OR status = 'N'.
+        RETURN.
+      ENDIF.
+      " O: the update task is done, tp export still running
+      IF status = 'O' AND exported = abap_false.
+        RETURN.
+      ENDIF.
+      IF lv_waited >= timeout.
+        EXIT.
+      ENDIF.
+      " WAIT also ends the DB LUW, so the next SELECT sees the update task's commit
+      WAIT UP TO 5 SECONDS.
+      lv_waited = lv_waited + 5.
+    ENDDO.
+    IF status = 'O'.
+      lv_message = 'Release started but export not finished, check tp logs'. "#EC NOTEXT
+    ELSE.
+      lv_message = 'Release not completed, check update task (SM13)'. "#EC NOTEXT
+    ENDIF.
+    /atrm/cx_exception=>raise( iv_message = lv_message
+                               iv_reason  = /atrm/cx_exception=>c_reason-generic ).
+  ENDMETHOD.
 ENDCLASS.
