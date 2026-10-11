@@ -1,5 +1,7 @@
 REPORT ztrm_installer.
 
+TABLES sscrfields.
+
 *******************************************************************
 *              TRM - Transport Request Manager                    *
 *                  https://trmregistry.com                        *
@@ -31,8 +33,6 @@ REPORT ztrm_installer.
 * OTHER DEALINGS IN THE SOFTWARE.                                 *
 *                                                                 *
 *******************************************************************
-
-TABLES sscrfields.
 
 TYPES: BEGIN OF ty_vscan_f4,
          profile TYPE vscan_prof-profile,
@@ -850,13 +850,15 @@ CLASS lcl_report IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD load_release_file.
-    DATA: binary_data TYPE STANDARD TABLE OF x255,
-          file_length TYPE i.
+    DATA: filename_string TYPE string,
+          binary_data     TYPE STANDARD TABLE OF x255,
+          file_length     TYPE i.
 
     CLEAR: file, ok.
+    filename_string = filename.
     CALL FUNCTION 'GUI_UPLOAD'
       EXPORTING
-        filename                = filename
+        filename                = filename_string
         filetype                = 'BIN'
       IMPORTING
         filelength              = file_length
