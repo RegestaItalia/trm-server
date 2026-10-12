@@ -356,41 +356,64 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           e_package      = lo_package
         EXCEPTIONS
           OTHERS         = 1 ).
-      lo_package->set_changeable(
-        EXPORTING
-          i_changeable                 = 'X'
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          object_already_changeable = 0                       "ignore it
-          OTHERS            = 1 ).
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = 'X'
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              object_already_changeable = 0
+              OTHERS                    = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = 'X'
+            EXCEPTIONS
+              object_already_changeable = 0
+              OTHERS                    = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->set_super_package_name(
+      CALL METHOD lo_package->('SET_SUPER_PACKAGE_NAME')
         EXPORTING
           i_super_package_name = parentcl
         EXCEPTIONS
-          OTHERS               = 1 ).
+          OTHERS               = 1.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->save(
-        EXPORTING
-          i_suppress_dialog      = 'X'
-          i_suppress_corr_insert = 'X'
-        EXCEPTIONS
-          OTHERS                 = 1 ).
+      TRY.
+          CALL METHOD lo_package->('SAVE')
+            EXPORTING
+              i_suppress_dialog      = 'X'
+              i_suppress_corr_insert = 'X'
+            EXCEPTIONS
+              OTHERS                 = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SAVE')
+            EXCEPTIONS
+              OTHERS = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->set_changeable(
-        EXPORTING
-          i_changeable                 = ' '
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          OTHERS            = 1 ).
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = ' '
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              OTHERS = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = ' '
+            EXCEPTIONS
+              OTHERS = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.

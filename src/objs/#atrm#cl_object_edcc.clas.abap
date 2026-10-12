@@ -24,7 +24,6 @@ CLASS /atrm/cl_object_edcc IMPLEMENTATION.
       lt_tables      TYPE STANDARD TABLE OF string,
       lt_classes     TYPE STANDARD TABLE OF string,
       lv_obj_name    TYPE string,
-      lv_ddls_name   TYPE sobj_name,
       ls_dependency  TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
@@ -143,27 +142,12 @@ CLASS /atrm/cl_object_edcc IMPLEMENTATION.
         ENDLOOP.
 
         LOOP AT lt_entities INTO lv_obj_name.
-          CLEAR lv_ddls_name.
           TRY.
-              SELECT SINGLE ddlname
-                FROM ddldependency
-                INTO lv_ddls_name
-                WHERE objectname = lv_obj_name
-                  AND objecttype = 'STOB'
-                  AND state = 'A'.
-              IF lv_ddls_name IS NOT INITIAL.
-                CLEAR ls_dependency.
-                CALL METHOD get_tadir_dependency
-                  EXPORTING object = 'DDLS' obj_name = lv_ddls_name
-                  RECEIVING dependency = ls_dependency.
-                APPEND ls_dependency TO dependencies.
-              ELSE.
-                CLEAR ls_dependency.
-                CALL METHOD get_tadir_dependency
-                  EXPORTING object = 'TABL' obj_name = lv_obj_name
-                  RECEIVING dependency = ls_dependency.
-                APPEND ls_dependency TO dependencies.
-              ENDIF.
+              CLEAR ls_dependency.
+              CALL METHOD get_entity_dependency
+                EXPORTING entity = lv_obj_name
+                IMPORTING dependency = ls_dependency.
+              APPEND ls_dependency TO dependencies.
             CATCH cx_root.
               " optional dependency may not exist in the target system
           ENDTRY.

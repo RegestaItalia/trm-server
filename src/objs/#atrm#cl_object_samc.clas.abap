@@ -15,8 +15,9 @@ CLASS /atrm/cl_object_samc IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
     DATA:
-      lt_authorities TYPE STANDARD TABLE OF amc_chnl_auth,
-      ls_authority   TYPE amc_chnl_auth,
+      lr_authorities TYPE REF TO data,
+      lv_table       TYPE tabname,
+      lv_where       TYPE string,
       lv_class_flag  TYPE c,
       lv_class_name  TYPE seoclsname,
       lv_fugr_flag   TYPE c,
@@ -25,15 +26,26 @@ CLASS /atrm/cl_object_samc IMPLEMENTATION.
       lv_obj_name    TYPE sobj_name,
       ls_dependency  TYPE /atrm/object_dependency.
 
-    TRY.
-        SELECT *
-          FROM amc_chnl_auth
-          INTO TABLE lt_authorities
-          WHERE application_id = me->key-obj_name
-            AND version = 'A'.
+    FIELD-SYMBOLS:
+      <lt_authorities> TYPE STANDARD TABLE,
+      <ls_authority>   TYPE any,
+      <lv_program_id>  TYPE any.
 
-        LOOP AT lt_authorities INTO ls_authority.
-          CHECK ls_authority-program_id IS NOT INITIAL.
+    TRY.
+        lv_table = 'AMC_CHNL_AUTH'.
+        CREATE DATA lr_authorities TYPE STANDARD TABLE OF (lv_table).
+        ASSIGN lr_authorities->* TO <lt_authorities>.
+        CONCATENATE `APPLICATION_ID = '` me->key-obj_name
+          `' AND VERSION = 'A'` INTO lv_where.
+        SELECT * FROM (lv_table)
+          INTO TABLE <lt_authorities>
+          WHERE (lv_where).
+
+        LOOP AT <lt_authorities> ASSIGNING <ls_authority>.
+          UNASSIGN <lv_program_id>.
+          ASSIGN COMPONENT 'PROGRAM_ID' OF STRUCTURE <ls_authority> TO <lv_program_id>.
+          CHECK sy-subrc = 0.
+          CHECK <lv_program_id> IS NOT INITIAL.
 
           CLEAR:
             lv_class_flag,
@@ -45,7 +57,7 @@ CLASS /atrm/cl_object_samc IMPLEMENTATION.
 
           CALL FUNCTION 'RS_PROGNAME_SPLIT'
             EXPORTING
-              progname_with_namespace = ls_authority-program_id
+              progname_with_namespace = <lv_program_id>
             IMPORTING
               fugr_is_name            = lv_fugr_flag
               fugr_group              = lv_fugr_name
@@ -63,7 +75,7 @@ CLASS /atrm/cl_object_samc IMPLEMENTATION.
             lv_obj_name = lv_fugr_name.
           ELSE.
             lv_object = 'PROG'.
-            lv_obj_name = ls_authority-program_id.
+            lv_obj_name = <lv_program_id>.
           ENDIF.
 
           TRY.
@@ -74,7 +86,6 @@ CLASS /atrm/cl_object_samc IMPLEMENTATION.
                   obj_name   = lv_obj_name
                 RECEIVING
                   dependency = ls_dependency.
-
               APPEND ls_dependency TO dependencies.
             CATCH cx_root.
               " optional dependency may not exist in the target system

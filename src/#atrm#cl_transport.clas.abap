@@ -294,7 +294,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     TRY.
         DATA: lt_langs   TYPE TABLE OF lxeisolang,
               wa_langs   LIKE LINE OF lt_langs,
-              lo_explang TYPE REF TO cl_lxe_log_export,
+              lo_explang TYPE REF TO object,
               lt_date    TYPE lxe_tt_date,
               lv_ret_cnt TYPE i,
               lt_objct   TYPE lxe_tt_objct,
@@ -323,7 +323,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
           CLEAR lo_explang.
 
-          CREATE OBJECT lo_explang TYPE cl_lxe_log_export_local
+          CREATE OBJECT lo_explang TYPE ('CL_LXE_LOG_EXPORT_LOCAL')
             EXPORTING
               custmnr = cl_lxe_constants=>c_trl_area_local
               isolang = wa_langs.
@@ -335,22 +335,30 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           APPEND ls_date TO lt_date.
 
           CLEAR lv_ret_cnt.
-          lv_ret_cnt = lo_explang->log_select( st_objct = lt_objct[]
-                                               st_user  = lt_user[]
-                                               st_date  = lt_date[] ).
+          CALL METHOD lo_explang->('LOG_SELECT')
+            EXPORTING
+              st_objct = lt_objct[]
+              st_user  = lt_user[]
+              st_date  = lt_date[]
+            RECEIVING
+              ret_cnt  = lv_ret_cnt.
           CHECK lv_ret_cnt NE 0.
 
           CLEAR lv_ret_cnt.
-          lv_ret_cnt = lo_explang->apply_filters( st_packg  = devclass[]
-                                                  st_comp   = lt_comp[]
-                                                  piecelist = ' '
-                                                  check_ex  = 'X'
-                                                  chckorlg  = ' '
-                                                  clientdp  = ' ' ).
+          CALL METHOD lo_explang->('APPLY_FILTERS')
+            EXPORTING
+              st_packg  = devclass[]
+              st_comp   = lt_comp[]
+              piecelist = ' '
+              check_ex  = 'X'
+              chckorlg  = ' '
+              clientdp  = ' '
+            RECEIVING
+              ret_cnt   = lv_ret_cnt.
 
           CHECK lv_ret_cnt NE 0.
 
-          CALL METHOD lo_explang->export_objects
+          CALL METHOD lo_explang->('EXPORT_OBJECTS')
             EXPORTING
               tr_auto                      = ''
               tr_request                   = gv_trkorr

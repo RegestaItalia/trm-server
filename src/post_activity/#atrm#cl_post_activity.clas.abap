@@ -69,7 +69,8 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
           lo_paramtype     TYPE REF TO cl_abap_datadescr,
           lx_root          TYPE REF TO cx_root.
     FIELD-SYMBOLS: <fs_pa_parameter>       TYPE ty_pa_parameter,
-                   <fs_pa_attribute_value> TYPE flag.
+                   <fs_pa_attribute_value> TYPE flag,
+                   <fs_param_value>        TYPE any.
 
     CALL TRANSFORMATION id
     SOURCE XML iv_data
@@ -200,7 +201,9 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
       ls_parambind-name = ls_method_param-name.
       ls_parambind-kind = 'E'.
       CREATE DATA ls_parambind-value TYPE HANDLE lo_paramtype.
-      ls_parambind-value->* = ls_param-value.
+      ASSIGN ls_parambind-value->* TO <fs_param_value>.
+      <fs_param_value> = ls_param-value.
+      UNASSIGN <fs_param_value>.
       INSERT ls_parambind INTO TABLE lt_parambind_tab.
     ENDLOOP.
 
@@ -269,12 +272,20 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
     CLEAR ls_parambind.
     READ TABLE lt_parambind_tab INTO ls_parambind WITH KEY name = lc_pa_messages.
     IF sy-subrc EQ 0.
-      MOVE ls_parambind-value->* TO et_messages.
+      ASSIGN ls_parambind-value->* TO <fs_param_value>.
+      IF sy-subrc = 0.
+        MOVE <fs_param_value> TO et_messages.
+        UNASSIGN <fs_param_value>.
+      ENDIF.
     ENDIF.
     CLEAR ls_parambind.
     READ TABLE lt_parambind_tab INTO ls_parambind WITH KEY name = lc_pa_precheckval.
     IF sy-subrc EQ 0.
-      MOVE ls_parambind-value->* TO ev_execute.
+      ASSIGN ls_parambind-value->* TO <fs_param_value>.
+      IF sy-subrc = 0.
+        MOVE <fs_param_value> TO ev_execute.
+        UNASSIGN <fs_param_value>.
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 

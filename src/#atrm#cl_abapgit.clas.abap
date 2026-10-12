@@ -103,10 +103,11 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
       iv_package = devclass
       ii_log     = lo_log
     ).
-    zip = lcl_abapgit_zip=>encode_files(
+    CALL METHOD lcl_abapgit_zip=>encode_files
       EXPORTING
         it_files = lt_files
-    ).
+      RECEIVING
+        rv_xstr  = zip.
     LOOP AT lt_files INTO ls_file WHERE item IS NOT INITIAL.
       CLEAR ls_ser_obj.
       ls_ser_obj-pgmid = 'R3TR'.
