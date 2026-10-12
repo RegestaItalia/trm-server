@@ -2030,7 +2030,7 @@ INITIALIZATION.
   ELSE.
     sc_txt3              = 'You can provide a release via file upload.'.
   ENDIF.
-  sc_txt6                = '@X1@ TRM Installer v4.0.0 - RegestaItalia'.
+  sc_txt6                = '@X1@ TRM Installer v5.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
