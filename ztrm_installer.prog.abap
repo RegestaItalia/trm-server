@@ -71,7 +71,7 @@ SELECTION-SCREEN SKIP.
 
 SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 15 LINES,
 TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
-TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100,
+TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100 MODIF ID jsn,
 END OF BLOCK psel.
 
 SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
@@ -143,10 +143,14 @@ CLASS lcl_strust IMPLEMENTATION.
     pse_password = password.
 
     TRY.
-        cl_abap_pse=>authority_check(
-          iv_context  = ssl_client_context
-          iv_applic   = application
-          iv_activity = '02' ).
+        CALL METHOD ('CL_ABAP_PSE')=>('AUTHORITY_CHECK')
+          EXPORTING
+            iv_context  = ssl_client_context
+            iv_applic   = application
+            iv_activity = '02'.
+      CATCH cx_sy_dyn_call_error.
+        " CL_ABAP_PSE is not available on older SAP releases. The
+        " SSFPSE_* function modules still enforce their own authorization.
       CATCH cx_root INTO authority_error.
         error = authority_error->get_text( ).
         RETURN.
@@ -457,7 +461,7 @@ CLASS lcl_report IMPLEMENTATION.
     TRY.
         CREATE OBJECT test TYPE ('/UI2/CL_JSON').
         exists = 'X'.
-      CATCH cx_sy_dyn_call_error.
+      CATCH cx_root.
         CLEAR exists.
     ENDTRY.
   ENDMETHOD.
@@ -1337,13 +1341,13 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
   ENDMETHOD.
   METHOD import.
-    DATA: msgid   TYPE syst_msgid,
-          msgno   TYPE syst_msgno,
-          msgty   TYPE syst_msgty,
-          msgv1   TYPE syst_msgv,
-          msgv2   TYPE syst_msgv,
-          msgv3   TYPE syst_msgv,
-          msgv4   TYPE syst_msgv,
+    DATA: msgid   TYPE sy-msgid,
+          msgno   TYPE sy-msgno,
+          msgty   TYPE sy-msgty,
+          msgv1   TYPE sy-msgv1,
+          msgv2   TYPE sy-msgv2,
+          msgv3   TYPE sy-msgv3,
+          msgv4   TYPE sy-msgv4,
           imports TYPE stms_tp_imports,
           import  LIKE LINE OF imports.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
@@ -2136,6 +2140,10 @@ AT SELECTION-SCREEN OUTPUT.
   %_p_lserv_%_app_%-text  = 'trm-server package'.
   %_p_lrest_%_app_%-text  = 'trm-rest package'.
   LOOP AT SCREEN.
+    IF screen-group1 EQ 'JSN' AND json_supported <> 'X'.
+      screen-active = 0.
+      MODIFY SCREEN.
+    ENDIF.
     IF screen-group1 EQ 'CRT'.
       IF install_certificates_visible EQ 'X'.
         screen-active = 1.
