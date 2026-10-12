@@ -45,8 +45,8 @@ DATA: vscan                        TYPE STANDARD TABLE OF ty_vscan_f4,
       suppress_certificate_command TYPE flag.
 
 CONSTANTS: base_url      TYPE string VALUE 'https://trmregistry.com/registry',
-           server_trkorr TYPE trkorr VALUE 'A4HK999999',
-           rest_trkorr   TYPE trkorr VALUE 'A4HK9A0002'.
+           server_trkorr TYPE trkorr VALUE 'TRMK900000',
+           rest_trkorr   TYPE trkorr VALUE 'TRMK900001'.
 
 SELECTION-SCREEN BEGIN OF BLOCK sc_header WITH FRAME TITLE sc_titl1.
   SELECTION-SCREEN SKIP.
