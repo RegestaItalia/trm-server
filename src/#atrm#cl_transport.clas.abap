@@ -1048,13 +1048,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           msgv3     TYPE sy-msgv3,
           msgv4     TYPE sy-msgv4.
 
-    SELECT domnam sysnam trkorr tarcli FROM tmsbuffer
+    SELECT SINGLE domnam sysnam trkorr tarcli FROM tmsbuffer
       INTO CORRESPONDING FIELDS OF tmsbuffer
-      UP TO 1 ROWS
       WHERE sysnam EQ system
-        AND trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+        AND trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
 
     batch = sy-batch.
