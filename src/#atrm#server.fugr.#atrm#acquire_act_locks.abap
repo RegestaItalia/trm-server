@@ -1,4 +1,4 @@
-FUNCTION /ATRM/ACQUIRE_ACT_LOCKS.
+FUNCTION /atrm/acquire_act_locks.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -12,11 +12,11 @@ FUNCTION /ATRM/ACQUIRE_ACT_LOCKS.
 *"----------------------------------------------------------------------
   PERFORM check_auth.
   TRY.
-      /atrm/cl_action_lock=>acquire(
+      CALL METHOD ('/ATRM/CL_ACTION_LOCK')=>('ACQUIRE')
         EXPORTING
           it_keys = keys
           iv_owner_token = owner_token
-          iv_action_name = action_name ).
+          iv_action_name = action_name.
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

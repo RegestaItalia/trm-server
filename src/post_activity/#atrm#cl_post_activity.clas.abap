@@ -90,7 +90,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
     ELSE.
       CONCATENATE 'Post Activity' ls_data-name 'not found' INTO lv_error SEPARATED BY space.
     ENDIF.
-    cl_abap_classdescr=>describe_by_name(
+    CALL METHOD ('CL_ABAP_CLASSDESCR')=>('DESCRIBE_BY_NAME')
       EXPORTING
         p_name         = ls_data-name
       RECEIVING
@@ -98,7 +98,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
       EXCEPTIONS
         type_not_found = 1
         OTHERS         = 2
-    ).
+    .
     IF sy-subrc <> 0 OR lo_typedescr IS NOT BOUND.
       /atrm/cx_exception=>raise(
         iv_message = lv_error
@@ -109,7 +109,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
     lo_classdescr ?= lo_typedescr.
 
     " read trm_pa attribute
-    lo_classdescr->get_attribute_type(
+    CALL METHOD lo_classdescr->get_attribute_type
       EXPORTING
         p_name              = lc_pa_attribute
       RECEIVING
@@ -117,7 +117,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
       EXCEPTIONS
         attribute_not_found = 1
         OTHERS              = 2
-    ).
+    .
     IF sy-subrc <> 0 OR lo_pa_attribute IS NOT BOUND.
       /atrm/cx_exception=>raise(
         iv_message = lv_error
@@ -174,7 +174,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
         ).
       ENDIF.
       CLEAR lo_paramtype.
-      lo_classdescr->get_method_parameter_type(
+      CALL METHOD lo_classdescr->get_method_parameter_type
         EXPORTING
           p_method_name       = ls_method-name
           p_parameter_name    = ls_method_param-name
@@ -184,7 +184,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
           parameter_not_found = 1
           method_not_found    = 2
           OTHERS              = 3
-      ).
+      .
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise(
           iv_reason  = /atrm/cx_exception=>c_reason-pa_param_missing
@@ -211,7 +211,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
     READ TABLE ls_method-parameters INTO ls_method_param WITH KEY name = lc_pa_messages.
     IF sy-subrc EQ 0.
       CLEAR lo_paramtype.
-      lo_classdescr->get_method_parameter_type(
+      CALL METHOD lo_classdescr->get_method_parameter_type
         EXPORTING
           p_method_name       = ls_method-name
           p_parameter_name    = lc_pa_messages
@@ -221,7 +221,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
           parameter_not_found = 1
           method_not_found    = 2
           OTHERS              = 3
-      ).
+      .
       IF sy-subrc EQ 0.
         IF lo_paramtype->get_relative_name( ) EQ '/ATRM/SYMSG_TAB'.
           CLEAR ls_parambind.
@@ -237,7 +237,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
     READ TABLE ls_method-parameters INTO ls_method_param WITH KEY name = lc_pa_precheckval.
     IF sy-subrc EQ 0.
       CLEAR lo_paramtype.
-      lo_classdescr->get_method_parameter_type(
+      CALL METHOD lo_classdescr->get_method_parameter_type
         EXPORTING
           p_method_name       = ls_method-name
           p_parameter_name    = lc_pa_precheckval
@@ -247,7 +247,7 @@ CLASS /atrm/cl_post_activity IMPLEMENTATION.
           parameter_not_found = 1
           method_not_found    = 2
           OTHERS              = 3
-      ).
+      .
       IF sy-subrc EQ 0.
         IF lo_paramtype->get_relative_name( ) EQ 'FLAG'.
           CLEAR ls_parambind.

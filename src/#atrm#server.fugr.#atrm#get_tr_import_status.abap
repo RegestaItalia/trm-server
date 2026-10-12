@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_TR_IMPORT_STATUS.
+FUNCTION /atrm/get_tr_import_status.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -16,7 +16,6 @@ FUNCTION /ATRM/GET_TR_IMPORT_STATUS.
   TRY.
       CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
       status = go_transport->get_import_status(
-        EXPORTING
           system = system
       ).
     CATCH /atrm/cx_exception INTO go_exc.

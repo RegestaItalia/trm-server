@@ -12,10 +12,10 @@ FUNCTION /atrm/get_file_sys.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>get_file_sys(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('GET_FILE_SYS')
       IMPORTING
         file_sys = file_sys
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

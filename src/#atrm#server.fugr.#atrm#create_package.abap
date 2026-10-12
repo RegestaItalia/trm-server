@@ -12,10 +12,10 @@ FUNCTION /atrm/create_package.
   PERFORM check_auth.
 
   TRY.
-      /atrm/cl_package=>create(
+      CALL METHOD ('/ATRM/CL_PACKAGE')=>('CREATE')
         EXPORTING
           data = data
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

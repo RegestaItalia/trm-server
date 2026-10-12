@@ -13,10 +13,10 @@ FUNCTION /atrm/change_tr_owner.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->set_owner(
+    CALL METHOD go_transport->set_owner
       EXPORTING
         user = new_owner
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

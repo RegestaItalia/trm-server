@@ -385,13 +385,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       CLEAR ls_cr.
     ELSEIF parentcl IS NOT INITIAL.
       DATA lo_package TYPE REF TO if_package.
-      cl_package_factory=>load_package(
+      CALL METHOD ('CL_PACKAGE_FACTORY')=>('LOAD_PACKAGE')
         EXPORTING
           i_package_name = gv_devclass
         IMPORTING
           e_package      = lo_package
         EXCEPTIONS
-          OTHERS         = 1 ).
+          OTHERS         = 1.
       TRY.
           CALL METHOD lo_package->('SET_CHANGEABLE')
             EXPORTING
@@ -489,7 +489,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
             no_output_parameter_requested = 6
             OTHERS                        = 7.
       CATCH cx_dynamic_check.
-        cl_pak_package_queries=>get_all_subpackages(
+        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
          EXPORTING
            im_package                    = gv_devclass
          IMPORTING
@@ -502,7 +502,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
             invalid_superpackage          = 5
            no_output_parameter_requested = 6
            OTHERS                        = 7
-       ).
+.
     ENDTRY.
   ENDMETHOD.
 

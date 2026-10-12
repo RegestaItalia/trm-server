@@ -138,13 +138,13 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           ls_include   LIKE LINE OF lt_includes.
     lv_classname = key-obj_name.
     TRY.
-        cl_oo_classname_service=>get_all_method_includes(
+        CALL METHOD ('CL_OO_CLASSNAME_SERVICE')=>('GET_ALL_METHOD_INCLUDES')
           EXPORTING
             clsname           = lv_classname
             with_enhancements = 'X'
           RECEIVING
             result = lt_includes
-        ).
+        .
       CATCH cx_class_not_existent.
     ENDTRY.
     LOOP AT lt_includes INTO ls_include.

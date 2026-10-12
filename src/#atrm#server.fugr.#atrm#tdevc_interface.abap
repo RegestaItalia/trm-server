@@ -1,4 +1,4 @@
-FUNCTION /ATRM/TDEVC_INTERFACE.
+FUNCTION /atrm/tdevc_interface.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -15,12 +15,12 @@ FUNCTION /ATRM/TDEVC_INTERFACE.
 
   TRY.
       CREATE OBJECT go_package EXPORTING devclass = devclass.
-      go_package->interface(
+      CALL METHOD go_package->interface
         EXPORTING
           parentcl    = parentcl
           rm_parentcl = rm_parentcl
           devlayer    = devlayer
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

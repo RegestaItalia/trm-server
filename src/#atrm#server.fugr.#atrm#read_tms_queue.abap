@@ -14,12 +14,12 @@ FUNCTION /atrm/read_tms_queue.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_transport=>read_queue(
+    CALL METHOD ('/ATRM/CL_TRANSPORT')=>('READ_QUEUE')
       EXPORTING
         target   = target
       IMPORTING
         requests = requests
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

@@ -17,7 +17,7 @@ FUNCTION /atrm/get_abapgit_source.
 
   TRY.
       DATA ser_objects TYPE /atrm/cl_abapgit=>tyt_ser_objs.
-      CALL METHOD /atrm/cl_abapgit=>serialize
+      CALL METHOD ('/ATRM/CL_ABAPGIT')=>('SERIALIZE')
         EXPORTING
           devclass = devclass
         IMPORTING

@@ -18,7 +18,6 @@ FUNCTION /atrm/import_tr.
   TRY.
       CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
       import = go_transport->import(
-        EXPORTING
           system = system
           test   = test
       ).

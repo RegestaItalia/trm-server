@@ -18,20 +18,20 @@ FUNCTION /atrm/execute_post_activity.
 
   TRY.
       IF pre EQ 'X'.
-        /atrm/cl_post_activity=>pre(
+        CALL METHOD ('/ATRM/CL_POST_ACTIVITY')=>('PRE')
           EXPORTING
             data     = data
           IMPORTING
             messages = messages[]
             execute  = execute
-        ).
+        .
       ELSE.
-        /atrm/cl_post_activity=>execute(
+        CALL METHOD ('/ATRM/CL_POST_ACTIVITY')=>('EXECUTE')
           EXPORTING
             data     = data
           IMPORTING
             messages = messages[]
-        ).
+        .
       ENDIF.
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.

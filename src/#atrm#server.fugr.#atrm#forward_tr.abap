@@ -1,4 +1,4 @@
-FUNCTION /ATRM/FORWARD_TR.
+FUNCTION /atrm/forward_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -15,12 +15,12 @@ FUNCTION /ATRM/FORWARD_TR.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->forward(
+    CALL METHOD go_transport->forward
       EXPORTING
         target       = target
         source       = source
         import_again = import_again
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

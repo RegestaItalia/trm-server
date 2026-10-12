@@ -193,18 +193,18 @@ CLASS /atrm/cl_object IMPLEMENTATION.
 
     LOOP AT senvi INTO ls_senvi.
       CLEAR lo_map.
-      /atrm/cl_senvi_map=>get(
+      CALL METHOD ('/ATRM/CL_SENVI_MAP')=>('GET')
         EXPORTING
           senvi  = ls_senvi
           origin = me
         RECEIVING
           map    = lo_map
-      ).
+      .
       CHECK lo_map IS BOUND.
-      lo_map->map_dependencies(
+      CALL METHOD lo_map->map_dependencies
         CHANGING
           deps = dependencies
-      ).
+      .
     ENDLOOP.
   ENDMETHOD.
   METHOD get_cds_dependency.

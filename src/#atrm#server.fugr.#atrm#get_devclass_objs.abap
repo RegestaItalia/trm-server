@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_DEVCLASS_OBJS.
+FUNCTION /atrm/get_devclass_objs.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,10 +14,10 @@ FUNCTION /ATRM/GET_DEVCLASS_OBJS.
 
   TRY.
     CREATE OBJECT go_package EXPORTING devclass = devclass.
-    go_package->get_objects(
+    CALL METHOD go_package->get_objects
       IMPORTING
         tadir    = tadir[]
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

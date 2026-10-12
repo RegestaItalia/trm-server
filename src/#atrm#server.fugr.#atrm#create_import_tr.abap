@@ -14,13 +14,13 @@ FUNCTION /atrm/create_import_tr.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_transport=>create_workbench(
+    CALL METHOD ('/ATRM/CL_TRANSPORT')=>('CREATE_WORKBENCH')
       EXPORTING
         text   = text
         target = target
       RECEIVING
         transport = go_transport
-    ).
+    .
     trkorr = go_transport->get_trkorr( ).
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.

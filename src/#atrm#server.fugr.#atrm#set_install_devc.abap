@@ -21,18 +21,18 @@ FUNCTION /atrm/set_install_devc.
   TRY.
     IF package IS SUPPLIED.
       CREATE OBJECT lo_utilities.
-      lo_utilities->restore_install_metadata(
+      CALL METHOD lo_utilities->restore_install_metadata
         EXPORTING
           package        = package
           package_exists = package_exists
           installdevc    = installdevc[]
           installtr      = installtr[]
-      ).
+      .
     ELSE.
-      /atrm/cl_utilities=>add_install_devclass(
+      CALL METHOD ('/ATRM/CL_UTILITIES')=>('ADD_INSTALL_DEVCLASS')
         EXPORTING
           installdevc = installdevc[]
-      ).
+      .
     ENDIF.
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.

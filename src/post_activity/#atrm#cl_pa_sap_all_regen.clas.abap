@@ -1,5 +1,3 @@
-"! Regenerate SAP_ALL for all clients
-"!
 CLASS /atrm/cl_pa_sap_all_regen DEFINITION
   PUBLIC
   FINAL
@@ -66,10 +64,10 @@ CLASS /atrm/cl_pa_sap_all_regen IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     SUBMIT (lv_report) WITH SELECTION-TABLE selection EXPORTING LIST TO MEMORY AND RETURN.
-    /atrm/cl_utilities=>append_messages_from_memory(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('APPEND_MESSAGES_FROM_MEMORY')
       CHANGING
         messages = messages
-    ).
+    .
   ENDMETHOD.
 
 ENDCLASS.

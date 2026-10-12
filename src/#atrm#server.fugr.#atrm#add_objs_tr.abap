@@ -17,13 +17,13 @@ FUNCTION /atrm/add_objs_tr.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->add_objects(
+    CALL METHOD go_transport->add_objects
       EXPORTING
         lock   = lock
         e071   = e071[]
       IMPORTING
         log    = log
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

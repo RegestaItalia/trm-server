@@ -1,4 +1,4 @@
-FUNCTION /ATRM/SET_TRANSPORT_DOC.
+FUNCTION /atrm/set_transport_doc.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -16,10 +16,10 @@ FUNCTION /ATRM/SET_TRANSPORT_DOC.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->set_documentation(
+    CALL METHOD go_transport->set_documentation
       EXPORTING
         doc    = doc[]
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.
