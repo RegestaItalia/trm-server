@@ -289,6 +289,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_translations.
+    CONSTANTS lc_trl_area_local TYPE lxe_log-custmnr VALUE '999999'.
     DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
           lr_date       TYPE REF TO data,
           lr_objct      TYPE REF TO data,
@@ -330,7 +331,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             RETURN.
         ENDTRY.
 
-        SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ cl_lxe_constants=>c_trl_area_local.
+        SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ lc_trl_area_local.
 
         LOOP AT lt_langs INTO wa_langs.
           CALL FUNCTION 'LXE_T002_CHECK_LANGUAGE'
@@ -349,7 +350,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           TRY.
               CREATE OBJECT lo_explang TYPE ('CL_LXE_LOG_EXPORT_LOCAL')
                 EXPORTING
-                  custmnr = cl_lxe_constants=>c_trl_area_local
+                  custmnr = lc_trl_area_local
                   isolang = wa_langs.
             CATCH cx_root.
               " Translation export class is not available on this SAP release
