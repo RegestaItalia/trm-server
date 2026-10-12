@@ -1133,11 +1133,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       WHERE trkorr EQ gv_trkorr
         AND langu EQ sy-langu.
     SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
-    SELECT client FROM e070c INTO ls_tmsbuftxt-srccli
-      UP TO 1 ROWS
-      WHERE trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli
+      WHERE trkorr EQ gv_trkorr.
     " there's no standard way to update buffer text table other than clearing the buffer as a whole?
     MODIFY tmsbuftxt FROM ls_tmsbuftxt.
     COMMIT WORK AND WAIT.
@@ -1195,12 +1192,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: ls_tmsbuffer TYPE tmsbuffer,
           lt_stats     TYPE tpstats.
 
-    SELECT * FROM tmsbuffer INTO ls_tmsbuffer
-      UP TO 1 ROWS
+    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer
       WHERE sysnam EQ system
-        AND trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+        AND trkorr EQ gv_trkorr.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise(
         iv_message = 'Transport was not found in the target system buffer' "#EC NOTEXT
