@@ -1,3 +1,74 @@
+# ECC 6.0 EHP2 / SAP_BASIS 702 compatibility
+
+The lowest supported target is ECC 6.0 EHP2 with SAP_BASIS 702 SP12. Modern S/4
+activation and a clean abaplint run are necessary, but they do not prove that an import
+will generate successfully on that release.
+
+## What abaplint can enforce
+
+`abaplint.json` pins `syntax.version` to `v702` and enables the syntax, parser, DDIC,
+unknown-type, include, implementation and XML consistency checks. Keep that version
+pinned and run `npm run lint` before considering a change complete. It reliably catches
+language constructs that are outside the configured release and many unresolved static
+references represented by the configured dependency model.
+
+Do not treat a zero-issue abaplint result as an ECC import simulation. The dependency
+bundle is not the target system's exact DDIC/API catalog, and abaplint currently does not
+reliably catch all of these SAP_BASIS 702 differences:
+
+- a type, class, interface, method or function module that exists in the lint dependency
+  set or on S/4 but not on the real ECC system;
+- `ORDER BY PRIMARY KEY` applied to an object that is a database view on the target;
+- old-kernel method-call grammar differences, especially section keywords inside a
+  functional call;
+- generated function-group/include syntax and other errors that only appear during the
+  target system's import generation phase.
+
+The actual ECC import generation log remains the final compatibility check.
+
+## Rules learned from the 7.02 import campaign
+
+- Never use release-specific system aliases such as `SYST_BATCH`, `SYST_SUBRC`,
+  `SYST_MSGID`, `SYST_MSGNO`, `SYST_MSGTY` or `SYST_MSGV`. Type saved system values with
+  the corresponding fields: `TYPE sy-batch`, `sy-subrc`, `sy-msgid`, `sy-msgno`,
+  `sy-msgty`, and `sy-msgv1` through `sy-msgv4`.
+- Do not use `ORDER BY PRIMARY KEY` for a query that can address a view. When only one
+  matching row is required, use `SELECT SINGLE`. Otherwise name the ordering fields
+  explicitly. Before transport, search the complete source set for `ORDER BY PRIMARY
+  KEY`; the compatibility sweep intentionally leaves none in `/ATRM/CL_TRANSPORT`.
+- In a functional method call, do not write section keywords inside the parentheses.
+  For a returning call, use `result = class=>method( parameter = value )`, without
+  `EXPORTING`. For calls needing `IMPORTING`, `RECEIVING`, `CHANGING` or `EXCEPTIONS`,
+  use classic `CALL METHOD` syntax.
+- On code paths that showed old-parser ambiguity for a static classic call, use the
+  fully dynamic form, for example `CALL METHOD ('/ATRM/CL_ABAPGIT')=>('SERIALIZE') ...`.
+  This is also the required pattern when the class or method may not exist on an older
+  release.
+- Avoid static references to optional platform APIs. Known examples from this campaign
+  include `CL_ABAP_PSE`, `/UI2/CL_JSON`, newer package APIs, RAP/workbench APIs and LXE
+  translation types/classes. Resolve them dynamically and catch `CX_ROOT` so absence
+  degrades cleanly.
+- Do not depend on standard type `SYMSG`/`SYMSG_TAB` being present. The project-owned
+  `/ATRM/SYMSG` structure and `/ATRM/SYMSG_TAB` table type are the portable contract.
+- Features unavailable on the target must disappear completely from the UI. Do not
+  leave an empty or untitled tab when online installation is unsupported.
+- After ARC-1 changes, verify the active SAP source again before releasing the request.
+  In particular, check function-module includes: a later synchronization from an older
+  mirror can silently restore an incompatible call. `src/` is still never edited
+  locally; update the mirror only through the normal SAP/abapGit workflow.
+
+For a compatibility sweep, search at least for:
+
+```text
+ORDER BY PRIMARY KEY
+TYPE SYST_
+=>method( followed by EXPORTING/IMPORTING/RECEIVING/CHANGING/EXCEPTIONS
+CALL METHOD class=>method followed by parameter sections
+```
+
+Then run SAP syntax checks, activate every changed object (including function modules,
+not only their function group), and confirm that the inactive-object list is empty.
+
 # Writing an object dependency handler
 
 Scope: `src/objs/`, the `/ATRM/CL_OBJECT_*` family. Read this before adding or changing
