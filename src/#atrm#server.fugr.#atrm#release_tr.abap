@@ -1,4 +1,4 @@
-FUNCTION /ATRM/RELEASE_TR.
+FUNCTION /atrm/release_tr.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -15,12 +15,12 @@ FUNCTION /ATRM/RELEASE_TR.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->release(
+    CALL METHOD go_transport->release
       EXPORTING
         lock     = lock
       IMPORTING
         messages = messages[]
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

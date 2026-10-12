@@ -23,13 +23,13 @@ FUNCTION /atrm/get_transport_entries.
   TRY.
       DATA lo_transport TYPE REF TO /atrm/cl_transport.
       CREATE OBJECT lo_transport EXPORTING trkorr = trkorr.
-      lo_transport->get_entries(
+      CALL METHOD lo_transport->get_entries
         IMPORTING
           e071 = ls_entries-e071
           tadir = ls_entries-tadir
           tdevc = ls_entries-tdevc
           tdevct = ls_entries-tdevct
-      ).
+      .
 
       CALL TRANSFORMATION id
         SOURCE entries = ls_entries

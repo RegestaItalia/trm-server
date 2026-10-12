@@ -1,4 +1,4 @@
-FUNCTION /ATRM/RELEASE_ACT_LOCKS.
+FUNCTION /atrm/release_act_locks.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -11,10 +11,10 @@ FUNCTION /ATRM/RELEASE_ACT_LOCKS.
 *"----------------------------------------------------------------------
   PERFORM check_auth.
   TRY.
-      /atrm/cl_action_lock=>release(
+      CALL METHOD ('/ATRM/CL_ACTION_LOCK')=>('RELEASE')
         EXPORTING
           it_keys = keys
-          iv_owner_token = owner_token ).
+          iv_owner_token = owner_token.
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

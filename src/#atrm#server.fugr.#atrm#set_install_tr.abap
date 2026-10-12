@@ -16,12 +16,12 @@ FUNCTION /atrm/set_install_tr.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>set_install_transports(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('SET_INSTALL_TRANSPORTS')
       EXPORTING
         package_name     = package_name
         package_registry = package_registry
         installtr        = installtr[]
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

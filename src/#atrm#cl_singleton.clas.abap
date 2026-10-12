@@ -43,9 +43,9 @@ CLASS /atrm/cl_singleton IMPLEMENTATION.
 
   METHOD get_supported_object_types.
     IF gt_object_text[] IS INITIAL.
-      /atrm/cl_utilities=>get_supported_object_types(
+      CALL METHOD ('/ATRM/CL_UTILITIES')=>('GET_SUPPORTED_OBJECT_TYPES')
         IMPORTING object_text = gt_object_text
-      ).
+      .
     ENDIF.
     object_text[] = gt_object_text[].
   ENDMETHOD.

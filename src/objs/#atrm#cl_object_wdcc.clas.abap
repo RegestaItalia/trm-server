@@ -21,6 +21,12 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
       lv_parent     TYPE sobj_name,
       ls_dependency TYPE /atrm/object_dependency.
 
+    FIELD-SYMBOLS:
+      <lv_component> TYPE any,
+      <lv_id>        TYPE any,
+      <lv_type>      TYPE any,
+      <lv_variant>   TYPE any.
+
     TRY.
         ls_config_key = me->key-obj_name.
 
@@ -31,10 +37,11 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
             xml_xcontent         = lv_xml
             original_config_data = ls_config.
 
-        IF ls_config-component IS NOT INITIAL.
+        ASSIGN COMPONENT 'COMPONENT' OF STRUCTURE ls_config TO <lv_component>.
+        IF sy-subrc = 0 AND <lv_component> IS NOT INITIAL.
           TRY.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = 'WDYN' obj_name = ls_config-component
+                EXPORTING object = 'WDYN' obj_name = <lv_component>
                 RECEIVING dependency = ls_dependency.
               APPEND ls_dependency TO dependencies.
             CATCH cx_root.
@@ -42,12 +49,11 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
           ENDTRY.
         ENDIF.
 
-        IF ls_config-config_idpar IS NOT INITIAL.
-          CONCATENATE
-            ls_config-config_idpar
-            ls_config-config_typepar
-            ls_config-config_varpar
-            INTO lv_parent.
+        ASSIGN COMPONENT 'CONFIG_IDPAR' OF STRUCTURE ls_config TO <lv_id>.
+        ASSIGN COMPONENT 'CONFIG_TYPEPAR' OF STRUCTURE ls_config TO <lv_type>.
+        ASSIGN COMPONENT 'CONFIG_VARPAR' OF STRUCTURE ls_config TO <lv_variant>.
+        IF <lv_id> IS ASSIGNED AND <lv_id> IS NOT INITIAL.
+          CONCATENATE <lv_id> <lv_type> <lv_variant> INTO lv_parent.
           TRY.
               CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency

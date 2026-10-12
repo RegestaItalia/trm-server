@@ -1,4 +1,4 @@
-FUNCTION /ATRM/TR_COPY.
+FUNCTION /atrm/tr_copy.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -14,11 +14,11 @@ FUNCTION /ATRM/TR_COPY.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = to.
-    go_transport->copy(
+    CALL METHOD go_transport->copy
       EXPORTING
         trkorr = from
         doc    = doc
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

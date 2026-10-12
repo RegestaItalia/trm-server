@@ -15,7 +15,6 @@ FUNCTION /atrm/get_dot_abapgit.
 
   TRY.
       dot_abapgit = /atrm/cl_abapgit=>get_dot_abapgit(
-        EXPORTING
           devclass    = devclass
       ).
     CATCH /atrm/cx_exception INTO go_exc.

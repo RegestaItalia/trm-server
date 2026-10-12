@@ -1,4 +1,3 @@
-"! Execute checks before exporting transport requests
 CLASS /atrm/cl_before_export DEFINITION
   PUBLIC
   FINAL
@@ -100,10 +99,10 @@ CLASS /atrm/cl_before_export IMPLEMENTATION.
     APPEND ls_selection TO lt_selection.
 
     SUBMIT rs_stree_objects_to_req_get WITH SELECTION-TABLE lt_selection EXPORTING LIST TO MEMORY AND RETURN. "#EC CI_SUBMIT
-    /atrm/cl_utilities=>append_messages_from_memory(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('APPEND_MESSAGES_FROM_MEMORY')
       CHANGING
         messages = messages
-    ).
+    .
   ENDMETHOD.
 
 ENDCLASS.

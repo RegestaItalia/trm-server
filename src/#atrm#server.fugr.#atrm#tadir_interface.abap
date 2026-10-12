@@ -17,7 +17,7 @@ FUNCTION /atrm/tadir_interface.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>tadir_interface(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('TADIR_INTERFACE')
       EXPORTING
         pgmid     = pgmid
         object    = object
@@ -26,7 +26,7 @@ FUNCTION /atrm/tadir_interface.
         srcsystem = srcsystem
         author    = author
         genflag   = set_genflag
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

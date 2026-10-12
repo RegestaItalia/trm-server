@@ -12,11 +12,11 @@ FUNCTION /atrm/write_binary_file.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>write_binary_file(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('WRITE_BINARY_FILE')
       EXPORTING
         file_path = file_path
         file      = file
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

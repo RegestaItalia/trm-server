@@ -1,14 +1,13 @@
-*"* use this source file for any macro definitions you need
-*"* in the implementation part of the class
+
 DEFINE create_data.
   TRY.
     CREATE DATA &1 TYPE (&2).
   CATCH cx_root INTO tmp_exception.
-    /atrm/cx_exception=>raise(
+    CALL METHOD ('/ATRM/CX_EXCEPTION')=>('RAISE')
       EXPORTING
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_data_error
         io_root    = tmp_exception
-    ).
+    .
   ENDTRY.
 END-OF-DEFINITION.
 
@@ -16,11 +15,11 @@ DEFINE create_data_ref.
   TRY.
     CREATE DATA &1 TYPE REF TO (&2).
   CATCH cx_root INTO tmp_exception.
-    /atrm/cx_exception=>raise(
+    CALL METHOD ('/ATRM/CX_EXCEPTION')=>('RAISE')
       EXPORTING
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_data_error
         io_root    = tmp_exception
-    ).
+    .
   ENDTRY.
 END-OF-DEFINITION.
 
@@ -30,11 +29,11 @@ DEFINE create_object.
       PARAMETER-TABLE tmp_param_tab.
     CLEAR tmp_param_tab.
   CATCH cx_root INTO tmp_exception.
-    /atrm/cx_exception=>raise(
+    CALL METHOD ('/ATRM/CX_EXCEPTION')=>('RAISE')
       EXPORTING
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
         io_root    = tmp_exception
-    ).
+    .
   ENDTRY.
 END-OF-DEFINITION.
 
@@ -52,11 +51,11 @@ DEFINE call_object_method.
       PARAMETER-TABLE tmp_param_tab.
     clear tmp_param_tab.
   CATCH cx_root INTO tmp_exception.
-    /atrm/cx_exception=>raise(
+    CALL METHOD ('/ATRM/CX_EXCEPTION')=>('RAISE')
       EXPORTING
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
         io_root    = tmp_exception
-    ).
+    .
   ENDTRY.
 END-OF-DEFINITION.
 
@@ -66,10 +65,10 @@ DEFINE call_static_method.
       PARAMETER-TABLE tmp_param_tab.
     clear tmp_param_tab.
   CATCH cx_root INTO tmp_exception.
-    /atrm/cx_exception=>raise(
+    CALL METHOD ('/ATRM/CX_EXCEPTION')=>('RAISE')
       EXPORTING
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
         io_root    = tmp_exception
-    ).
+    .
   ENDTRY.
 END-OF-DEFINITION.

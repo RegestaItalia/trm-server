@@ -12,13 +12,15 @@ FUNCTION /atrm/get_dependencies_single.
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
+  DATA lo_object TYPE REF TO /atrm/if_object.
+
   TRY.
-      /atrm/cl_object_dispacher=>get(
+      lo_object = /atrm/cl_object_dispacher=>get(
         key = object
-      )->get_dependencies(
-        IMPORTING
-          dependencies = dependencies[]
       ).
+      CALL METHOD lo_object->get_dependencies
+        IMPORTING
+          dependencies = dependencies[].
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

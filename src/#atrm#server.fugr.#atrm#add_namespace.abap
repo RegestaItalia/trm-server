@@ -14,12 +14,12 @@ FUNCTION /atrm/add_namespace.
   PERFORM check_auth.
 
   TRY.
-      /atrm/cl_utilities=>add_namespace(
+      CALL METHOD ('/ATRM/CL_UTILITIES')=>('ADD_NAMESPACE')
         EXPORTING
           namespace  = namespace
           replicense = replicense
           texts      = texts[]
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

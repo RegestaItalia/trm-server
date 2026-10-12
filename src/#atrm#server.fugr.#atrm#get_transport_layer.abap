@@ -11,10 +11,10 @@ FUNCTION /atrm/get_transport_layer.
   PERFORM check_auth.
 
   TRY.
-      /atrm/cl_utilities=>get_default_transport_layer(
+      CALL METHOD ('/ATRM/CL_UTILITIES')=>('GET_DEFAULT_TRANSPORT_LAYER')
         IMPORTING
           layer = layer
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

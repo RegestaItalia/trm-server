@@ -10,11 +10,13 @@ FUNCTION /atrm/list_object_types.
 *"----------------------------------------------------------------------
   PERFORM check_auth.
 
+  DATA lo_singleton TYPE REF TO /atrm/cl_singleton.
+
   TRY.
-    /atrm/cl_singleton=>get( )->get_supported_object_types(
+    lo_singleton = /atrm/cl_singleton=>get( ).
+    CALL METHOD lo_singleton->get_supported_object_types
       IMPORTING
-        object_text = object_text[]
-    ).
+        object_text = object_text[].
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

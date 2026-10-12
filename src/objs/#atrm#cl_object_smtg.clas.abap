@@ -15,32 +15,46 @@ CLASS /atrm/cl_object_smtg IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
     DATA:
-      ls_header      TYPE smtg_tmpl_hdr,
-      lv_ddls_name   TYPE sobj_name,
+      lr_header      TYPE REF TO data,
       lv_table_name  TYPE tabname,
+      lv_where       TYPE string,
       ls_dependency  TYPE /atrm/object_dependency.
 
+    FIELD-SYMBOLS:
+      <ls_header> TYPE any,
+      <lv_value>  TYPE any.
+
     TRY.
-        SELECT SINGLE *
-          FROM smtg_tmpl_hdr
-          INTO ls_header
-          WHERE id = me->key-obj_name
-            AND version = 'A'.
+        lv_table_name = 'SMTG_TMPL_HDR'.
+        CREATE DATA lr_header TYPE (lv_table_name).
+        ASSIGN lr_header->* TO <ls_header>.
+        CONCATENATE `ID = '` me->key-obj_name
+          `' AND VERSION = 'A'` INTO lv_where.
+        SELECT SINGLE * FROM (lv_table_name)
+          INTO <ls_header>
+          WHERE (lv_where).
         CHECK sy-subrc = 0.
 
-        IF ls_header-cds_view IS NOT INITIAL.
-          lv_table_name = 'DDLDEPENDENCY'.
+        ASSIGN COMPONENT 'CDS_VIEW' OF STRUCTURE <ls_header> TO <lv_value>.
+        IF sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
           TRY.
-              SELECT SINGLE ddlname
-                FROM (lv_table_name)
-                INTO lv_ddls_name
-                WHERE objectname = ls_header-cds_view
-                  AND objecttype = 'STOB'
-                  AND state = 'A'.
-              CHECK lv_ddls_name IS NOT INITIAL.
+              CLEAR ls_dependency.
+              CALL METHOD get_cds_dependency
+                EXPORTING entity = <lv_value>
+                IMPORTING dependency = ls_dependency.
+              APPEND ls_dependency TO dependencies.
+            CATCH cx_root.
+              " optional dependency may not exist in the target system
+          ENDTRY.
+        ENDIF.
 
+        UNASSIGN <lv_value>.
+        ASSIGN COMPONENT 'PARENT_ID' OF STRUCTURE <ls_header> TO <lv_value>.
+        IF sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
+          TRY.
+              CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = 'DDLS' obj_name = lv_ddls_name
+                EXPORTING object = 'SMTG' obj_name = <lv_value>
                 RECEIVING dependency = ls_dependency.
               APPEND ls_dependency TO dependencies.
             CATCH cx_root.
@@ -48,23 +62,13 @@ CLASS /atrm/cl_object_smtg IMPLEMENTATION.
           ENDTRY.
         ENDIF.
 
-        IF ls_header-parent_id IS NOT INITIAL.
+        UNASSIGN <lv_value>.
+        ASSIGN COMPONENT 'ORIGINAL_ID' OF STRUCTURE <ls_header> TO <lv_value>.
+        IF sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
           TRY.
               CLEAR ls_dependency.
               CALL METHOD get_tadir_dependency
-                EXPORTING object = 'SMTG' obj_name = ls_header-parent_id
-                RECEIVING dependency = ls_dependency.
-              APPEND ls_dependency TO dependencies.
-            CATCH cx_root.
-              " optional dependency may not exist in the target system
-          ENDTRY.
-        ENDIF.
-
-        IF ls_header-original_id IS NOT INITIAL.
-          TRY.
-              CLEAR ls_dependency.
-              CALL METHOD get_tadir_dependency
-                EXPORTING object = 'SMTG' obj_name = ls_header-original_id
+                EXPORTING object = 'SMTG' obj_name = <lv_value>
                 RECEIVING dependency = ls_dependency.
               APPEND ls_dependency TO dependencies.
             CATCH cx_root.

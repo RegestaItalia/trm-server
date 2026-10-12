@@ -1,4 +1,4 @@
-FUNCTION /ATRM/GET_DEPENDENCIES.
+FUNCTION /atrm/get_dependencies.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -16,7 +16,6 @@ FUNCTION /ATRM/GET_DEPENDENCIES.
 
   TRY.
       dependencies = /atrm/cl_object_dispacher=>get_package_dependencies(
-        EXPORTING
           package      = devclass
           incl_sub     = incl_sub
           log_id       = log_id

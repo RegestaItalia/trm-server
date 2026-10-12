@@ -15,12 +15,12 @@ FUNCTION /atrm/import_tr_multiple.
   PERFORM check_auth.
 
   TRY.
-      /atrm/cl_transport=>import_multiple(
+      CALL METHOD ('/ATRM/CL_TRANSPORT')=>('IMPORT_MULTIPLE')
         EXPORTING
           system     = system
           transports = trkorr
           test       = test
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.

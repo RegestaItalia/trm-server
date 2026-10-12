@@ -1,4 +1,3 @@
-"! ABAPGit API exposure
 CLASS /atrm/cl_abapgit DEFINITION
   PUBLIC
   FINAL
@@ -46,12 +45,12 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
     DATA: lo_srv  TYPE REF TO lcl_abapgit_repo_srv,
           lo_repo TYPE REF TO lcl_abapgit_repo.
     lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
-    lo_srv->get_repo_from_package(
+    CALL METHOD lo_srv->get_repo_from_package
       EXPORTING
         iv_package = devclass
       IMPORTING
         eo_repo    = lo_repo
-    ).
+    .
     IF lo_repo IS NOT BOUND.
       /atrm/cx_exception=>raise(
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
@@ -74,12 +73,12 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
           ls_ser_obj     LIKE LINE OF objects.
 
     lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
-    lo_srv->get_repo_from_package(
+    CALL METHOD lo_srv->get_repo_from_package
       EXPORTING
         iv_package = devclass
       IMPORTING
         eo_repo    = lo_repo
-    ).
+    .
     IF lo_repo IS BOUND.
       lo_dot_abapgit = lo_repo->get_dot_abapgit( ).
     ENDIF.
@@ -103,10 +102,11 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
       iv_package = devclass
       ii_log     = lo_log
     ).
-    zip = lcl_abapgit_zip=>encode_files(
+    CALL METHOD lcl_abapgit_zip=>encode_files
       EXPORTING
         it_files = lt_files
-    ).
+      RECEIVING
+        rv_xstr  = zip.
     LOOP AT lt_files INTO ls_file WHERE item IS NOT INITIAL.
       CLEAR ls_ser_obj.
       ls_ser_obj-pgmid = 'R3TR'.

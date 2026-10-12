@@ -18,21 +18,31 @@ CLASS /atrm/cl_object_sapc IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
     DATA:
-      lv_class_name TYPE apc_appl-class_name,
-      lv_path       TYPE apc_appl-path,
-      lv_path_str   TYPE string,
-      ls_dependency TYPE /atrm/object_dependency.
+      lr_application TYPE REF TO data,
+      lv_table       TYPE tabname,
+      lv_where       TYPE string,
+      lv_class_name  TYPE sobj_name,
+      lv_path_str    TYPE string,
+      ls_dependency  TYPE /atrm/object_dependency.
+
+    FIELD-SYMBOLS:
+      <ls_application> TYPE any,
+      <lv_value>       TYPE any.
 
     TRY.
-        SELECT SINGLE class_name path
-          FROM apc_appl
-          INTO (lv_class_name, lv_path)
-          WHERE application_id = me->key-obj_name
-            AND version = 'A'.
-
+        lv_table = 'APC_APPL'.
+        CREATE DATA lr_application TYPE (lv_table).
+        ASSIGN lr_application->* TO <ls_application>.
+        CONCATENATE `APPLICATION_ID = '` me->key-obj_name
+          `' AND VERSION = 'A'` INTO lv_where.
+        SELECT SINGLE * FROM (lv_table)
+          INTO <ls_application>
+          WHERE (lv_where).
         CHECK sy-subrc = 0.
 
-        IF lv_class_name IS NOT INITIAL.
+        ASSIGN COMPONENT 'CLASS_NAME' OF STRUCTURE <ls_application> TO <lv_value>.
+        IF sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
+          lv_class_name = <lv_value>.
           TRY.
               CALL METHOD get_tadir_dependency
                 EXPORTING
@@ -46,15 +56,16 @@ CLASS /atrm/cl_object_sapc IMPLEMENTATION.
           ENDTRY.
         ENDIF.
 
-        " Generated ICF service of the application path
-        IF lv_path IS NOT INITIAL.
-          lv_path_str = lv_path.
+        UNASSIGN <lv_value>.
+        ASSIGN COMPONENT 'PATH' OF STRUCTURE <ls_application> TO <lv_value>.
+        IF sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
+          lv_path_str = <lv_value>.
           append_icf_service(
             EXPORTING path         = lv_path_str
             CHANGING  dependencies = dependencies ).
         ENDIF.
       CATCH cx_root.
-        " optional dependency may not exist in the target system
+        " optional ABAP push channel API may not exist in the target system
     ENDTRY.
 
     SORT dependencies BY tabname tabkey.

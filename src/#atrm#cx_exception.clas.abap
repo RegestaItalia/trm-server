@@ -219,11 +219,11 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
       CONCATENATE 'Caused by:' lv_class lv_text
         INTO lv_line SEPARATED BY space.                    "#EC NOTEXT
       append_line( EXPORTING iv_text = lv_line CHANGING ct_log = rt_stack ).
-      lo_exc->get_source_position(
+      CALL METHOD lo_exc->get_source_position
         IMPORTING
           include_name = lv_include
           source_line  = lv_source
-      ).
+      .
       IF lv_include IS NOT INITIAL.
         lv_lineno = lv_source.
         CONDENSE lv_lineno.

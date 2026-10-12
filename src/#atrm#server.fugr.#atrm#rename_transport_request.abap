@@ -1,4 +1,4 @@
-FUNCTION /ATRM/RENAME_TRANSPORT_REQUEST.
+FUNCTION /atrm/rename_transport_request.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -15,10 +15,10 @@ FUNCTION /ATRM/RENAME_TRANSPORT_REQUEST.
 
   TRY.
     CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-    go_transport->rename(
+    CALL METHOD go_transport->rename
       EXPORTING
         as4text = as4text
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

@@ -185,10 +185,10 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       CLEAR lv_linked_package_registry.
       UNASSIGN <fs_trkorr_package>.
       CREATE OBJECT lo_transport EXPORTING iv_trkorr = ls_trkorr-trkorr iv_migration = ls_trkorr-migration.
-      lo_transport->get_linked_package(
+      CALL METHOD lo_transport->get_linked_package
         RECEIVING
           ro_linked_package = lo_linked_package
-      ).
+      .
       IF lo_linked_package IS BOUND.
         lv_linked_package_name = lo_linked_package->name.
         lv_linked_package_registry = lo_linked_package->registry.

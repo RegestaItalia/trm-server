@@ -14,12 +14,12 @@ FUNCTION /atrm/get_binary_file.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_utilities=>get_binary_file(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('GET_BINARY_FILE')
       EXPORTING
         file_path = file_path
       IMPORTING
         file      = file
-    ).
+    .
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.
   ENDTRY.

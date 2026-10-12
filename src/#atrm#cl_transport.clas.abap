@@ -289,24 +289,49 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_translations.
-    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    CONSTANTS lc_trl_area_local TYPE lxe_log-custmnr VALUE '999999'.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          lr_date       TYPE REF TO data,
+          lr_objct      TYPE REF TO data,
+          lr_user       TYPE REF TO data,
+          lr_comp       TYPE REF TO data.
+    FIELD-SYMBOLS:
+      <lt_date>  TYPE STANDARD TABLE,
+      <lt_objct> TYPE STANDARD TABLE,
+      <lt_user>  TYPE STANDARD TABLE,
+      <lt_comp>  TYPE STANDARD TABLE,
+      <ls_date>  TYPE any,
+      <lv_value> TYPE any.
+
     enqueue( ).
     TRY.
         DATA: lt_langs   TYPE TABLE OF lxeisolang,
               wa_langs   LIKE LINE OF lt_langs,
-              lo_explang TYPE REF TO cl_lxe_log_export,
-              lt_date    TYPE lxe_tt_date,
-              lv_ret_cnt TYPE i,
-              lt_objct   TYPE lxe_tt_objct,
-              lt_user    TYPE lxe_tt_user,
-              lt_comp    TYPE lxe_tt_comp.
+              lo_explang TYPE REF TO object,
+              lv_ret_cnt TYPE i.
 
         IF devclass[] IS INITIAL.
           /atrm/cx_exception=>raise( iv_message = 'No input packages defined' "#EC NOTEXT
                                     iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
         ENDIF.
 
-        SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ cl_lxe_constants=>c_trl_area_local.
+        TRY.
+            CREATE DATA lr_date TYPE ('LXE_TT_DATE').
+            CREATE DATA lr_objct TYPE ('LXE_TT_OBJCT').
+            CREATE DATA lr_user TYPE ('LXE_TT_USER').
+            CREATE DATA lr_comp TYPE ('LXE_TT_COMP').
+            ASSIGN lr_date->* TO <lt_date>.
+            ASSIGN lr_objct->* TO <lt_objct>.
+            ASSIGN lr_user->* TO <lt_user>.
+            ASSIGN lr_comp->* TO <lt_comp>.
+          CATCH cx_root.
+            " Translation log API is not available on this SAP release
+            sort_and_compress( ).
+            dequeue( ).
+            RETURN.
+        ENDTRY.
+
+        SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ lc_trl_area_local.
 
         LOOP AT lt_langs INTO wa_langs.
           CALL FUNCTION 'LXE_T002_CHECK_LANGUAGE'
@@ -322,35 +347,57 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           ENDIF.
 
           CLEAR lo_explang.
+          TRY.
+              CREATE OBJECT lo_explang TYPE ('CL_LXE_LOG_EXPORT_LOCAL')
+                EXPORTING
+                  custmnr = lc_trl_area_local
+                  isolang = wa_langs.
+            CATCH cx_root.
+              " Translation export class is not available on this SAP release
+              CONTINUE.
+          ENDTRY.
 
-          CREATE OBJECT lo_explang TYPE cl_lxe_log_export_local
+          APPEND INITIAL LINE TO <lt_date> ASSIGNING <ls_date>.
+          ASSIGN COMPONENT 'SIGN' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = 'I'.
+          ENDIF.
+          UNASSIGN <lv_value>.
+          ASSIGN COMPONENT 'OPTION' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = 'LE'.
+          ENDIF.
+          UNASSIGN <lv_value>.
+          ASSIGN COMPONENT 'LOW' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = sy-datum.
+          ENDIF.
+
+          CLEAR lv_ret_cnt.
+          CALL METHOD lo_explang->('LOG_SELECT')
             EXPORTING
-              custmnr = cl_lxe_constants=>c_trl_area_local
-              isolang = wa_langs.
-
-          DATA ls_date LIKE LINE OF lt_date.
-          ls_date-sign = 'I'.
-          ls_date-option = 'LE'.
-          ls_date-low = sy-datum.
-          APPEND ls_date TO lt_date.
-
-          CLEAR lv_ret_cnt.
-          lv_ret_cnt = lo_explang->log_select( st_objct = lt_objct[]
-                                               st_user  = lt_user[]
-                                               st_date  = lt_date[] ).
+              st_objct = <lt_objct>
+              st_user  = <lt_user>
+              st_date  = <lt_date>
+            RECEIVING
+              ret_cnt  = lv_ret_cnt.
           CHECK lv_ret_cnt NE 0.
 
           CLEAR lv_ret_cnt.
-          lv_ret_cnt = lo_explang->apply_filters( st_packg  = devclass[]
-                                                  st_comp   = lt_comp[]
-                                                  piecelist = ' '
-                                                  check_ex  = 'X'
-                                                  chckorlg  = ' '
-                                                  clientdp  = ' ' ).
+          CALL METHOD lo_explang->('APPLY_FILTERS')
+            EXPORTING
+              st_packg  = devclass[]
+              st_comp   = <lt_comp>
+              piecelist = ' '
+              check_ex  = 'X'
+              chckorlg  = ' '
+              clientdp  = ' '
+            RECEIVING
+              ret_cnt   = lv_ret_cnt.
 
           CHECK lv_ret_cnt NE 0.
 
-          CALL METHOD lo_explang->export_objects
+          CALL METHOD lo_explang->('EXPORT_OBJECTS')
             EXPORTING
               tr_auto                      = ''
               tr_request                   = gv_trkorr
@@ -651,16 +698,16 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           result   TYPE stms_tp_forward,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
-          batch    TYPE syst_batch,
+          batch    TYPE sy-batch,
           found    TYPE flag,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
 
     batch = sy-batch.
     sy-batch = 'X'.
@@ -743,16 +790,16 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   METHOD read_queue.
     DATA: bufcnt      TYPE tmsbufcnt,
           alog        TYPE tmsalog,
-          batch       TYPE syst_batch,
-          alert_subrc TYPE syst_subrc,
-          subrc       TYPE syst_subrc,
-          msgid       TYPE syst_msgid,
-          msgno       TYPE syst_msgno,
-          msgty       TYPE syst_msgty,
-          msgv1       TYPE syst_msgv,
-          msgv2       TYPE syst_msgv,
-          msgv3       TYPE syst_msgv,
-          msgv4       TYPE syst_msgv.
+          batch       TYPE sy-batch,
+          alert_subrc TYPE sy-subrc,
+          subrc       TYPE sy-subrc,
+          msgid       TYPE sy-msgid,
+          msgno       TYPE sy-msgno,
+          msgty       TYPE sy-msgty,
+          msgv1       TYPE sy-msgv1,
+          msgv2       TYPE sy-msgv2,
+          msgv3       TYPE sy-msgv3,
+          msgv4       TYPE sy-msgv4.
 
     batch = sy-batch.
     sy-batch = 'X'.
@@ -990,24 +1037,21 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           result    TYPE stms_tp_maintain,
           stdout    TYPE /atrm/cx_exception=>tyt_log,
           tpstdout  TYPE tpstdout,
-          batch     TYPE syst_batch,
+          batch     TYPE sy-batch,
           found     TYPE flag,
-          subrc     TYPE syst_subrc,
-          msgid     TYPE syst_msgid,
-          msgno     TYPE syst_msgno,
-          msgty     TYPE syst_msgty,
-          msgv1     TYPE syst_msgv,
-          msgv2     TYPE syst_msgv,
-          msgv3     TYPE syst_msgv,
-          msgv4     TYPE syst_msgv.
+          subrc     TYPE sy-subrc,
+          msgid     TYPE sy-msgid,
+          msgno     TYPE sy-msgno,
+          msgty     TYPE sy-msgty,
+          msgv1     TYPE sy-msgv1,
+          msgv2     TYPE sy-msgv2,
+          msgv3     TYPE sy-msgv3,
+          msgv4     TYPE sy-msgv4.
 
-    SELECT domnam sysnam trkorr tarcli FROM tmsbuffer
+    SELECT SINGLE domnam sysnam trkorr tarcli FROM tmsbuffer
       INTO CORRESPONDING FIELDS OF tmsbuffer
-      UP TO 1 ROWS
       WHERE sysnam EQ system
-        AND trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+        AND trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
 
     batch = sy-batch.
@@ -1089,11 +1133,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       WHERE trkorr EQ gv_trkorr
         AND langu EQ sy-langu.
     SELECT SINGLE as4user FROM e070 INTO ls_tmsbuftxt-owner WHERE trkorr EQ gv_trkorr.
-    SELECT client FROM e070c INTO ls_tmsbuftxt-srccli
-      UP TO 1 ROWS
-      WHERE trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+    SELECT SINGLE client FROM e070c INTO ls_tmsbuftxt-srccli
+      WHERE trkorr EQ gv_trkorr.
     " there's no standard way to update buffer text table other than clearing the buffer as a whole?
     MODIFY tmsbuftxt FROM ls_tmsbuftxt.
     COMMIT WORK AND WAIT.
@@ -1151,12 +1192,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: ls_tmsbuffer TYPE tmsbuffer,
           lt_stats     TYPE tpstats.
 
-    SELECT * FROM tmsbuffer INTO ls_tmsbuffer
-      UP TO 1 ROWS
+    SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer
       WHERE sysnam EQ system
-        AND trkorr EQ gv_trkorr
-      ORDER BY PRIMARY KEY.
-    ENDSELECT.
+        AND trkorr EQ gv_trkorr.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise(
         iv_message = 'Transport was not found in the target system buffer' "#EC NOTEXT
@@ -1257,22 +1295,22 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD execute_import.
+METHOD execute_import.
     DATA: imports  TYPE stms_tp_imports,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
-          batch    TYPE syst_batch,
+          batch    TYPE sy-batch,
           subset   TYPE stms_flag,
           offline  TYPE stms_flag,
           found    TYPE flag,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
 
     IF transport = 'SOME'.
       subset = 'X'.
@@ -1381,14 +1419,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: error    TYPE trboolean,
           messages TYPE ctsgerrmsgs,
           message  LIKE LINE OF messages,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
     CALL FUNCTION 'TR_LOCK_REQUEST'
       EXPORTING
         iv_trkorr          = gv_trkorr

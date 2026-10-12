@@ -14,7 +14,6 @@ FUNCTION /atrm/get_objs_locks.
 
   TRY.
     locks = /atrm/cl_utilities=>get_objs_locks(
-      EXPORTING
         objects = objects[]
     ).
   CATCH /atrm/cx_exception INTO go_exc.

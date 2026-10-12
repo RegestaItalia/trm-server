@@ -257,14 +257,23 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
 
 * lock package
-    CALL METHOD lo_package->set_changeable
-      EXPORTING
-        i_changeable                 = 'X'
-        i_suppress_dialog            = 'D'
-        i_suppress_access_permission = 'X'
-      EXCEPTIONS
-        object_already_changeable    = 0                       "ignore it
-        OTHERS                       = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable                 = 'X'
+            i_suppress_dialog            = 'D'
+            i_suppress_access_permission = 'X'
+          EXCEPTIONS
+            object_already_changeable = 0
+            OTHERS                    = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = 'X'
+          EXCEPTIONS
+            object_already_changeable = 0
+            OTHERS                    = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
@@ -282,26 +291,44 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 *   try to unlock the package, exceptions are tolerated
       subrc = sy-subrc.
 
-      CALL METHOD lo_package->set_changeable
-        EXPORTING
-          i_changeable                 = ' '
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          OTHERS                       = 0.
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = ' '
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              OTHERS = 0.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = ' '
+            EXCEPTIONS
+              OTHERS = 0.
+      ENDTRY.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
 * save package
-    CALL METHOD lo_package->save
-      EXPORTING
-        i_transport_request    = transport_request
-        i_suppress_dialog      = 'X'
-        i_suppress_corr_insert = 'X'
-      IMPORTING
-        e_transport_request    = transport_request
-      EXCEPTIONS
-        OTHERS                 = 1.
+    TRY.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_transport_request    = transport_request
+            i_suppress_dialog      = 'X'
+            i_suppress_corr_insert = 'X'
+          IMPORTING
+            e_transport_request    = transport_request
+          EXCEPTIONS
+            OTHERS                 = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_transport_request = transport_request
+          IMPORTING
+            e_transport_request = transport_request
+          EXCEPTIONS
+            OTHERS              = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
 *   try to undo the changes, exceptions are tolerated
@@ -314,14 +341,23 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
 
 * unlock package
-    CALL METHOD lo_package->set_changeable
-      EXPORTING
-        i_changeable                 = ' '
-        i_suppress_dialog            = 'D'
-        i_suppress_access_permission = 'X'
-      EXCEPTIONS
-        object_already_unlocked      = 0                       "ignore
-        OTHERS                       = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable                 = ' '
+            i_suppress_dialog            = 'D'
+            i_suppress_access_permission = 'X'
+          EXCEPTIONS
+            object_already_unlocked = 0
+            OTHERS                  = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = ' '
+          EXCEPTIONS
+            object_already_unlocked = 0
+            OTHERS                  = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
@@ -349,48 +385,71 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       CLEAR ls_cr.
     ELSEIF parentcl IS NOT INITIAL.
       DATA lo_package TYPE REF TO if_package.
-      cl_package_factory=>load_package(
+      CALL METHOD ('CL_PACKAGE_FACTORY')=>('LOAD_PACKAGE')
         EXPORTING
           i_package_name = gv_devclass
         IMPORTING
           e_package      = lo_package
         EXCEPTIONS
-          OTHERS         = 1 ).
-      lo_package->set_changeable(
-        EXPORTING
-          i_changeable                 = 'X'
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          object_already_changeable = 0                       "ignore it
-          OTHERS            = 1 ).
+          OTHERS         = 1.
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = 'X'
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              object_already_changeable = 0
+              OTHERS                    = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = 'X'
+            EXCEPTIONS
+              object_already_changeable = 0
+              OTHERS                    = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->set_super_package_name(
+      CALL METHOD lo_package->('SET_SUPER_PACKAGE_NAME')
         EXPORTING
           i_super_package_name = parentcl
         EXCEPTIONS
-          OTHERS               = 1 ).
+          OTHERS               = 1.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->save(
-        EXPORTING
-          i_suppress_dialog      = 'X'
-          i_suppress_corr_insert = 'X'
-        EXCEPTIONS
-          OTHERS                 = 1 ).
+      TRY.
+          CALL METHOD lo_package->('SAVE')
+            EXPORTING
+              i_suppress_dialog      = 'X'
+              i_suppress_corr_insert = 'X'
+            EXCEPTIONS
+              OTHERS                 = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SAVE')
+            EXCEPTIONS
+              OTHERS = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      lo_package->set_changeable(
-        EXPORTING
-          i_changeable                 = ' '
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          OTHERS            = 1 ).
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = ' '
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              OTHERS = 1.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = ' '
+            EXCEPTIONS
+              OTHERS = 1.
+      ENDTRY.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
@@ -430,7 +489,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
             no_output_parameter_requested = 6
             OTHERS                        = 7.
       CATCH cx_dynamic_check.
-        cl_pak_package_queries=>get_all_subpackages(
+        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
          EXPORTING
            im_package                    = gv_devclass
          IMPORTING
@@ -443,7 +502,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
             invalid_superpackage          = 5
            no_output_parameter_requested = 6
            OTHERS                        = 7
-       ).
+.
     ENDTRY.
   ENDMETHOD.
 

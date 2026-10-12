@@ -14,13 +14,13 @@ FUNCTION /atrm/create_toc.
   PERFORM check_auth.
 
   TRY.
-    /atrm/cl_transport=>create_transport_of_copies(
+    CALL METHOD ('/ATRM/CL_TRANSPORT')=>('CREATE_TRANSPORT_OF_COPIES')
       EXPORTING
         text   = text
         target = target
       RECEIVING
         transport = go_transport
-    ).
+    .
     trkorr = go_transport->get_trkorr( ).
   CATCH /atrm/cx_exception INTO go_exc.
     PERFORM handle_exception.

@@ -1,18 +1,3 @@
-"! Executes a full cleanup of Fiori/UI5-related caches after transport import
-"!
-"! Runs a series of reports including:
-"!
-"!  - /UI2/DELETE_CACHE_AFTER_IMP
-"!
-"!  - /UI2/INVALIDATE_CLIENT_CACHES
-"!
-"!  - /UI5/APP_INDEX_CALCULATE
-"!
-"!  - /UI5/DEL_ODATA_METADATA_CACHE
-"!
-"!  - /IWFND/R_MED_CACHE_CLEANUP
-"!
-"!  - /IWBEP/R_MGW_MED_CACHE_CLEANUP
 CLASS /atrm/cl_pa_fiori_cache_clean DEFINITION
   PUBLIC
   FINAL
@@ -187,10 +172,10 @@ CLASS /atrm/cl_pa_fiori_cache_clean IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
     SUBMIT (lv_report) WITH SELECTION-TABLE selection EXPORTING LIST TO MEMORY AND RETURN.
-    /atrm/cl_utilities=>append_messages_from_memory(
+    CALL METHOD ('/ATRM/CL_UTILITIES')=>('APPEND_MESSAGES_FROM_MEMORY')
       CHANGING
         messages = messages
-    ).
+    .
   ENDMETHOD.
 
 ENDCLASS.

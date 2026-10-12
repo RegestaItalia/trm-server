@@ -14,10 +14,10 @@ FUNCTION /atrm/add_lang_tr.
 
   TRY.
       CREATE OBJECT go_transport EXPORTING trkorr = trkorr.
-      go_transport->add_translations(
+      CALL METHOD go_transport->add_translations
         EXPORTING
           devclass = devclass[]
-      ).
+      .
     CATCH /atrm/cx_exception INTO go_exc.
       PERFORM handle_exception.
   ENDTRY.
