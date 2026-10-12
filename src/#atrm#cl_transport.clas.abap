@@ -698,16 +698,16 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           result   TYPE stms_tp_forward,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
-          batch    TYPE syst_batch,
+          batch    TYPE sy-batch,
           found    TYPE flag,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
 
     batch = sy-batch.
     sy-batch = 'X'.
@@ -790,16 +790,16 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   METHOD read_queue.
     DATA: bufcnt      TYPE tmsbufcnt,
           alog        TYPE tmsalog,
-          batch       TYPE syst_batch,
-          alert_subrc TYPE syst_subrc,
-          subrc       TYPE syst_subrc,
-          msgid       TYPE syst_msgid,
-          msgno       TYPE syst_msgno,
-          msgty       TYPE syst_msgty,
-          msgv1       TYPE syst_msgv,
-          msgv2       TYPE syst_msgv,
-          msgv3       TYPE syst_msgv,
-          msgv4       TYPE syst_msgv.
+          batch       TYPE sy-batch,
+          alert_subrc TYPE sy-subrc,
+          subrc       TYPE sy-subrc,
+          msgid       TYPE sy-msgid,
+          msgno       TYPE sy-msgno,
+          msgty       TYPE sy-msgty,
+          msgv1       TYPE sy-msgv1,
+          msgv2       TYPE sy-msgv2,
+          msgv3       TYPE sy-msgv3,
+          msgv4       TYPE sy-msgv4.
 
     batch = sy-batch.
     sy-batch = 'X'.
@@ -1037,16 +1037,16 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           result    TYPE stms_tp_maintain,
           stdout    TYPE /atrm/cx_exception=>tyt_log,
           tpstdout  TYPE tpstdout,
-          batch     TYPE syst_batch,
+          batch     TYPE sy-batch,
           found     TYPE flag,
-          subrc     TYPE syst_subrc,
-          msgid     TYPE syst_msgid,
-          msgno     TYPE syst_msgno,
-          msgty     TYPE syst_msgty,
-          msgv1     TYPE syst_msgv,
-          msgv2     TYPE syst_msgv,
-          msgv3     TYPE syst_msgv,
-          msgv4     TYPE syst_msgv.
+          subrc     TYPE sy-subrc,
+          msgid     TYPE sy-msgid,
+          msgno     TYPE sy-msgno,
+          msgty     TYPE sy-msgty,
+          msgv1     TYPE sy-msgv1,
+          msgv2     TYPE sy-msgv2,
+          msgv3     TYPE sy-msgv3,
+          msgv4     TYPE sy-msgv4.
 
     SELECT domnam sysnam trkorr tarcli FROM tmsbuffer
       INTO CORRESPONDING FIELDS OF tmsbuffer
@@ -1304,22 +1304,22 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD execute_import.
+METHOD execute_import.
     DATA: imports  TYPE stms_tp_imports,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
-          batch    TYPE syst_batch,
+          batch    TYPE sy-batch,
           subset   TYPE stms_flag,
           offline  TYPE stms_flag,
           found    TYPE flag,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
 
     IF transport = 'SOME'.
       subset = 'X'.
@@ -1428,14 +1428,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     DATA: error    TYPE trboolean,
           messages TYPE ctsgerrmsgs,
           message  LIKE LINE OF messages,
-          subrc    TYPE syst_subrc,
-          msgid    TYPE syst_msgid,
-          msgno    TYPE syst_msgno,
-          msgty    TYPE syst_msgty,
-          msgv1    TYPE syst_msgv,
-          msgv2    TYPE syst_msgv,
-          msgv3    TYPE syst_msgv,
-          msgv4    TYPE syst_msgv.
+          subrc    TYPE sy-subrc,
+          msgid    TYPE sy-msgid,
+          msgno    TYPE sy-msgno,
+          msgty    TYPE sy-msgty,
+          msgv1    TYPE sy-msgv1,
+          msgv2    TYPE sy-msgv2,
+          msgv3    TYPE sy-msgv3,
+          msgv4    TYPE sy-msgv4.
     CALL FUNCTION 'TR_LOCK_REQUEST'
       EXPORTING
         iv_trkorr          = gv_trkorr
