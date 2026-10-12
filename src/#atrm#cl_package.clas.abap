@@ -257,14 +257,23 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
 
 * lock package
-    CALL METHOD lo_package->set_changeable
-      EXPORTING
-        i_changeable                 = 'X'
-        i_suppress_dialog            = 'D'
-        i_suppress_access_permission = 'X'
-      EXCEPTIONS
-        object_already_changeable    = 0                       "ignore it
-        OTHERS                       = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable                 = 'X'
+            i_suppress_dialog            = 'D'
+            i_suppress_access_permission = 'X'
+          EXCEPTIONS
+            object_already_changeable = 0
+            OTHERS                    = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = 'X'
+          EXCEPTIONS
+            object_already_changeable = 0
+            OTHERS                    = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
@@ -282,26 +291,44 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 *   try to unlock the package, exceptions are tolerated
       subrc = sy-subrc.
 
-      CALL METHOD lo_package->set_changeable
-        EXPORTING
-          i_changeable                 = ' '
-          i_suppress_dialog            = 'D'
-          i_suppress_access_permission = 'X'
-        EXCEPTIONS
-          OTHERS                       = 0.
+      TRY.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable                 = ' '
+              i_suppress_dialog            = 'D'
+              i_suppress_access_permission = 'X'
+            EXCEPTIONS
+              OTHERS = 0.
+        CATCH cx_sy_dyn_call_param_not_found.
+          CALL METHOD lo_package->('SET_CHANGEABLE')
+            EXPORTING
+              i_changeable = ' '
+            EXCEPTIONS
+              OTHERS = 0.
+      ENDTRY.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
 * save package
-    CALL METHOD lo_package->save
-      EXPORTING
-        i_transport_request    = transport_request
-        i_suppress_dialog      = 'X'
-        i_suppress_corr_insert = 'X'
-      IMPORTING
-        e_transport_request    = transport_request
-      EXCEPTIONS
-        OTHERS                 = 1.
+    TRY.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_transport_request    = transport_request
+            i_suppress_dialog      = 'X'
+            i_suppress_corr_insert = 'X'
+          IMPORTING
+            e_transport_request    = transport_request
+          EXCEPTIONS
+            OTHERS                 = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_transport_request = transport_request
+          IMPORTING
+            e_transport_request = transport_request
+          EXCEPTIONS
+            OTHERS              = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
 *   try to undo the changes, exceptions are tolerated
@@ -314,14 +341,23 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     ENDIF.
 
 * unlock package
-    CALL METHOD lo_package->set_changeable
-      EXPORTING
-        i_changeable                 = ' '
-        i_suppress_dialog            = 'D'
-        i_suppress_access_permission = 'X'
-      EXCEPTIONS
-        object_already_unlocked      = 0                       "ignore
-        OTHERS                       = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable                 = ' '
+            i_suppress_dialog            = 'D'
+            i_suppress_access_permission = 'X'
+          EXCEPTIONS
+            object_already_unlocked = 0
+            OTHERS                  = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = ' '
+          EXCEPTIONS
+            object_already_unlocked = 0
+            OTHERS                  = 1.
+    ENDTRY.
 
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).

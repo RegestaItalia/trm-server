@@ -289,22 +289,46 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD add_translations.
-    DATA lo_lock_error TYPE REF TO /atrm/cx_exception.
+    DATA: lo_lock_error TYPE REF TO /atrm/cx_exception,
+          lr_date       TYPE REF TO data,
+          lr_objct      TYPE REF TO data,
+          lr_user       TYPE REF TO data,
+          lr_comp       TYPE REF TO data.
+    FIELD-SYMBOLS:
+      <lt_date>  TYPE STANDARD TABLE,
+      <lt_objct> TYPE STANDARD TABLE,
+      <lt_user>  TYPE STANDARD TABLE,
+      <lt_comp>  TYPE STANDARD TABLE,
+      <ls_date>  TYPE any,
+      <lv_value> TYPE any.
+
     enqueue( ).
     TRY.
         DATA: lt_langs   TYPE TABLE OF lxeisolang,
               wa_langs   LIKE LINE OF lt_langs,
               lo_explang TYPE REF TO object,
-              lt_date    TYPE lxe_tt_date,
-              lv_ret_cnt TYPE i,
-              lt_objct   TYPE lxe_tt_objct,
-              lt_user    TYPE lxe_tt_user,
-              lt_comp    TYPE lxe_tt_comp.
+              lv_ret_cnt TYPE i.
 
         IF devclass[] IS INITIAL.
           /atrm/cx_exception=>raise( iv_message = 'No input packages defined' "#EC NOTEXT
                                     iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
         ENDIF.
+
+        TRY.
+            CREATE DATA lr_date TYPE ('LXE_TT_DATE').
+            CREATE DATA lr_objct TYPE ('LXE_TT_OBJCT').
+            CREATE DATA lr_user TYPE ('LXE_TT_USER').
+            CREATE DATA lr_comp TYPE ('LXE_TT_COMP').
+            ASSIGN lr_date->* TO <lt_date>.
+            ASSIGN lr_objct->* TO <lt_objct>.
+            ASSIGN lr_user->* TO <lt_user>.
+            ASSIGN lr_comp->* TO <lt_comp>.
+          CATCH cx_root.
+            " Translation log API is not available on this SAP release
+            sort_and_compress( ).
+            dequeue( ).
+            RETURN.
+        ENDTRY.
 
         SELECT DISTINCT targlng FROM lxe_log INTO TABLE lt_langs WHERE custmnr EQ cl_lxe_constants=>c_trl_area_local.
 
@@ -322,24 +346,38 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           ENDIF.
 
           CLEAR lo_explang.
+          TRY.
+              CREATE OBJECT lo_explang TYPE ('CL_LXE_LOG_EXPORT_LOCAL')
+                EXPORTING
+                  custmnr = cl_lxe_constants=>c_trl_area_local
+                  isolang = wa_langs.
+            CATCH cx_root.
+              " Translation export class is not available on this SAP release
+              CONTINUE.
+          ENDTRY.
 
-          CREATE OBJECT lo_explang TYPE ('CL_LXE_LOG_EXPORT_LOCAL')
-            EXPORTING
-              custmnr = cl_lxe_constants=>c_trl_area_local
-              isolang = wa_langs.
-
-          DATA ls_date LIKE LINE OF lt_date.
-          ls_date-sign = 'I'.
-          ls_date-option = 'LE'.
-          ls_date-low = sy-datum.
-          APPEND ls_date TO lt_date.
+          APPEND INITIAL LINE TO <lt_date> ASSIGNING <ls_date>.
+          ASSIGN COMPONENT 'SIGN' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = 'I'.
+          ENDIF.
+          UNASSIGN <lv_value>.
+          ASSIGN COMPONENT 'OPTION' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = 'LE'.
+          ENDIF.
+          UNASSIGN <lv_value>.
+          ASSIGN COMPONENT 'LOW' OF STRUCTURE <ls_date> TO <lv_value>.
+          IF sy-subrc = 0.
+            <lv_value> = sy-datum.
+          ENDIF.
 
           CLEAR lv_ret_cnt.
           CALL METHOD lo_explang->('LOG_SELECT')
             EXPORTING
-              st_objct = lt_objct[]
-              st_user  = lt_user[]
-              st_date  = lt_date[]
+              st_objct = <lt_objct>
+              st_user  = <lt_user>
+              st_date  = <lt_date>
             RECEIVING
               ret_cnt  = lv_ret_cnt.
           CHECK lv_ret_cnt NE 0.
@@ -348,7 +386,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           CALL METHOD lo_explang->('APPLY_FILTERS')
             EXPORTING
               st_packg  = devclass[]
-              st_comp   = lt_comp[]
+              st_comp   = <lt_comp>
               piecelist = ' '
               check_ex  = 'X'
               chckorlg  = ' '
