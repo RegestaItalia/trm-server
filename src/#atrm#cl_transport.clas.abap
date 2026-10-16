@@ -1220,7 +1220,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       ).
     ENDIF.
     SORT lt_stats BY timestamp DESCENDING.
-    READ TABLE lt_stats INTO stat INDEX 1.
+    " In a batch import (IMPORT SUBSET) every request shares the same timestamp:
+    " return the latest row of the requested transport, else the latest row.
+    READ TABLE lt_stats INTO stat WITH KEY trkorr = gv_trkorr.
+    IF sy-subrc <> 0.
+      READ TABLE lt_stats INTO stat INDEX 1.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_targets.
