@@ -891,6 +891,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             iv_display_export_log    = ' '
             iv_without_objects_check = 'X'
             iv_without_locking       = lv_without_lock
+            " objects deleted by an already released request have no TADIR entry:
+            " skip their lock (TK313) instead of failing the release with TR776
+            iv_ignore_warnings       = lock
           EXCEPTIONS
             OTHERS                   = 1.
         IF sy-subrc <> 0.
