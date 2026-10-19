@@ -13,6 +13,7 @@ Legend
 * package objects: generated sql views of cds in subpackages were not removed
 * package objects: removing generated sql views could delete their database tadir entries
 + lock transaction translations in DE, IT and FR
+* changes in package transport layer
 
 2026-10-12 v7.0.1
 -------------------
