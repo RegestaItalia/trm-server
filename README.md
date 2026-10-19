@@ -62,7 +62,6 @@ If not installed, the client can still communicate directly with the SAP system,
 
 ---
 
-<!-- START OF SETUP.MD -->
 # Server setup
 
 **trm-server** is the server-side component of TRM.
@@ -71,6 +70,7 @@ It acts as the secure bridge between the **SAP application server** and the **TR
 
 It exposes the APIs that allow TRM to import/export transports, and, as a consequence, it must be installed **only** on source and target systems, as its not required on any other system in the landscape.
 
+<!-- START OF SETUP.MD -->
 ## First Installation
 
 The first installation must be performed using the [standalone installer](https://raw.githubusercontent.com/RegestaItalia/trm-server/refs/heads/main/ztrm_installer.prog.abap).
@@ -224,7 +224,6 @@ If you are running a **demo system**, you can use the following keys
 ### Other systems
 
 For abapGit to work, you need to generate a valid developer key using the [Development Namespace Application](https://me.sap.com/namespaces/opensource).
-
 <!-- END OF SETUP.MD -->
 
 ---
