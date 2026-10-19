@@ -1,6 +1,6 @@
-INTERFACE /atrm/if_server
-  PUBLIC .
+interface /ATRM/IF_SERVER
+  public .
 
 
-  CONSTANTS version TYPE string VALUE '7.0.1' ##NO_TEXT.
-ENDINTERFACE.
+  constants VERSION type STRING value '7.0.2' ##NO_TEXT.
+endinterface.

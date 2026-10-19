@@ -891,6 +891,9 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
             iv_display_export_log    = ' '
             iv_without_objects_check = 'X'
             iv_without_locking       = lv_without_lock
+            " objects deleted by an already released request have no TADIR entry:
+            " skip their lock (TK313) instead of failing the release with TR776
+            iv_ignore_warnings       = lock
           EXCEPTIONS
             OTHERS                   = 1.
         IF sy-subrc <> 0.
@@ -1220,7 +1223,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
       ).
     ENDIF.
     SORT lt_stats BY timestamp DESCENDING.
-    READ TABLE lt_stats INTO stat INDEX 1.
+    " In a batch import (IMPORT SUBSET) every request shares the same timestamp:
+    " return the latest row of the requested transport, else the latest row.
+    READ TABLE lt_stats INTO stat WITH KEY trkorr = gv_trkorr.
+    IF sy-subrc <> 0.
+      READ TABLE lt_stats INTO stat INDEX 1.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_targets.
