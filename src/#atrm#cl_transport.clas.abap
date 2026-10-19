@@ -66,6 +66,15 @@ CLASS /atrm/cl_transport DEFINITION
       RETURNING VALUE(targets) TYPE tarsystems
       RAISING   /atrm/cx_exception.
 
+    "! Get the transport layers with a consolidation route from this system to a target
+    "! @parameter target | Transport target
+    "! @parameter layers | Transport layers, sorted
+    "! @raising /atrm/cx_exception | Raised if target is missing or no transport configuration is active
+    CLASS-METHODS get_transport_layers
+      IMPORTING target        TYPE tarsystem
+      RETURNING VALUE(layers) TYPE /atrm/devlayer_t
+      RAISING   /atrm/cx_exception.
+
     "! Get the current transport request number
     "! @parameter trkorr | Transport request number
     METHODS get_trkorr
@@ -1654,5 +1663,22 @@ METHOD execute_import.
     ENDIF.
     /atrm/cx_exception=>raise( iv_message = lv_message
                                iv_reason  = /atrm/cx_exception=>c_reason-generic ).
+  ENDMETHOD.
+
+  METHOD get_transport_layers.
+    DATA: version TYPE tceversion.
+    IF target IS INITIAL.
+      /atrm/cx_exception=>raise( iv_message = 'No transport target supplied' "#EC NOTEXT
+                                iv_reason  = /atrm/cx_exception=>c_reason-invalid_input ).
+    ENDIF.
+    SELECT SINGLE version FROM tcevers INTO version WHERE active EQ 'A'.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( iv_message = 'Transport configuration has no active version' ). "#EC NOTEXT
+    ENDIF.
+    SELECT DISTINCT translayer
+      FROM tcerele
+      INTO TABLE layers
+      WHERE version EQ version AND intsys EQ sy-sysid AND consys EQ target.
+    SORT layers.
   ENDMETHOD.
 ENDCLASS.

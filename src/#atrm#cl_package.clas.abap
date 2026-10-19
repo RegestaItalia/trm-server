@@ -220,7 +220,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       ENDIF.
       APPEND LINES OF lt_tadir TO tadir.
     ENDLOOP.
-    LOOP AT lt_tadir INTO ls_tadir WHERE pgmid EQ 'R3TR' AND object EQ 'DDLS'.
+    LOOP AT tadir INTO ls_tadir WHERE pgmid EQ 'R3TR' AND object EQ 'DDLS'.
       APPEND ls_tadir-obj_name TO lt_ddls.
     ENDLOOP.
     IF lt_ddls[] IS NOT INITIAL.
@@ -233,7 +233,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         CATCH cx_sy_dynamic_osql_semantics.
       ENDTRY.
       LOOP AT lt_ddls_gen_view INTO ls_ddls_gen_view.
-        DELETE FROM tadir WHERE pgmid EQ 'R3TR' AND object EQ ls_ddls_gen_view-objecttype AND obj_name EQ ls_ddls_gen_view-objectname.
+        DELETE tadir WHERE pgmid EQ 'R3TR' AND object EQ ls_ddls_gen_view-objecttype AND obj_name EQ ls_ddls_gen_view-objectname.
       ENDLOOP.
     ENDIF.
   ENDMETHOD.
