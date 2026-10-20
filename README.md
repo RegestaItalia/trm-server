@@ -75,35 +75,35 @@ It exposes the APIs that allow TRM to import/export transports, and, as a conseq
 
 The first installation must be performed using the [standalone installer](https://raw.githubusercontent.com/RegestaItalia/trm-server/refs/heads/main/ztrm_installer.prog.abap).
 
-The **standalone installer** is a self-contained ABAP report that allows the installation of **trm-server** and **trm-rest**.\
-The installer will import trm-server transports (and eventually trm-rest transports too, if necessary) into your system and automatically move its objects into the temporary package `$TRM` (which will also be generated).\
-The installer does not import the **/ATRM/** namespace, as trm-server and trm-rest are intended to be used as-is. If you need to modify its objects, consider [installing them via abapGit](#install-with-abapgit) instead.
+The **standalone installer** is a self-contained ABAP report that allows the installation of **trm-server** and **trm-rest**.<br>
+The installer imports trm-server transports (and trm-rest transports, if necessary) into your system and automatically moves their objects into the temporary package(s) `$TRM`/`$TRM_*`, which it also creates.<br>
+The installer does not import the **/ATRM/** namespace because trm-server and trm-rest are intended to be used as-is. If you need to modify their objects, consider [installing them via abapGit](#install-with-abapgit) instead.
 
-After the initial installation, it is recommended to install subsequent theit updates via TRM.
+After the initial installation, we recommend installing subsequent updates through TRM.
 
 1. Download the report source code from [here](https://raw.githubusercontent.com/RegestaItalia/trm-server/refs/heads/main/ztrm_installer.prog.abap)
 2. Open transaction `SE38` and create a new report called `ZTRM_INSTALLER`
 
 <p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/se38_1.png?raw=true" alt="SE38">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/se38_1.png" alt="SE38">
 </p>
 
-3. Give it a title and make sure to set the type to "Executable program"
+3. Give it a title and set the type to "Executable program"
 
 <p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/se38_2.png?raw=true" alt="SE38">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/se38_2.png" alt="SE38">
 </p>
 
 4. Save as a local object (or in temporary package `$TMP`)
 
 <p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/se38_3.png?raw=true" alt="SE38">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/se38_3.png" alt="SE38">
 </p>
 
-5. Copy and paste the source code of the report (or upload) and activate
+5. Paste or upload the report's source code, then activate it
 
 <p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/se38_4.png?raw=true" alt="SE38">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/se38_4.png" alt="SE38">
 </p>
 
 ### Release file install (From file)
@@ -111,94 +111,40 @@ After the initial installation, it is recommended to install subsequent theit up
 #### Download the releases
 
 1. Go to [https://trmregistry.com](https://trmregistry.com) and search for [trm-server](https://trmregistry.com/package/trm-server)
-2. In the release page, press the **Download** button
+2. On the release page, select **Download**
 3. Download [trm-rest](https://trmregistry.com/package/trm-rest) too, if needed
 4. Open SE38 and run `ZTRM_INSTALLER`
 5. Select the file(s) downloaded
-6. Execute and wait for install to complete (~ 5 minutes)
+6. Execute the report and wait for the installation to complete (approximately 10 minutes)
 
 <p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/offline.png?raw=true" alt="ZTRM_INSTALLER">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/offline.png" alt="ZTRM_INSTALLER">
 </p>
+
+Installation of either package can be performed at any time through this report. However, you should consider using a TRM client when upgrading `trm-server` or `trm-rest`.
 
 <details>
-  <summary>Online install (From registry)</summary>
-
-### Online install
-
-The online installation is only possible if your system is allowed to connect to the external server [https://trmregistry.com](https://trmregistry.com).
-
-#### Download the certificate files
-
-*This paragraph is courtesy of abapGit.org*
-
-##### Option A - Chrome
-
-1. Using Google Chrome to go to [https://trmregistry.com](https://trmregistry.com)
-2. Click on the lock icon near the address bar, then click on "Connection is secure"
-3. On the Security tab, click on "Certificate is valid"
-4. Go to the "Details" tab and select "Export..." to download the certificate to a file
-5. In the "Certification hierarchy" box, select the parent node of the GitHub certificate and export it as well. Repeat the same with the root node.
+  <summary>Online install (From registry)</summary><br>
+The online installation is only possible if your system is allowed to connect to the external server <a href="https://trmregistry.com">https://trmregistry.com</a>.
 
 <p align="center">
-    <img src="https://docs.abapgit.org/img/ssl_setup_chrome.gif" alt="Courtesy of abapGit">
+    <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/online.png" alt="ZTRM_INSTALLER">
 </p>
 
-##### Option B - Firefox
+If you see the "Install certificates" button, then your system is missing the required certificates to trust <a href="https://trmregistry.com">https://trmregistry.com</a>.<br>
+You should either install them manually (via STRUST) or let the report install them by pressing that button.<br>
 
-1. Use Firefox to go to [https://trmregistry.com](https://trmregistry.com)
-2. Click on the lock icon and then "More Information ..." and there "View Certificate"
-3. Switch to the Details Tab, choose the first certificate of the hierarchy and click Export
-4. Do the same for the next certificate in the hierarchy
+Once certificates are installed, you can proceede with the install.
 
-##### Option C - Safari
-
-1. Use Safari to go to [https://trmregistry.com](https://trmregistry.com)
-2. Click on the lock icon and then "View Certificate"
-3. In the certificate hierarchy, select the root certificate
-4. Holding down the Option key (⌥), drag the large certificate icon into a text editor
-5. Save the document as a `.PEM` file
-
-#### Install the Certificate Files
-
-*This paragraph is courtesy of abapGit.org*
-
-1. Install the certificates in transaction `STRUST`:
-2. Open the "SSL client Client SSL Client (Anonymous)" folder
-
-<p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/strust_1.png?raw=true" alt="STRUST">
-</p>
-
-3. Click on the Change button
-4. In the third box called "Certificate", click on the bottom-left button "Import certificate" to bring the certificate into the system
-5. Select "Add to certificate list"
-6. Repeat the process for all downloaded certificates
-
-<p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/strust_2.png?raw=true" alt="STRUST">
-</p>
-
-7. Save
-
-#### Execute TRM Installer online
-
-1. Open SE38 and run `ZTRM_INSTALLER`
-2. In the report you can configure connection settings (if needed) and select/deselect `trm-rest` install
-3. Execute and wait for install to complete (~ 5 minutes)
-
-<p align="center">
-    <img src="https://github.com/RegestaItalia/trm-docs/blob/main/docs/assets/server/online.png?raw=true" alt="ZTRM_INSTALLER">
-</p>
-
+Installation of either package can be performed at any time through this report. However, you should consider using a TRM client when upgrading `trm-server` or `trm-rest`.<br>
 </details>
 
-### Maintain Authorized Users
+### Authorize Users
 
-1.  Execute transaction `SE16`
-2.  Create a new record in table `/ATRM/USERS`
+Grant each SAP user who needs to use TRM authorization object `ZTRM_AUTH` with activity
+`ACTVT = 16` (Execute), typically through an assigned role.
 
-> For security reasons, by default, TRM does not allow any user to execute RFC functions unless explicitly authorized.
+> For security reasons, TRM does not allow a user to execute its functions unless the user has this authorization.
 
 ### Verify RFC Authorization
 
@@ -212,18 +158,21 @@ access will be denied.
 
 ## Install with abapGit
 
-Because this package is in namespace **/ATRM/**, install via [abapgit](https://docs.abapGit.org/) needs a system with this namespace installed.
+Because this package uses the **/ATRM/** namespace, installation through [abapGit](https://docs.abapGit.org/) requires a system with this namespace installed.
+
+Installing via abapGit is **not recommended** unless you are planning to contribute new features or bug fixes.
 
 ### Demo systems
 
-If you are running a **demo system**, you can use the following keys
+If you are running a **demo system**, you can use the following keys:
 
-**Development key**: 18531191373370851361\
+**Development key**: 18531191373370851361<br>
 **Repair key**: 00211665563784583720
 
 ### Other systems
 
 For abapGit to work, you need to generate a valid developer key using the [Development Namespace Application](https://me.sap.com/namespaces/opensource).
+
 <!-- END OF SETUP.MD -->
 
 ---
