@@ -100,12 +100,6 @@ CLASS /atrm/cl_utilities DEFINITION
                 texts      TYPE tyt_trnspacett
       RAISING   /atrm/cx_exception.
 
-    "! Get R3trans utility version
-    "! @parameter r3trans | Version
-    CLASS-METHODS get_r3trans_info
-      RETURNING VALUE(r3trans) TYPE string
-      RAISING   /atrm/cx_exception.
-
     "! Reads messages from memory (e.g., after SUBMIT) and appends them to the provided message table
     "! @parameter messages | Message table to append entries from memory
     CLASS-METHODS append_messages_from_memory
@@ -409,23 +403,6 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
     UPDATE trnspace SET editflag = 'X' WHERE namespace = namespace.
 
     COMMIT WORK AND WAIT.
-  ENDMETHOD.
-
-  METHOD get_r3trans_info.
-    TYPES: ty_cmd TYPE c LENGTH 254,
-           BEGIN OF ty_result,
-             line(255),
-           END OF ty_result.
-    DATA: cmd    TYPE ty_cmd,
-          result TYPE STANDARD TABLE OF ty_result.
-    cmd = 'R3trans'.                                        "#EC NOTEXT
-    CALL 'SYSTEM' ID 'COMMAND' FIELD cmd
-                  ID 'TAB'     FIELD result.         "#EC CI_SYSTEMCALL
-    IF sy-subrc <> 12. "Fatal errors have occurred, R3trans sets to 12 when running without options
-      /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-r3trans_cmd_error ).
-    ENDIF.
-
-    CONCATENATE LINES OF result INTO r3trans SEPARATED BY cl_abap_char_utilities=>newline.
   ENDMETHOD.
 
   METHOD append_messages_from_memory.
