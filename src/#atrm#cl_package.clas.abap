@@ -83,28 +83,48 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           EXCEPTIONS
             OTHERS            = 1.
       CATCH cx_sy_dyn_call_param_not_found.
-        /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dyn_call_param_not_found ).
+        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
+          IMPORTING
+            e_package      = lo_package
+          CHANGING
+            c_package_data = ls_data
+          EXCEPTIONS
+            OTHERS         = 1.
     ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    CALL METHOD lo_package->('SAVE')
-      EXPORTING
-        i_suppress_dialog      = 'X'
-        i_suppress_corr_insert = 'X'
-      EXCEPTIONS
-        OTHERS                 = 1.
+    TRY.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_suppress_dialog      = 'X'
+            i_suppress_corr_insert = 'X'
+          EXCEPTIONS
+            OTHERS                 = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SAVE')
+          EXCEPTIONS
+            OTHERS = 1.
+    ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    CALL METHOD lo_package->('SET_CHANGEABLE')
-      EXPORTING
-        i_changeable      = ' '
-        i_suppress_dialog = 'X'
-      EXCEPTIONS
-        OTHERS            = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable      = ' '
+            i_suppress_dialog = 'X'
+          EXCEPTIONS
+            OTHERS            = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = ' '
+          EXCEPTIONS
+            OTHERS       = 1.
+    ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
@@ -156,31 +176,51 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    CALL METHOD lo_package->('SET_CHANGEABLE')
-      EXPORTING
-        i_changeable      = 'X'
-        i_suppress_dialog = 'X'
-      EXCEPTIONS
-        OTHERS            = 1.
+    TRY.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable      = 'X'
+            i_suppress_dialog = 'X'
+          EXCEPTIONS
+            OTHERS            = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SET_CHANGEABLE')
+          EXPORTING
+            i_changeable = 'X'
+          EXCEPTIONS
+            OTHERS       = 1.
+    ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    CALL METHOD lo_package->('DELETE')
-      EXPORTING
-        i_suppress_dialog = 'X'
-      EXCEPTIONS
-        OTHERS            = 1.
+    TRY.
+        CALL METHOD lo_package->('DELETE')
+          EXPORTING
+            i_suppress_dialog = 'X'
+          EXCEPTIONS
+            OTHERS            = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('DELETE')
+          EXCEPTIONS
+            OTHERS = 1.
+    ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    CALL METHOD lo_package->('SAVE')
-      EXPORTING
-        i_suppress_dialog      = 'X'
-        i_suppress_corr_insert = 'X'
-      EXCEPTIONS
-        OTHERS                 = 1.
+    TRY.
+        CALL METHOD lo_package->('SAVE')
+          EXPORTING
+            i_suppress_dialog      = 'X'
+            i_suppress_corr_insert = 'X'
+          EXCEPTIONS
+            OTHERS                 = 1.
+      CATCH cx_sy_dyn_call_param_not_found.
+        CALL METHOD lo_package->('SAVE')
+          EXCEPTIONS
+            OTHERS = 1.
+    ENDTRY.
     IF sy-subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
