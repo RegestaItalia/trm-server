@@ -48,6 +48,57 @@ CLASS /atrm/cl_package DEFINITION
       CHANGING  package_data      TYPE scompkdtln
                 transport_request TYPE e070-trkorr
       RAISING   /atrm/cx_exception.
+
+    "! Calls a package API method passing only the parameters its signature has on this release
+    "! (e.g. no I_SUPPRESS_DIALOG on 702, no I_SUPPRESS_ACCESS_PERMISSION on 740), so a missing
+    "! optional parameter never costs the others
+    "! @parameter class_name | Class of a static call; ignored when instance is bound
+    "! @parameter instance | Object of an instance call
+    "! @parameter method_name | Method, interface methods as INTF~METHOD (upper case)
+    "! @parameter tolerate | Classic exception that counts as success, when the method has it
+    "! @parameter subrc | 0, or 1 when the method raised a classic exception
+    CLASS-METHODS call_api
+      IMPORTING class_name   TYPE string OPTIONAL
+                instance     TYPE REF TO object OPTIONAL
+                method_name  TYPE string
+                parameters   TYPE abap_parmbind_tab
+                tolerate     TYPE string OPTIONAL
+      RETURNING VALUE(subrc) TYPE sy-subrc
+      RAISING   /atrm/cx_exception.
+
+    "! Adds an EXPORTING parameter, passed by value
+    CLASS-METHODS with_value
+      IMPORTING parameters    TYPE abap_parmbind_tab
+                name          TYPE string
+                value         TYPE any
+      RETURNING VALUE(result) TYPE abap_parmbind_tab.
+
+    "! Adds a parameter bound to the caller's variable (IMPORTING/CHANGING)
+    CLASS-METHODS with_ref
+      IMPORTING parameters    TYPE abap_parmbind_tab
+                name          TYPE string
+                kind          TYPE abap_parmkind
+                ref           TYPE REF TO data
+      RETURNING VALUE(result) TYPE abap_parmbind_tab.
+
+    CLASS-METHODS load
+      IMPORTING devclass       TYPE devclass
+                force_reload   TYPE flag OPTIONAL
+      RETURNING VALUE(package) TYPE REF TO if_package
+      RAISING   /atrm/cx_exception.
+
+    CLASS-METHODS set_changeable
+      IMPORTING package                    TYPE REF TO if_package
+                changeable                 TYPE flag
+                suppress_dialog            TYPE flag
+                suppress_access_permission TYPE flag OPTIONAL
+                tolerate                   TYPE string OPTIONAL
+      RAISING   /atrm/cx_exception.
+
+    CLASS-METHODS save
+      IMPORTING package           TYPE REF TO if_package
+      CHANGING  transport_request TYPE trkorr OPTIONAL
+      RAISING   /atrm/cx_exception.
 ENDCLASS.
 
 
@@ -63,6 +114,8 @@ CLASS /atrm/cl_package IMPLEMENTATION.
   METHOD create.
     DATA ls_data LIKE data.
     DATA lo_package TYPE REF TO if_package.
+    DATA: lt_parameters TYPE abap_parmbind_tab,
+          lr_ref        TYPE REF TO data.
     MOVE data TO ls_data.
 
     IF ls_data-as4user IS INITIAL.
@@ -72,62 +125,20 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       ls_data-masterlang = sy-langu.
     ENDIF.
 
-    TRY.
-        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
-          EXPORTING
-            i_suppress_dialog = 'X'
-          IMPORTING
-            e_package         = lo_package
-          CHANGING
-            c_package_data    = ls_data
-          EXCEPTIONS
-            OTHERS            = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE')
-          IMPORTING
-            e_package      = lo_package
-          CHANGING
-            c_package_data = ls_data
-          EXCEPTIONS
-            OTHERS         = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
+    GET REFERENCE OF lo_package INTO lr_ref.
+    lt_parameters = with_ref( parameters = lt_parameters name = 'E_PACKAGE' kind = cl_abap_objectdescr=>importing ref = lr_ref ).
+    GET REFERENCE OF ls_data INTO lr_ref.
+    lt_parameters = with_ref( parameters = lt_parameters name = 'C_PACKAGE_DATA' kind = cl_abap_objectdescr=>changing ref = lr_ref ).
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = 'X' ).
+    IF call_api( class_name  = 'CL_PACKAGE_FACTORY'
+                 method_name = 'IF_PACKAGE_FACTORY~CREATE_NEW_PACKAGE'
+                 parameters  = lt_parameters ) <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    TRY.
-        CALL METHOD lo_package->('SAVE')
-          EXPORTING
-            i_suppress_dialog      = 'X'
-            i_suppress_corr_insert = 'X'
-          EXCEPTIONS
-            OTHERS                 = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SAVE')
-          EXCEPTIONS
-            OTHERS = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    save( package = lo_package ).
 
-    TRY.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable      = ' '
-            i_suppress_dialog = 'X'
-          EXCEPTIONS
-            OTHERS            = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable = ' '
-          EXCEPTIONS
-            OTHERS       = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    set_changeable( package = lo_package changeable = ' ' suppress_dialog = 'X' ).
 
     IF ls_data-devclass(1) <> '$'.
       DATA: lv_objname    TYPE sobj_name,
@@ -156,74 +167,24 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
   METHOD delete_tmp.
     DATA lo_package TYPE REF TO if_package.
+    DATA lt_parameters TYPE abap_parmbind_tab.
 
     IF gv_devclass(1) <> '$'.
       /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-package_not_temporary ).
     ENDIF.
 
-    TRY.
-        CALL METHOD cl_package_factory=>('IF_PACKAGE_FACTORY~LOAD_PACKAGE')
-          EXPORTING
-            i_package_name = gv_devclass
-          IMPORTING
-            e_package      = lo_package
-          EXCEPTIONS
-            OTHERS         = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        /atrm/cx_exception=>raise( iv_reason  = /atrm/cx_exception=>c_reason-dyn_call_param_not_found ).
-    ENDTRY.
-    IF sy-subrc <> 0.
+    lo_package = load( devclass = gv_devclass ).
+
+    set_changeable( package = lo_package changeable = 'X' suppress_dialog = 'X' ).
+
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = 'X' ).
+    IF call_api( instance    = lo_package
+                 method_name = 'IF_PACKAGE~DELETE'
+                 parameters  = lt_parameters ) <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    TRY.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable      = 'X'
-            i_suppress_dialog = 'X'
-          EXCEPTIONS
-            OTHERS            = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable = 'X'
-          EXCEPTIONS
-            OTHERS       = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-    TRY.
-        CALL METHOD lo_package->('DELETE')
-          EXPORTING
-            i_suppress_dialog = 'X'
-          EXCEPTIONS
-            OTHERS            = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('DELETE')
-          EXCEPTIONS
-            OTHERS = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-    TRY.
-        CALL METHOD lo_package->('SAVE')
-          EXPORTING
-            i_suppress_dialog      = 'X'
-            i_suppress_corr_insert = 'X'
-          EXCEPTIONS
-            OTHERS                 = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SAVE')
-          EXCEPTIONS
-            OTHERS = 1.
-    ENDTRY.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    save( package = lo_package ).
   ENDMETHOD.
 
   METHOD get_objects.
@@ -280,44 +241,18 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD modify_package_data.
-    DATA: subrc LIKE sy-subrc.
-    DATA: lo_package TYPE REF TO if_package.
+    DATA: lo_package TYPE REF TO if_package,
+          lx_save    TYPE REF TO /atrm/cx_exception.
 
 * load package
-    CALL METHOD cl_package_factory=>load_package
-      EXPORTING
-        i_package_name = package_data-devclass
-        i_force_reload = 'X'
-      IMPORTING
-        e_package      = lo_package
-      EXCEPTIONS
-        OTHERS         = 1.
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    lo_package = load( devclass = package_data-devclass force_reload = 'X' ).
 
 * lock package
-    TRY.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable                 = 'X'
-            i_suppress_dialog            = 'D'
-            i_suppress_access_permission = 'X'
-          EXCEPTIONS
-            object_already_changeable = 0
-            OTHERS                    = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable = 'X'
-          EXCEPTIONS
-            object_already_changeable = 0
-            OTHERS                    = 1.
-    ENDTRY.
-
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+    set_changeable( package                    = lo_package
+                    changeable                 = 'X'
+                    suppress_dialog            = 'D'
+                    suppress_access_permission = 'X'
+                    tolerate                   = 'OBJECT_ALREADY_CHANGEABLE' ).
 
 * modify package
     CALL METHOD lo_package->set_all_attributes
@@ -329,79 +264,38 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 *
     IF sy-subrc <> 0.
 *   try to unlock the package, exceptions are tolerated
-      subrc = sy-subrc.
-
       TRY.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable                 = ' '
-              i_suppress_dialog            = 'D'
-              i_suppress_access_permission = 'X'
-            EXCEPTIONS
-              OTHERS = 0.
-        CATCH cx_sy_dyn_call_param_not_found.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable = ' '
-            EXCEPTIONS
-              OTHERS = 0.
+          set_changeable( package                    = lo_package
+                          changeable                 = ' '
+                          suppress_dialog            = 'D'
+                          suppress_access_permission = 'X' ).
+        CATCH /atrm/cx_exception.
       ENDTRY.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
 * save package
     TRY.
-        CALL METHOD lo_package->('SAVE')
+        CALL METHOD save
           EXPORTING
-            i_transport_request    = transport_request
-            i_suppress_dialog      = 'X'
-            i_suppress_corr_insert = 'X'
-          IMPORTING
-            e_transport_request    = transport_request
-          EXCEPTIONS
-            OTHERS                 = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SAVE')
-          EXPORTING
-            i_transport_request = transport_request
-          IMPORTING
-            e_transport_request = transport_request
-          EXCEPTIONS
-            OTHERS              = 1.
-    ENDTRY.
-
-    IF sy-subrc <> 0.
+            package           = lo_package
+          CHANGING
+            transport_request = transport_request.
+      CATCH /atrm/cx_exception INTO lx_save.
 *   try to undo the changes, exceptions are tolerated
 *   (Note: if successful, this also unlocks the package)
-      subrc = sy-subrc.
-      CALL METHOD lo_package->undo_all_changes
-        EXCEPTIONS
-          OTHERS = 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-* unlock package
-    TRY.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable                 = ' '
-            i_suppress_dialog            = 'D'
-            i_suppress_access_permission = 'X'
+        CALL METHOD lo_package->undo_all_changes
           EXCEPTIONS
-            object_already_unlocked = 0
-            OTHERS                  = 1.
-      CATCH cx_sy_dyn_call_param_not_found.
-        CALL METHOD lo_package->('SET_CHANGEABLE')
-          EXPORTING
-            i_changeable = ' '
-          EXCEPTIONS
-            object_already_unlocked = 0
-            OTHERS                  = 1.
+            OTHERS = 0.
+        RAISE EXCEPTION lx_save.
     ENDTRY.
 
-    IF sy-subrc <> 0.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
+* unlock package
+    set_changeable( package                    = lo_package
+                    changeable                 = ' '
+                    suppress_dialog            = 'D'
+                    suppress_access_permission = 'X'
+                    tolerate                   = 'OBJECT_ALREADY_UNLOCKED' ).
   ENDMETHOD.
 
 
@@ -425,33 +319,12 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       CLEAR ls_cr.
     ELSEIF parentcl IS NOT INITIAL.
       DATA lo_package TYPE REF TO if_package.
-      CALL METHOD ('CL_PACKAGE_FACTORY')=>('LOAD_PACKAGE')
-        EXPORTING
-          i_package_name = gv_devclass
-        IMPORTING
-          e_package      = lo_package
-        EXCEPTIONS
-          OTHERS         = 1.
-      TRY.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable                 = 'X'
-              i_suppress_dialog            = 'D'
-              i_suppress_access_permission = 'X'
-            EXCEPTIONS
-              object_already_changeable = 0
-              OTHERS                    = 1.
-        CATCH cx_sy_dyn_call_param_not_found.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable = 'X'
-            EXCEPTIONS
-              object_already_changeable = 0
-              OTHERS                    = 1.
-      ENDTRY.
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
+      lo_package = load( devclass = gv_devclass ).
+      set_changeable( package                    = lo_package
+                      changeable                 = 'X'
+                      suppress_dialog            = 'D'
+                      suppress_access_permission = 'X'
+                      tolerate                   = 'OBJECT_ALREADY_CHANGEABLE' ).
       CALL METHOD lo_package->('SET_SUPER_PACKAGE_NAME')
         EXPORTING
           i_super_package_name = parentcl
@@ -460,39 +333,11 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      TRY.
-          CALL METHOD lo_package->('SAVE')
-            EXPORTING
-              i_suppress_dialog      = 'X'
-              i_suppress_corr_insert = 'X'
-            EXCEPTIONS
-              OTHERS                 = 1.
-        CATCH cx_sy_dyn_call_param_not_found.
-          CALL METHOD lo_package->('SAVE')
-            EXCEPTIONS
-              OTHERS = 1.
-      ENDTRY.
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
-      TRY.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable                 = ' '
-              i_suppress_dialog            = 'D'
-              i_suppress_access_permission = 'X'
-            EXCEPTIONS
-              OTHERS = 1.
-        CATCH cx_sy_dyn_call_param_not_found.
-          CALL METHOD lo_package->('SET_CHANGEABLE')
-            EXPORTING
-              i_changeable = ' '
-            EXCEPTIONS
-              OTHERS = 1.
-      ENDTRY.
-      IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( ).
-      ENDIF.
+      save( package = lo_package ).
+      set_changeable( package                    = lo_package
+                      changeable                 = ' '
+                      suppress_dialog            = 'D'
+                      suppress_access_permission = 'X' ).
     ENDIF.
     IF devlayer IS NOT INITIAL.
       ls_modify_sign-pdevclass = 'X'.
@@ -657,5 +502,169 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         ENDLOOP.
       ENDIF.
     ENDLOOP.
+  ENDMETHOD.
+
+
+  METHOD call_api.
+    DATA: lv_type       TYPE string,
+          lv_method     TYPE string,
+          lo_descr      TYPE REF TO cl_abap_typedescr,
+          lo_objdescr   TYPE REF TO cl_abap_objectdescr,
+          ls_methdescr  TYPE abap_methdescr,
+          lv_known      TYPE flag,
+          lt_parameters TYPE abap_parmbind_tab,
+          ls_parameter  LIKE LINE OF lt_parameters,
+          lt_exceptions TYPE abap_excpbind_tab,
+          ls_exception  LIKE LINE OF lt_exceptions,
+          lx_dyn_call   TYPE REF TO cx_sy_dyn_call_error.
+
+    lt_parameters = parameters.
+
+    "read the signature the method has on this release: from the declaring interface
+    "for INTF~METHOD, else from the class
+    IF method_name CS '~'.
+      SPLIT method_name AT '~' INTO lv_type lv_method.
+    ELSE.
+      lv_type = class_name.
+      lv_method = method_name.
+    ENDIF.
+    CALL METHOD cl_abap_typedescr=>describe_by_name
+      EXPORTING
+        p_name         = lv_type
+      RECEIVING
+        p_descr_ref    = lo_descr
+      EXCEPTIONS
+        type_not_found = 1
+        OTHERS         = 2.
+    IF sy-subrc = 0.
+      TRY.
+          lo_objdescr ?= lo_descr.
+          READ TABLE lo_objdescr->methods INTO ls_methdescr WITH KEY name = lv_method.
+          IF sy-subrc = 0.
+            lv_known = 'X'.
+          ENDIF.
+        CATCH cx_sy_move_cast_error.
+      ENDTRY.
+    ENDIF.
+
+    "pass only the parameters the method has: a missing one never drops the others
+    IF lv_known = 'X'.
+      LOOP AT lt_parameters INTO ls_parameter.
+        READ TABLE ls_methdescr-parameters TRANSPORTING NO FIELDS WITH KEY name = ls_parameter-name.
+        IF sy-subrc <> 0.
+          DELETE lt_parameters.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    IF tolerate IS NOT INITIAL.
+      IF lv_known = 'X'.
+        READ TABLE ls_methdescr-exceptions TRANSPORTING NO FIELDS WITH KEY name = tolerate.
+      ENDIF.
+      IF lv_known <> 'X' OR sy-subrc = 0.
+        ls_exception-name = tolerate.
+        ls_exception-value = 0.
+        INSERT ls_exception INTO TABLE lt_exceptions.
+      ENDIF.
+    ENDIF.
+    ls_exception-name = 'OTHERS'.
+    ls_exception-value = 1.
+    INSERT ls_exception INTO TABLE lt_exceptions.
+
+    TRY.
+        IF instance IS BOUND.
+          CALL METHOD instance->(method_name)
+            PARAMETER-TABLE lt_parameters
+            EXCEPTION-TABLE lt_exceptions.
+        ELSE.
+          CALL METHOD (class_name)=>(method_name)
+            PARAMETER-TABLE lt_parameters
+            EXCEPTION-TABLE lt_exceptions.
+        ENDIF.
+        subrc = sy-subrc.
+      CATCH cx_sy_dyn_call_error INTO lx_dyn_call.
+        /atrm/cx_exception=>raise( iv_reason = /atrm/cx_exception=>c_reason-dyn_call_param_not_found
+                                   io_root   = lx_dyn_call ).
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD with_value.
+    DATA: ls_parameter LIKE LINE OF result.
+    FIELD-SYMBOLS <lv_value> TYPE any.
+
+    result = parameters.
+    ls_parameter-name = name.
+    ls_parameter-kind = cl_abap_objectdescr=>exporting.
+    CREATE DATA ls_parameter-value LIKE value.
+    ASSIGN ls_parameter-value->* TO <lv_value>.
+    <lv_value> = value.
+    INSERT ls_parameter INTO TABLE result.
+  ENDMETHOD.
+
+
+  METHOD with_ref.
+    DATA: ls_parameter LIKE LINE OF result.
+
+    result = parameters.
+    ls_parameter-name = name.
+    ls_parameter-kind = kind.
+    ls_parameter-value = ref.
+    INSERT ls_parameter INTO TABLE result.
+  ENDMETHOD.
+
+
+  METHOD load.
+    DATA: lt_parameters TYPE abap_parmbind_tab,
+          lr_ref        TYPE REF TO data.
+
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_PACKAGE_NAME' value = devclass ).
+    IF force_reload IS NOT INITIAL.
+      lt_parameters = with_value( parameters = lt_parameters name = 'I_FORCE_RELOAD' value = force_reload ).
+    ENDIF.
+    GET REFERENCE OF package INTO lr_ref.
+    lt_parameters = with_ref( parameters = lt_parameters name = 'E_PACKAGE' kind = cl_abap_objectdescr=>importing ref = lr_ref ).
+    IF call_api( class_name  = 'CL_PACKAGE_FACTORY'
+                 method_name = 'IF_PACKAGE_FACTORY~LOAD_PACKAGE'
+                 parameters  = lt_parameters ) <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD set_changeable.
+    DATA: lt_parameters TYPE abap_parmbind_tab.
+
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_CHANGEABLE' value = changeable ).
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = suppress_dialog ).
+    IF suppress_access_permission IS NOT INITIAL.
+      lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_ACCESS_PERMISSION' value = suppress_access_permission ).
+    ENDIF.
+    IF call_api( instance    = package
+                 method_name = 'IF_PACKAGE~SET_CHANGEABLE'
+                 parameters  = lt_parameters
+                 tolerate    = tolerate ) <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD save.
+    DATA: lt_parameters TYPE abap_parmbind_tab,
+          lr_ref        TYPE REF TO data.
+
+    IF transport_request IS SUPPLIED.
+      lt_parameters = with_value( parameters = lt_parameters name = 'I_TRANSPORT_REQUEST' value = transport_request ).
+      "reference to the caller's variable: the formal parameter is passed by reference
+      GET REFERENCE OF transport_request INTO lr_ref.
+      lt_parameters = with_ref( parameters = lt_parameters name = 'E_TRANSPORT_REQUEST' kind = cl_abap_objectdescr=>importing ref = lr_ref ).
+    ENDIF.
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = 'X' ).
+    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_CORR_INSERT' value = 'X' ).
+    IF call_api( instance    = package
+                 method_name = 'IF_PACKAGE~SAVE'
+                 parameters  = lt_parameters ) <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
