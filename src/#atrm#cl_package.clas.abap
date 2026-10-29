@@ -99,6 +99,16 @@ CLASS /atrm/cl_package DEFINITION
       IMPORTING package           TYPE REF TO if_package
       CHANGING  transport_request TYPE trkorr OPTIONAL
       RAISING   /atrm/cx_exception.
+    "! Signature of a method on this release
+    "! @parameter class_name | Class, for a method that isn't INTF~METHOD
+    "! @parameter method_name | Method, interface methods as INTF~METHOD (upper case)
+    "! @parameter descr | Method description
+    "! @parameter found | X when the method was described
+    CLASS-METHODS describe_method
+      IMPORTING class_name  TYPE string OPTIONAL
+                method_name TYPE string
+      EXPORTING descr       TYPE abap_methdescr
+                found       TYPE flag.
 ENDCLASS.
 
 
@@ -506,11 +516,7 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD call_api.
-    DATA: lv_type       TYPE string,
-          lv_method     TYPE string,
-          lo_descr      TYPE REF TO cl_abap_typedescr,
-          lo_objdescr   TYPE REF TO cl_abap_objectdescr,
-          ls_methdescr  TYPE abap_methdescr,
+    DATA: ls_methdescr  TYPE abap_methdescr,
           lv_known      TYPE flag,
           lt_parameters TYPE abap_parmbind_tab,
           ls_parameter  LIKE LINE OF lt_parameters,
@@ -518,43 +524,24 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           ls_exception  LIKE LINE OF lt_exceptions,
           lx_dyn_call   TYPE REF TO cx_sy_dyn_call_error.
 
-    lt_parameters = parameters.
-
-    "read the signature the method has on this release: from the declaring interface
-    "for INTF~METHOD, else from the class
-    IF method_name CS '~'.
-      SPLIT method_name AT '~' INTO lv_type lv_method.
-    ELSE.
-      lv_type = class_name.
-      lv_method = method_name.
-    ENDIF.
-    CALL METHOD cl_abap_typedescr=>describe_by_name
+    CALL METHOD describe_method
       EXPORTING
-        p_name         = lv_type
-      RECEIVING
-        p_descr_ref    = lo_descr
-      EXCEPTIONS
-        type_not_found = 1
-        OTHERS         = 2.
-    IF sy-subrc = 0.
-      TRY.
-          lo_objdescr ?= lo_descr.
-          READ TABLE lo_objdescr->methods INTO ls_methdescr WITH KEY name = lv_method.
-          IF sy-subrc = 0.
-            lv_known = 'X'.
-          ENDIF.
-        CATCH cx_sy_move_cast_error.
-      ENDTRY.
-    ENDIF.
+        class_name  = class_name
+        method_name = method_name
+      IMPORTING
+        descr       = ls_methdescr
+        found       = lv_known.
 
     "pass only the parameters the method has: a missing one never drops the others
     IF lv_known = 'X'.
-      LOOP AT lt_parameters INTO ls_parameter.
+      LOOP AT parameters INTO ls_parameter.
         READ TABLE ls_methdescr-parameters TRANSPORTING NO FIELDS WITH KEY name = ls_parameter-name.
-        IF sy-subrc <> 0.
-          DELETE lt_parameters.
+        IF sy-subrc = 0.
+          INSERT ls_parameter INTO TABLE lt_parameters.
         ENDIF.
       ENDLOOP.
+    ELSE.
+      lt_parameters = parameters.
     ENDIF.
 
     IF tolerate IS NOT INITIAL.
@@ -633,17 +620,62 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD set_changeable.
-    DATA: lt_parameters TYPE abap_parmbind_tab.
+    DATA: lt_parameters  TYPE abap_parmbind_tab,
+          ls_methdescr   TYPE abap_methdescr,
+          lv_found       TYPE flag,
+          lv_masterlang  TYPE tadir-masterlang,
+          lv_logon_langu TYPE sy-langu,
+          lv_switched    TYPE flag,
+          lv_subrc       TYPE sy-subrc,
+          lx_exception   TYPE REF TO /atrm/cx_exception.
 
     lt_parameters = with_value( parameters = lt_parameters name = 'I_CHANGEABLE' value = changeable ).
     lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = suppress_dialog ).
     IF suppress_access_permission IS NOT INITIAL.
       lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_ACCESS_PERMISSION' value = suppress_access_permission ).
     ENDIF.
-    IF call_api( instance    = package
-                 method_name = 'IF_PACKAGE~SET_CHANGEABLE'
-                 parameters  = lt_parameters
-                 tolerate    = tolerate ) <> 0.
+
+    "without I_SUPPRESS_ACCESS_PERMISSION the lock runs RS_ACCESS_PERMISSION, whose master
+    "language check (RS_TEXTLOG_MASTER_LANGUAGE) shows a popup when the logon language isn't
+    "the package's original language, and I_SUPPRESS_DIALOG doesn't reach it: over RFC that is
+    "DYNPRO_SEND_IN_BACKGROUND. Lock in the original language instead
+    CALL METHOD describe_method
+      EXPORTING
+        method_name = 'IF_PACKAGE~SET_CHANGEABLE'
+      IMPORTING
+        descr       = ls_methdescr
+        found       = lv_found.
+    IF lv_found = 'X'.
+      READ TABLE ls_methdescr-parameters TRANSPORTING NO FIELDS WITH KEY name = 'I_SUPPRESS_ACCESS_PERMISSION'.
+    ENDIF.
+    IF suppress_access_permission IS INITIAL OR lv_found <> 'X' OR sy-subrc <> 0.
+      SELECT SINGLE masterlang FROM tadir INTO lv_masterlang
+        WHERE pgmid = 'R3TR' AND object = 'DEVC' AND obj_name = package->package_name.
+      IF sy-subrc = 0 AND lv_masterlang IS NOT INITIAL AND lv_masterlang <> sy-langu.
+        lv_logon_langu = sy-langu.
+        TRY.
+            SET LOCALE LANGUAGE lv_masterlang.
+            lv_switched = 'X'.
+          CATCH cx_sy_localization_error.
+            "language not available on this server: keep the logon language
+        ENDTRY.
+      ENDIF.
+    ENDIF.
+
+    TRY.
+        lv_subrc = call_api( instance    = package
+                             method_name = 'IF_PACKAGE~SET_CHANGEABLE'
+                             parameters  = lt_parameters
+                             tolerate    = tolerate ).
+      CATCH /atrm/cx_exception INTO lx_exception.
+    ENDTRY.
+    IF lv_switched = 'X'.
+      SET LOCALE LANGUAGE lv_logon_langu.
+    ENDIF.
+    IF lx_exception IS BOUND.
+      RAISE EXCEPTION lx_exception.
+    ENDIF.
+    IF lv_subrc <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
   ENDMETHOD.
@@ -666,5 +698,38 @@ CLASS /atrm/cl_package IMPLEMENTATION.
                  parameters  = lt_parameters ) <> 0.
       /atrm/cx_exception=>raise( ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD describe_method.
+    DATA: lv_type     TYPE string,
+          lv_method   TYPE string,
+          lo_descr    TYPE REF TO cl_abap_typedescr,
+          lo_objdescr TYPE REF TO cl_abap_objectdescr.
+
+    CLEAR: descr, found.
+    "read the signature from the declaring interface for INTF~METHOD, else from the class
+    IF method_name CS '~'.
+      SPLIT method_name AT '~' INTO lv_type lv_method.
+    ELSE.
+      lv_type = class_name.
+      lv_method = method_name.
+    ENDIF.
+    CALL METHOD cl_abap_typedescr=>describe_by_name
+      EXPORTING
+        p_name         = lv_type
+      RECEIVING
+        p_descr_ref    = lo_descr
+      EXCEPTIONS
+        type_not_found = 1
+        OTHERS         = 2.
+    CHECK sy-subrc = 0.
+    TRY.
+        lo_objdescr ?= lo_descr.
+        READ TABLE lo_objdescr->methods INTO descr WITH KEY name = lv_method.
+        IF sy-subrc = 0.
+          found = 'X'.
+        ENDIF.
+      CATCH cx_sy_move_cast_error.
+    ENDTRY.
   ENDMETHOD.
 ENDCLASS.
