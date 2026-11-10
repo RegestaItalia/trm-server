@@ -20,21 +20,18 @@
     <TTEXT>TRM action log</TTEXT>
    </TSTCT>
    <I18N_TPOOL>
-    <item>
+    <TSTCT>
      <SPRSL>D</SPRSL>
-     <TCODE>/ATRM/LOG</TCODE>
      <TTEXT>TRM-Aktionsprotokoll</TTEXT>
-    </item>
-    <item>
+    </TSTCT>
+    <TSTCT>
      <SPRSL>F</SPRSL>
-     <TCODE>/ATRM/LOG</TCODE>
      <TTEXT>Journal des actions TRM</TTEXT>
-    </item>
-    <item>
+    </TSTCT>
+    <TSTCT>
      <SPRSL>I</SPRSL>
-     <TCODE>/ATRM/LOG</TCODE>
      <TTEXT>Log delle azioni TRM</TTEXT>
-    </item>
+    </TSTCT>
    </I18N_TPOOL>
   </asx:values>
  </asx:abap>
