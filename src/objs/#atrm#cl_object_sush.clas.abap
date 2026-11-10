@@ -15,34 +15,52 @@ CLASS /atrm/cl_object_sush IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
     DATA:
-      lv_name       TYPE usobkey-name,
-      lv_type       TYPE usobkey-type,
-      ls_hash       TYPE usobhash,
-      ls_dependency TYPE /atrm/object_dependency.
+      lv_name     TYPE usobkey-name,
+      lv_type     TYPE usobkey-type,
+      lv_len      TYPE i,
+      lv_nescape  TYPE string,
+      lv_where    TYPE string.
 
-    TRY.
-        lv_name = me->key-obj_name(32).
-        CONDENSE lv_name.
-        lv_type = me->key-obj_name+32(2).
+    " Object name is the USOBKEY name followed by the 2-character type
+    DESCRIBE FIELD lv_name LENGTH lv_len IN CHARACTER MODE.
+    lv_name = me->key-obj_name(lv_len).
+    lv_type = me->key-obj_name+lv_len(2).
+    CHECK lv_name IS NOT INITIAL.
 
-        SELECT SINGLE *
-          FROM usobhash
-          INTO ls_hash
-          WHERE name = lv_name
-            AND type = lv_type.
+    lv_nescape = lv_name.
+    REPLACE ALL OCCURRENCES OF `'` IN lv_nescape WITH `''`.
 
-        CHECK sy-subrc = 0.
-        CHECK ls_hash-pgmid = 'R3TR'.
-        CHECK ls_hash-object IS NOT INITIAL.
-        CHECK ls_hash-obj_name IS NOT INITIAL.
+    " Hashed application (e.g. external service): object behind the hash
+    CONCATENATE `NAME = '` lv_nescape `' AND TYPE = '` lv_type `' AND PGMID = 'R3TR'` INTO lv_where.
+    append_typed_dependencies(
+      EXPORTING table_name        = 'USOBHASH'
+                where_clause      = lv_where
+                object_field      = 'OBJ_NAME'
+                object_type_field = 'OBJECT'
+      CHANGING  dependencies      = dependencies ).
 
-        CALL METHOD get_tadir_dependency
-          EXPORTING object = ls_hash-object obj_name = ls_hash-obj_name
-          RECEIVING dependency = ls_dependency.
-        APPEND ls_dependency TO dependencies.
-      CATCH cx_root.
-        " optional SU22 API may not exist in the target system
-    ENDTRY.
+    " Proposed authorization objects
+    CONCATENATE `NAME = '` lv_nescape `' AND TYPE = '` lv_type `'` INTO lv_where.
+    append_table_dependencies(
+      EXPORTING table_name   = 'USOBX'
+                where_clause = lv_where
+                object_field = 'OBJECT'
+                object_type  = 'SUSO'
+      CHANGING  dependencies = dependencies ).
+
+    " RFC function module application: function group
+    IF lv_type = 'RF'.
+      CONCATENATE `FUNCNAME = '` lv_nescape `'` INTO lv_where.
+      append_table_dependencies(
+        EXPORTING table_name   = 'V_FDIR'
+                  where_clause = lv_where
+                  object_field = 'AREA'
+                  object_type  = 'FUGR'
+        CHANGING  dependencies = dependencies ).
+    ENDIF.
+
+    SORT dependencies BY tabname tabkey.
+    DELETE ADJACENT DUPLICATES FROM dependencies COMPARING tabname tabkey.
   ENDMETHOD.
 
 ENDCLASS.

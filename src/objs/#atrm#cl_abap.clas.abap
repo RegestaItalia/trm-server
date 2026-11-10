@@ -66,6 +66,13 @@ CLASS /atrm/cl_abap DEFINITION
       CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
     METHODS add_includes
       CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
+METHODS get_main_program
+      RETURNING VALUE(rv_program) TYPE program.
+METHODS add_safety_dependencies
+      CHANGING ct_dependencies TYPE /atrm/object_dependency_t.
+METHODS append_safety_dependency
+      IMPORTING is_dependency  TYPE /atrm/object_dependency
+      CHANGING  ct_dependencies TYPE /atrm/object_dependency_t.
 ENDCLASS.
 
 
@@ -130,6 +137,7 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     add_nrob( CHANGING ct_dependencies = dependencies ).
     add_docv( CHANGING ct_dependencies = dependencies ).
     add_includes( CHANGING ct_dependencies = dependencies ).
+    add_safety_dependencies( CHANGING ct_dependencies = dependencies ).
   ENDMETHOD.
 
   METHOD get_clas_programs.
@@ -413,5 +421,163 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     ENDLOOP.
   ENDMETHOD.
 
+  METHOD get_main_program.
+    DATA: lv_clsname   TYPE seoclsname,
+          lv_name      TYPE string,
+          lv_namespace TYPE string,
+          lv_group     TYPE string.
+    lv_name = key-obj_name.
+    TRY.
+        CASE object.
+          WHEN 'PROG'.
+            rv_program = key-obj_name.
+          WHEN 'CLAS'.
+            lv_clsname = key-obj_name.
+            CALL METHOD ('CL_OO_CLASSNAME_SERVICE')=>('GET_CLASSPOOL_NAME')
+              EXPORTING
+                clsname = lv_clsname
+              RECEIVING
+                result  = rv_program.
+          WHEN 'INTF'.
+            lv_clsname = key-obj_name.
+            CALL METHOD ('CL_OO_CLASSNAME_SERVICE')=>('GET_INTERFACEPOOL_NAME')
+              EXPORTING
+                clsname = lv_clsname
+              RECEIVING
+                result  = rv_program.
+          WHEN 'FUGR'.
+            IF lv_name CP '/*'.
+              FIND REGEX '^(/[^/]+/)(.+)$' IN lv_name SUBMATCHES lv_namespace lv_group.
+              CONCATENATE lv_namespace 'SAPL' lv_group INTO rv_program.
+            ELSE.
+              CONCATENATE 'SAPL' lv_name INTO rv_program.
+            ENDIF.
+        ENDCASE.
+      CATCH cx_root.
+        " class name service not available in this release
+        CLEAR rv_program.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD add_safety_dependencies.
+    " safety handler: Repository Environment reads the where-used index, which
+    " can be missing (e.g. objects imported without an index update). Ask the
+    " compiler for the external objects used by the main program instead, so the
+    " dependencies are found even when the index is empty.
+    TYPES: BEGIN OF ty_used_object,
+             trobjtype TYPE trobjtype,
+             sobj_name TYPE sobj_name,
+           END OF ty_used_object.
+    DATA: lv_program     TYPE program,
+          lv_true        TYPE abap_bool VALUE abap_true,
+          lv_error       TYPE c LENGTH 1,
+          lo_compiler    TYPE REF TO object,
+          lr_usages      TYPE REF TO data,
+          lt_ptab        TYPE abap_parmbind_tab,
+          ls_ptab        TYPE abap_parmbind,
+          lt_used        TYPE SORTED TABLE OF ty_used_object WITH UNIQUE KEY trobjtype sobj_name,
+          ls_used        TYPE ty_used_object,
+          lv_table       TYPE tabname,
+          lv_where       TYPE string,
+          lv_funcname    TYPE string,
+          lv_area        TYPE sobj_name,
+          lv_enqu        TYPE string,
+          ls_dependency  TYPE /atrm/object_dependency.
+    FIELD-SYMBOLS: <lt_usages> TYPE STANDARD TABLE,
+                   <ls_usage>  TYPE any,
+                   <lv_type>   TYPE any,
+                   <lv_name>   TYPE any.
+
+    lv_program = get_main_program( ).
+    CHECK lv_program IS NOT INITIAL.
+
+    TRY.
+        CREATE DATA lr_usages TYPE ('SCR_OBJ_USAGES').
+        ASSIGN lr_usages->* TO <lt_usages>.
+        ls_ptab-name = 'P_NAME'.
+        ls_ptab-kind = cl_abap_objectdescr=>exporting.
+        GET REFERENCE OF lv_program INTO ls_ptab-value.
+        INSERT ls_ptab INTO TABLE lt_ptab.
+        ls_ptab-name = 'P_EXT_OBJECT_USAGE'.
+        ls_ptab-kind = cl_abap_objectdescr=>exporting.
+        GET REFERENCE OF lv_true INTO ls_ptab-value.
+        INSERT ls_ptab INTO TABLE lt_ptab.
+        CREATE OBJECT lo_compiler TYPE ('CL_ABAP_COMPILER')
+          PARAMETER-TABLE lt_ptab.
+        CALL METHOD lo_compiler->('GET_EXT_OBJ_USAGE')
+          IMPORTING
+            p_obj_usages = <lt_usages>
+            p_error      = lv_error.
+      CATCH cx_root.
+        " compiler object usage API not available in this release
+        RETURN.
+    ENDTRY.
+
+    LOOP AT <lt_usages> ASSIGNING <ls_usage>.
+      ASSIGN COMPONENT 'TROBJTYPE' OF STRUCTURE <ls_usage> TO <lv_type>.
+      CHECK sy-subrc = 0.
+      ASSIGN COMPONENT 'SOBJ_NAME' OF STRUCTURE <ls_usage> TO <lv_name>.
+      CHECK sy-subrc = 0.
+      CHECK <lv_type> IS NOT INITIAL AND <lv_name> IS NOT INITIAL.
+      CLEAR ls_used.
+      ls_used-trobjtype = <lv_type>.
+      ls_used-sobj_name = <lv_name>.
+      CHECK NOT ( ls_used-trobjtype = object AND ls_used-sobj_name = key-obj_name ).
+      INSERT ls_used INTO TABLE lt_used.
+    ENDLOOP.
+
+    LOOP AT lt_used INTO ls_used.
+      CASE ls_used-trobjtype.
+        WHEN 'FUNC'.
+          lv_funcname = ls_used-sobj_name.
+          " same mapping as /ATRM/CL_SENVI_FUNC: lock modules belong to their lock object
+          IF lv_funcname CP 'ENQUEUE_*' OR lv_funcname CP 'DEQUEUE_*'.
+            lv_enqu = lv_funcname+8.
+            TRY.
+                ls_dependency = get_tadir_dependency( object = 'ENQU' obj_name = lv_enqu ).
+                append_safety_dependency( EXPORTING is_dependency = ls_dependency CHANGING ct_dependencies = ct_dependencies ).
+              CATCH /atrm/cx_exception.
+                " lock function module without lock object
+            ENDTRY.
+            CONTINUE.
+          ENDIF.
+          CLEAR lv_area.
+          TRY.
+              lv_table = 'ENLFDIR'.
+              REPLACE ALL OCCURRENCES OF '''' IN lv_funcname WITH ''''''.
+              CONCATENATE 'FUNCNAME = ''' lv_funcname '''' INTO lv_where.
+              SELECT SINGLE area FROM (lv_table) INTO lv_area WHERE (lv_where).
+            CATCH cx_root.
+              CLEAR lv_area.
+          ENDTRY.
+          CHECK lv_area IS NOT INITIAL.
+          CHECK NOT ( object = 'FUGR' AND lv_area = key-obj_name ).
+          TRY.
+              ls_dependency = get_tadir_dependency( object = 'FUGR' obj_name = lv_area ).
+              append_safety_dependency( EXPORTING is_dependency = ls_dependency CHANGING ct_dependencies = ct_dependencies ).
+              ls_dependency = get_tfdir_dependency( funcname = ls_used-sobj_name ).
+              append_safety_dependency( EXPORTING is_dependency = ls_dependency CHANGING ct_dependencies = ct_dependencies ).
+            CATCH /atrm/cx_exception.
+              " function group not in TADIR
+          ENDTRY.
+        WHEN OTHERS.
+          TRY.
+              ls_dependency = get_tadir_dependency( object = ls_used-trobjtype obj_name = ls_used-sobj_name ).
+              append_safety_dependency( EXPORTING is_dependency = ls_dependency CHANGING ct_dependencies = ct_dependencies ).
+            CATCH /atrm/cx_exception.
+              " not a TADIR object (e.g. a sub-object of the program)
+          ENDTRY.
+      ENDCASE.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD append_safety_dependency.
+    CHECK is_dependency-tabname IS NOT INITIAL.
+    READ TABLE ct_dependencies
+      WITH KEY tabname = is_dependency-tabname tabkey = is_dependency-tabkey
+      TRANSPORTING NO FIELDS.
+    CHECK sy-subrc <> 0.
+    APPEND is_dependency TO ct_dependencies.
+  ENDMETHOD.
 ENDCLASS.
 
