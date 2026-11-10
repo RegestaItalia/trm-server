@@ -12,6 +12,8 @@ Legend
 -------------------
 + trm logs transaction (action, transport and event log viewer)
 + refresh button in lock transaction
++ log transaction translations in DE, IT and FR
++ lock and log transaction code texts in DE, IT and FR
 + dependency handlers for BDEF, CHKC, CHKO, CHKV, INTF, PINF, SMIM, WAPA, WEBI
 ! dependency coverage for SHMA, SUSH, WDCA, WDCC
 ! safety repository environment for PROG, CLAS, INTF, BDEF, FUGR dependencies
