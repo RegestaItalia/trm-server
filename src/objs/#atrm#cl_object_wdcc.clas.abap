@@ -21,13 +21,21 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
       ls_config_key TYPE wdy_config_key,
       lv_name       TYPE sobj_name,
       lr_rows       TYPE REF TO data,
-      lo_analyzer   TYPE REF TO if_wdr_cfg_analyze_config_data,
-      lo_appl       TYPE REF TO if_wdr_cfg_analyze_config_appl,
-      lt_types      TYPE if_wdr_cfg_analyze_config_data=>ty_t_types,
-      ls_type       LIKE LINE OF lt_types,
-      lt_attributes TYPE if_wdr_cfg_analyze_config_data=>ty_t_attribute_values,
-      ls_attribute  LIKE LINE OF lt_attributes,
-      ls_value      TYPE if_wdr_cfg_analyze_config_data=>ty_s_name_value,
+      lv_intf       TYPE string,
+      lv_method     TYPE string,
+      lv_par_in     TYPE abap_parmname,
+      lv_par_out    TYPE abap_parmname,
+      lr_analyzer   TYPE REF TO data,
+      lr_types      TYPE REF TO data,
+      lr_type       TYPE REF TO data,
+      lr_attributes TYPE REF TO data,
+      lo_analyzer   TYPE REF TO object,
+      lo_descr      TYPE REF TO cl_abap_typedescr,
+      lo_intfdescr  TYPE REF TO cl_abap_objectdescr,
+      ls_methdescr  TYPE abap_methdescr,
+      ls_parmdescr  TYPE abap_parmdescr,
+      lt_ptab       TYPE abap_parmbind_tab,
+      ls_ptab       TYPE abap_parmbind,
       ls_dependency TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
@@ -36,6 +44,15 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
       <lv_id>    TYPE any,
       <lv_type>  TYPE any,
       <lv_var>   TYPE any,
+      <lo_analyzer>  TYPE any,
+      <lt_types>     TYPE ANY TABLE,
+      <ls_type>      TYPE any,
+      <lt_attrs>     TYPE ANY TABLE,
+      <ls_attr>      TYPE any,
+      <lt_values>    TYPE ANY TABLE,
+      <ls_value>     TYPE any,
+      <lv_comp>      TYPE any,
+      <ls_kinds>     TYPE any,
       <lv_value> TYPE any.
 
     ls_config_key = me->key-obj_name.
@@ -97,30 +114,110 @@ CLASS /atrm/cl_object_wdcc IMPLEMENTATION.
         " optional repository table may not exist in the target system
     ENDTRY.
 
-    " Components and feeder classes typed in the configuration content (FPM UIBBs)
+    " Components and feeder classes typed in the configuration content (FPM UIBBs).
+    " The Web Dynpro configuration analyzer API is optional: resolve it fully dynamically.
     TRY.
-        ls_config_key = me->key-obj_name.
-        cl_wdr_cfg_analyze_config_data=>create_for_config_key(
-          EXPORTING config_key           = ls_config_key
-          IMPORTING config_data_analyzer = lo_analyzer
-                    config_appl_analyzer = lo_appl ).
-        IF lo_analyzer IS BOUND.
-          ls_type-type_kind = if_wdr_cfg_analyze_config_data=>co_type_kind-ddic_rollname.
-          ls_type-type_name = 'FPM_COMPONENT_NAME'.
-          INSERT ls_type INTO TABLE lt_types.
-          ls_type-type_name = 'WDY_COMPONENT_NAME'.
-          INSERT ls_type INTO TABLE lt_types.
-          ls_type-type_name = 'SEOCLSNAME'.
-          INSERT ls_type INTO TABLE lt_types.
-          lt_attributes = lo_analyzer->get_attributes_for_type( lt_types ).
+        lv_intf = 'IF_WDR_CFG_ANALYZE_CONFIG_DATA'.
+        CONCATENATE lv_intf '~GET_ATTRIBUTES_FOR_TYPE' INTO lv_method.
+
+        " Parameter names of GET_ATTRIBUTES_FOR_TYPE (single importing + returning)
+        CALL METHOD cl_abap_typedescr=>describe_by_name
+          EXPORTING
+            p_name         = lv_intf
+          RECEIVING
+            p_descr_ref    = lo_descr
+          EXCEPTIONS
+            type_not_found = 1
+            OTHERS         = 2.
+        IF sy-subrc <> 0.
+          RETURN.
         ENDIF.
-        LOOP AT lt_attributes INTO ls_attribute.
-          LOOP AT ls_attribute-attributes INTO ls_value WHERE value IS NOT INITIAL.
-            lv_name = ls_value-value.
+        lo_intfdescr ?= lo_descr.
+        READ TABLE lo_intfdescr->methods INTO ls_methdescr WITH KEY name = 'GET_ATTRIBUTES_FOR_TYPE'.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        LOOP AT ls_methdescr-parameters INTO ls_parmdescr.
+          CASE ls_parmdescr-parm_kind.
+            WHEN cl_abap_objectdescr=>importing.
+              lv_par_in = ls_parmdescr-name.
+            WHEN cl_abap_objectdescr=>returning.
+              lv_par_out = ls_parmdescr-name.
+          ENDCASE.
+        ENDLOOP.
+        IF lv_par_in IS INITIAL OR lv_par_out IS INITIAL.
+          RETURN.
+        ENDIF.
+
+        CREATE DATA lr_analyzer TYPE REF TO (lv_intf).
+        ASSIGN lr_analyzer->* TO <lo_analyzer>.
+        ls_config_key = me->key-obj_name.
+        CALL METHOD ('CL_WDR_CFG_ANALYZE_CONFIG_DATA')=>('CREATE_FOR_CONFIG_KEY')
+          EXPORTING
+            config_key           = ls_config_key
+          IMPORTING
+            config_data_analyzer = <lo_analyzer>.
+        lo_analyzer = <lo_analyzer>.
+        IF lo_analyzer IS NOT BOUND.
+          RETURN.
+        ENDIF.
+
+        CREATE DATA lr_types TYPE (`IF_WDR_CFG_ANALYZE_CONFIG_DATA=>TY_T_TYPES`).
+        ASSIGN lr_types->* TO <lt_types>.
+        CREATE DATA lr_type LIKE LINE OF <lt_types>.
+        ASSIGN lr_type->* TO <ls_type>.
+        ASSIGN (`IF_WDR_CFG_ANALYZE_CONFIG_DATA=>CO_TYPE_KIND`) TO <ls_kinds>.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        ASSIGN COMPONENT 'DDIC_ROLLNAME' OF STRUCTURE <ls_kinds> TO <lv_value>.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        ASSIGN COMPONENT 'TYPE_KIND' OF STRUCTURE <ls_type> TO <lv_comp>.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        <lv_comp> = <lv_value>.
+        ASSIGN COMPONENT 'TYPE_NAME' OF STRUCTURE <ls_type> TO <lv_comp>.
+        IF sy-subrc <> 0.
+          RETURN.
+        ENDIF.
+        <lv_comp> = 'FPM_COMPONENT_NAME'.
+        INSERT <ls_type> INTO TABLE <lt_types>.
+        <lv_comp> = 'WDY_COMPONENT_NAME'.
+        INSERT <ls_type> INTO TABLE <lt_types>.
+        <lv_comp> = 'SEOCLSNAME'.
+        INSERT <ls_type> INTO TABLE <lt_types>.
+
+        CREATE DATA lr_attributes TYPE (`IF_WDR_CFG_ANALYZE_CONFIG_DATA=>TY_T_ATTRIBUTE_VALUES`).
+        ASSIGN lr_attributes->* TO <lt_attrs>.
+        ls_ptab-name = lv_par_in.
+        ls_ptab-kind = cl_abap_objectdescr=>exporting.
+        ls_ptab-value = lr_types.
+        INSERT ls_ptab INTO TABLE lt_ptab.
+        ls_ptab-name = lv_par_out.
+        ls_ptab-kind = cl_abap_objectdescr=>receiving.
+        ls_ptab-value = lr_attributes.
+        INSERT ls_ptab INTO TABLE lt_ptab.
+        CALL METHOD lo_analyzer->(lv_method)
+          PARAMETER-TABLE lt_ptab.
+
+        LOOP AT <lt_attrs> ASSIGNING <ls_attr>.
+          ASSIGN COMPONENT 'ATTRIBUTES' OF STRUCTURE <ls_attr> TO <lt_values>.
+          CHECK sy-subrc = 0.
+          LOOP AT <lt_values> ASSIGNING <ls_value>.
+            ASSIGN COMPONENT 'VALUE' OF STRUCTURE <ls_value> TO <lv_value>.
+            CHECK sy-subrc = 0 AND <lv_value> IS NOT INITIAL.
+            lv_name = <lv_value>.
             TRANSLATE lv_name TO UPPER CASE.
+            ASSIGN COMPONENT 'TYPE' OF STRUCTURE <ls_value> TO <ls_type>.
+            CHECK sy-subrc = 0.
+            ASSIGN COMPONENT 'TYPE_NAME' OF STRUCTURE <ls_type> TO <lv_comp>.
+            CHECK sy-subrc = 0.
             TRY.
                 CLEAR ls_dependency.
-                IF ls_value-type-type_name = 'SEOCLSNAME'.
+                IF <lv_comp> = 'SEOCLSNAME'.
                   TRY.
                       CALL METHOD get_tadir_dependency
                         EXPORTING object = 'CLAS' obj_name = lv_name

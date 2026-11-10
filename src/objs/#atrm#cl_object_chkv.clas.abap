@@ -40,7 +40,7 @@ CLASS /atrm/cl_object_chkv IMPLEMENTATION.
 
     LOOP AT lt_contents INTO lv_content.
       " Checks included in the variant
-      FIND ALL OCCURRENCES OF PCRE `<[^>]*checkObject\s[^>]*adtcore:name="([^"]+)"`
+      FIND ALL OCCURRENCES OF REGEX `<[^>]*checkObject\s[^>]*adtcore:name="([^"]+)"`
         IN lv_content RESULTS lt_results.
       LOOP AT lt_results INTO ls_result.
         READ TABLE ls_result-submatches INTO ls_submatch INDEX 1.
@@ -58,7 +58,7 @@ CLASS /atrm/cl_object_chkv IMPLEMENTATION.
       ENDLOOP.
 
       " Referenced (base) check variant
-      FIND ALL OCCURRENCES OF PCRE `<[^>]*referencedVariant>([^<]+)<`
+      FIND ALL OCCURRENCES OF REGEX `<[^>]*referencedVariant>([^<]+)<`
         IN lv_content RESULTS lt_results.
       LOOP AT lt_results INTO ls_result.
         READ TABLE ls_result-submatches INTO ls_submatch INDEX 1.
