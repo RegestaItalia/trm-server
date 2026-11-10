@@ -73,6 +73,11 @@ METHODS add_safety_dependencies
 METHODS append_safety_dependency
       IMPORTING is_dependency  TYPE /atrm/object_dependency
       CHANGING  ct_dependencies TYPE /atrm/object_dependency_t.
+METHODS is_dynamic_usage
+      IMPORTING it_source         TYPE ty_program_src
+                iv_line           TYPE i
+                iv_name           TYPE csequence
+      RETURNING VALUE(rv_dynamic) TYPE abap_bool.
 ENDCLASS.
 
 
@@ -464,10 +469,17 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     " can be missing (e.g. objects imported without an index update). Ask the
     " compiler for the external objects used by the main program instead, so the
     " dependencies are found even when the index is empty.
+    " The compiler also resolves dynamic references written as literals
+    " (ASSIGN ('X')=>..., CREATE OBJECT o TYPE ('X'), CALL METHOD ('X')=>...): those
+    " are optional runtime lookups, not dependencies, so they are skipped.
     TYPES: BEGIN OF ty_used_object,
              trobjtype TYPE trobjtype,
              sobj_name TYPE sobj_name,
-           END OF ty_used_object.
+           END OF ty_used_object,
+           BEGIN OF ty_include_source,
+             include TYPE program,
+             source  TYPE ty_program_src,
+           END OF ty_include_source.
     DATA: lv_program     TYPE program,
           lv_true        TYPE abap_bool VALUE abap_true,
           lv_error       TYPE c LENGTH 1,
@@ -477,6 +489,10 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
           ls_ptab        TYPE abap_parmbind,
           lt_used        TYPE SORTED TABLE OF ty_used_object WITH UNIQUE KEY trobjtype sobj_name,
           ls_used        TYPE ty_used_object,
+          lt_sources     TYPE HASHED TABLE OF ty_include_source WITH UNIQUE KEY include,
+          ls_source      TYPE ty_include_source,
+          lv_include     TYPE program,
+          lv_line        TYPE i,
           lv_table       TYPE tabname,
           lv_where       TYPE string,
           lv_funcname    TYPE string,
@@ -486,7 +502,10 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     FIELD-SYMBOLS: <lt_usages> TYPE STANDARD TABLE,
                    <ls_usage>  TYPE any,
                    <lv_type>   TYPE any,
-                   <lv_name>   TYPE any.
+                   <lv_name>   TYPE any,
+                   <lv_include> TYPE any,
+                   <lv_line>   TYPE any,
+                   <ls_source> TYPE ty_include_source.
 
     lv_program = get_main_program( ).
     CHECK lv_program IS NOT INITIAL.
@@ -523,6 +542,26 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
       ls_used-trobjtype = <lv_type>.
       ls_used-sobj_name = <lv_name>.
       CHECK NOT ( ls_used-trobjtype = object AND ls_used-sobj_name = key-obj_name ).
+      ASSIGN COMPONENT 'INCLUDE' OF STRUCTURE <ls_usage> TO <lv_include>.
+      IF sy-subrc = 0.
+        ASSIGN COMPONENT 'LINE' OF STRUCTURE <ls_usage> TO <lv_line>.
+        IF sy-subrc = 0 AND <lv_include> IS NOT INITIAL AND <lv_line> > 0.
+          lv_include = <lv_include>.
+          lv_line = <lv_line>.
+          READ TABLE lt_sources ASSIGNING <ls_source> WITH TABLE KEY include = lv_include.
+          IF sy-subrc <> 0.
+            CLEAR ls_source.
+            ls_source-include = lv_include.
+            READ REPORT lv_include INTO ls_source-source.
+            INSERT ls_source INTO TABLE lt_sources ASSIGNING <ls_source>.
+          ENDIF.
+          IF is_dynamic_usage( it_source = <ls_source>-source
+                               iv_line   = lv_line
+                               iv_name   = ls_used-sobj_name ) = abap_true.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+      ENDIF.
       INSERT ls_used INTO TABLE lt_used.
     ENDLOOP.
 
@@ -578,6 +617,38 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
       TRANSPORTING NO FIELDS.
     CHECK sy-subrc <> 0.
     APPEND is_dependency TO ct_dependencies.
+  ENDMETHOD.
+
+  METHOD is_dynamic_usage.
+    " a usage is dynamic when the object name is only written as a literal on the
+    " reported line, e.g. ASSIGN ('/ATRM/IF_REST')=>... or CREATE OBJECT o TYPE ('ZCL_X'),
+    " also through a macro (the compiler reports the macro call line). The column is
+    " not reliable for macros, so every occurrence on the line must be quoted.
+    DATA: lv_line    TYPE string,
+          lv_name    TYPE string,
+          lv_offset  TYPE i,
+          lt_results TYPE match_result_tab,
+          ls_result  TYPE match_result.
+
+    rv_dynamic = abap_false.
+    READ TABLE it_source INTO lv_line INDEX iv_line.
+    CHECK sy-subrc = 0.
+    lv_name = iv_name.
+    CHECK lv_name IS NOT INITIAL.
+    TRANSLATE lv_line TO UPPER CASE.
+    TRANSLATE lv_name TO UPPER CASE.
+    FIND ALL OCCURRENCES OF lv_name IN lv_line RESULTS lt_results.
+    CHECK lt_results IS NOT INITIAL.
+    LOOP AT lt_results INTO ls_result.
+      IF ls_result-offset = 0.
+        RETURN.
+      ENDIF.
+      lv_offset = ls_result-offset - 1.
+      IF lv_line+lv_offset(1) <> '''' AND lv_line+lv_offset(1) <> '`'.
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+    rv_dynamic = abap_true.
   ENDMETHOD.
 ENDCLASS.
 
