@@ -18,7 +18,6 @@ CLASS /atrm/cx_exception DEFINITION
         not_found                TYPE string VALUE 'NOT_FOUND',
         tms_alert                TYPE string VALUE 'TMS_ALERT',
         insert_error             TYPE string VALUE 'INSERT_ERROR',
-        r3trans_cmd_error        TYPE string VALUE 'R3TRANS_CMD_ERROR',
         snro_interval_not_found  TYPE string VALUE 'SNRO_INTERVAL_NOT_FOUND',
         abapgit_data_error       TYPE string VALUE 'ABAPGIT_DATA_ERROR',
         abapgit_intergration     TYPE string VALUE 'ABAPGIT_INTEGRATION',

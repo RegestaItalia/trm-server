@@ -19,6 +19,20 @@
     <TCODE>/ATRM/LOCK</TCODE>
     <TTEXT>View and manually delete TRM action</TTEXT>
    </TSTCT>
+   <I18N_TPOOL>
+    <TSTCT>
+     <SPRSL>D</SPRSL>
+     <TTEXT>TRM-Aktionssperren anzeigen/löschen</TTEXT>
+    </TSTCT>
+    <TSTCT>
+     <SPRSL>F</SPRSL>
+     <TTEXT>Afficher/supprimer verrous TRM</TTEXT>
+    </TSTCT>
+    <TSTCT>
+     <SPRSL>I</SPRSL>
+     <TTEXT>Visualizza/elimina blocchi TRM</TTEXT>
+    </TSTCT>
+   </I18N_TPOOL>
   </asx:values>
  </asx:abap>
 </abapGit>
