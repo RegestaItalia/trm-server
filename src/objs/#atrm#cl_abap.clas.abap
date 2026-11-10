@@ -472,6 +472,8 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
     " The compiler also resolves dynamic references written as literals
     " (ASSIGN ('X')=>..., CREATE OBJECT o TYPE ('X'), CALL METHOD ('X')=>...): those
     " are optional runtime lookups, not dependencies, so they are skipped.
+    " Function modules are exempt: CALL FUNCTION 'X' is the static call syntax, and
+    " a call through a variable is never resolved by the compiler.
     TYPES: BEGIN OF ty_used_object,
              trobjtype TYPE trobjtype,
              sobj_name TYPE sobj_name,
@@ -542,23 +544,25 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
       ls_used-trobjtype = <lv_type>.
       ls_used-sobj_name = <lv_name>.
       CHECK NOT ( ls_used-trobjtype = object AND ls_used-sobj_name = key-obj_name ).
-      ASSIGN COMPONENT 'INCLUDE' OF STRUCTURE <ls_usage> TO <lv_include>.
-      IF sy-subrc = 0.
-        ASSIGN COMPONENT 'LINE' OF STRUCTURE <ls_usage> TO <lv_line>.
-        IF sy-subrc = 0 AND <lv_include> IS NOT INITIAL AND <lv_line> > 0.
-          lv_include = <lv_include>.
-          lv_line = <lv_line>.
-          READ TABLE lt_sources ASSIGNING <ls_source> WITH TABLE KEY include = lv_include.
-          IF sy-subrc <> 0.
-            CLEAR ls_source.
-            ls_source-include = lv_include.
-            READ REPORT lv_include INTO ls_source-source.
-            INSERT ls_source INTO TABLE lt_sources ASSIGNING <ls_source>.
-          ENDIF.
-          IF is_dynamic_usage( it_source = <ls_source>-source
-                               iv_line   = lv_line
-                               iv_name   = ls_used-sobj_name ) = abap_true.
-            CONTINUE.
+      IF ls_used-trobjtype <> 'FUNC'.
+        ASSIGN COMPONENT 'INCLUDE' OF STRUCTURE <ls_usage> TO <lv_include>.
+        IF sy-subrc = 0.
+          ASSIGN COMPONENT 'LINE' OF STRUCTURE <ls_usage> TO <lv_line>.
+          IF sy-subrc = 0 AND <lv_include> IS NOT INITIAL AND <lv_line> > 0.
+            lv_include = <lv_include>.
+            lv_line = <lv_line>.
+            READ TABLE lt_sources ASSIGNING <ls_source> WITH TABLE KEY include = lv_include.
+            IF sy-subrc <> 0.
+              CLEAR ls_source.
+              ls_source-include = lv_include.
+              READ REPORT lv_include INTO ls_source-source.
+              INSERT ls_source INTO TABLE lt_sources ASSIGNING <ls_source>.
+            ENDIF.
+            IF is_dynamic_usage( it_source = <ls_source>-source
+                                 iv_line   = lv_line
+                                 iv_name   = ls_used-sobj_name ) = abap_true.
+              CONTINUE.
+            ENDIF.
           ENDIF.
         ENDIF.
       ENDIF.
