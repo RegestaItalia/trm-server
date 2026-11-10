@@ -26,8 +26,6 @@ FORM handle_exception.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING not_found.
     WHEN /atrm/cx_exception=>c_reason-tms_alert.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING tms_alert.
-    WHEN /atrm/cx_exception=>c_reason-r3trans_cmd_error.
-      MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING r3trans_cmd_error.
     WHEN /atrm/cx_exception=>c_reason-snro_interval_not_found.
       MESSAGE ID sy-msgid TYPE 'E' NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING snro_interval_not_found.
     WHEN /atrm/cx_exception=>c_reason-abapgit_data_error.
