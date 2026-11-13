@@ -95,6 +95,8 @@ CLASS /atrm/cl_package DEFINITION
                 tolerate                   TYPE string OPTIONAL
       RAISING   /atrm/cx_exception.
 
+    "! Saves a package: in transport_request when one is given, otherwise without recording it
+    "! (where the release can skip that, see save_records_changes)
     CLASS-METHODS save
       IMPORTING package           TYPE REF TO if_package
       CHANGING  transport_request TYPE trkorr OPTIONAL
@@ -109,6 +111,26 @@ CLASS /atrm/cl_package DEFINITION
                 method_name TYPE string
       EXPORTING descr       TYPE abap_methdescr
                 found       TYPE flag.
+
+    "! X when IF_PACKAGE~SAVE can't skip recording the package in a request on this release
+    "! (no I_SUPPRESS_CORR_INSERT, e.g. SAP_BASIS 702)
+    CLASS-METHODS save_records_changes
+      RETURNING VALUE(result) TYPE flag.
+
+    "! Consolidation target of a transport layer from this system, blank when it has no route
+    CLASS-METHODS get_layer_target
+      IMPORTING layer         TYPE devlayer
+      RETURNING VALUE(target) TYPE tr_target.
+
+    "! Saves a new transportable package recorded in a temporary workbench request (no task) to the
+    "! target of its transport layer, then removes the request entries and deletes the request: TRM
+    "! ships packages in its own transports. Cleanup is attempted even when saving fails; the save
+    "! failure is raised first, otherwise a cleanup failure
+    "! @parameter request | The temporary request
+    CLASS-METHODS save_in_temporary_request
+      IMPORTING package TYPE REF TO if_package
+      EXPORTING request TYPE trkorr
+      RAISING   /atrm/cx_exception.
 ENDCLASS.
 
 
@@ -146,7 +168,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    save( package = lo_package ).
+    "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 702),
+    "and without a dialog it finds no request to record it in (TK 599): record it in a temporary one
+    IF ls_data-devclass(1) <> '$' AND lo_package->wbo_korr_flag = 'X' AND save_records_changes( ) = 'X'.
+      save_in_temporary_request( package = lo_package ).
+    ELSE.
+      save( package = lo_package ).
+    ENDIF.
 
     set_changeable( package = lo_package changeable = ' ' suppress_dialog = 'X' ).
 
@@ -692,7 +720,10 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       lt_parameters = with_ref( parameters = lt_parameters name = 'E_TRANSPORT_REQUEST' kind = cl_abap_objectdescr=>importing ref = lr_ref ).
     ENDIF.
     lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = 'X' ).
-    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_CORR_INSERT' value = 'X' ).
+    "a given request records the package in it; without one, TRM ships packages in its own transports
+    IF transport_request IS NOT SUPPLIED OR transport_request IS INITIAL.
+      lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_CORR_INSERT' value = 'X' ).
+    ENDIF.
     IF call_api( instance    = package
                  method_name = 'IF_PACKAGE~SAVE'
                  parameters  = lt_parameters ) <> 0.
@@ -731,5 +762,83 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         ENDIF.
       CATCH cx_sy_move_cast_error.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD save_records_changes.
+    DATA: ls_methdescr TYPE abap_methdescr,
+          lv_found     TYPE flag.
+
+    CLEAR result.
+    CALL METHOD describe_method
+      EXPORTING
+        method_name = 'IF_PACKAGE~SAVE'
+      IMPORTING
+        descr       = ls_methdescr
+        found       = lv_found.
+    "signature unknown: save as before
+    CHECK lv_found = 'X'.
+    READ TABLE ls_methdescr-parameters TRANSPORTING NO FIELDS WITH KEY name = 'I_SUPPRESS_CORR_INSERT'.
+    IF sy-subrc <> 0.
+      result = 'X'.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_layer_target.
+    DATA lv_version TYPE tceversion.
+
+    CLEAR target.
+    CHECK layer IS NOT INITIAL.
+    SELECT SINGLE version FROM tcevers INTO lv_version WHERE active EQ 'A'.
+    CHECK sy-subrc = 0.
+    SELECT SINGLE consys FROM tcerele INTO target
+      WHERE version EQ lv_version AND intsys EQ sy-sysid AND translayer EQ layer.
+  ENDMETHOD.
+
+  METHOD save_in_temporary_request.
+    DATA: lo_transport TYPE REF TO /atrm/cl_transport,
+          lv_text      TYPE as4text,
+          lv_target    TYPE tr_target,
+          lv_request   TYPE trkorr,
+          lv_reason    TYPE string,
+          lx_save      TYPE REF TO /atrm/cx_exception,
+          lx_cleanup   TYPE REF TO /atrm/cx_exception,
+          lt_log       TYPE /atrm/cx_exception=>tyt_log,
+          lv_log       LIKE LINE OF lt_log.
+
+    CLEAR request.
+    lv_target = get_layer_target( package->transport_layer ).
+    CONCATENATE 'TRM package' package->package_name INTO lv_text SEPARATED BY space.
+    "RS_CORR_INSERT records the package in a task of the current user
+    lo_transport = /atrm/cl_transport=>create_workbench( text = lv_text target = lv_target with_task = 'X' ).
+    request = lo_transport->get_trkorr( ).
+
+    lv_request = request.
+    TRY.
+        save( EXPORTING package = package CHANGING transport_request = lv_request ).
+      CATCH /atrm/cx_exception INTO lx_save.
+    ENDTRY.
+
+    "the request is deleted once its entries (and their object locks) are removed
+    TRY.
+        lo_transport->delete_entries( ).
+        lo_transport->delete( ).
+      CATCH /atrm/cx_exception INTO lx_cleanup.
+    ENDTRY.
+
+    IF lx_cleanup IS BOUND.
+      lv_reason = lx_cleanup->get_text( ).
+      CONCATENATE 'Temporary transport request' request 'of package' package->package_name
+        'could not be deleted:' lv_reason INTO lv_log SEPARATED BY space.
+      APPEND lv_log TO lt_log.
+    ENDIF.
+    IF lx_save IS BOUND.
+      IF lt_log IS INITIAL.
+        RAISE EXCEPTION lx_save.
+      ENDIF.
+      /atrm/cx_exception=>raise( io_root = lx_save it_log = lt_log ).
+    ENDIF.
+    IF lx_cleanup IS BOUND.
+      /atrm/cx_exception=>raise( io_root = lx_cleanup it_log = lt_log ).
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
