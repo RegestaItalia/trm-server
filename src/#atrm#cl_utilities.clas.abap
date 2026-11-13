@@ -142,6 +142,15 @@ CLASS /atrm/cl_utilities DEFINITION
       IMPORTING rfcdest     TYPE rfcdest DEFAULT 'NONE'
       RETURNING VALUE(dest) TYPE sysysid
       RAISING   /atrm/cx_exception.
+    "! Get the HTTP(S) URL of this system's ICF server (protocol://host:port[/service]),
+    "! determined the same way as SICF "Test Service"
+    "! @parameter service  | (Optional) ICF service path (e.g. /ztrmserver): appended to the URL,
+    "!                       its logon settings decide HTTP or HTTPS
+    "! @parameter base_url | URL, e.g. https://myhost.domain.com:44300/ztrmserver (no service: https://myhost.domain.com:44300)
+    CLASS-METHODS get_http_base_url
+      IMPORTING service         TYPE string OPTIONAL
+      RETURNING VALUE(base_url) TYPE string
+      RAISING   /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -639,5 +648,104 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
     dest = ls_rfcsi-rfcsysid.
+  ENDMETHOD.
+
+  METHOD get_http_base_url.
+    " same logic as SICF -> Test Service (RSICFTREE, form TEST_SERVICE)
+    DATA: lv_hostnumber TYPE icfhostnum,
+          lv_hostnr     TYPE i,
+          lv_url        TYPE string,
+          ls_actlogin   TYPE icflogin,
+          lv_protocol   TYPE sy-index,
+          lv_virt_idx   TYPE sy-index,
+          lv_scheme     TYPE string,
+          lv_host       TYPE string,
+          lv_port       TYPE string.
+
+    SELECT SINGLE hostnumber FROM icfvirhost INTO lv_hostnumber
+      WHERE icf_name = 'DEFAULT_HOST'
+        AND protocol = 'HTTP'.
+    IF sy-subrc <> 0.
+      CLEAR lv_hostnumber.
+    ENDIF.
+    lv_hostnr = lv_hostnumber.
+    lv_virt_idx = lv_hostnumber.
+
+    " protocol: HTTPS if the service logon settings require SSL
+    lv_scheme = 'http'.
+    IF service IS NOT INITIAL.
+      lv_url = service.
+      IF lv_url(1) <> '/'.
+        CONCATENATE '/' lv_url INTO lv_url.
+      ENDIF.
+      TRANSLATE lv_url TO LOWER CASE.
+      CALL FUNCTION 'HTTP_GET_HANDLER_LIST'
+        EXPORTING
+          url                 = lv_url
+          hostnumber          = lv_hostnr
+          enable_statistic    = 0
+        IMPORTING
+          actlogin            = ls_actlogin
+        EXCEPTIONS
+          no_virtual_host     = 1
+          host_inactive       = 2
+          empty_url           = 3
+          empty_url_component = 4
+          wrong_url           = 5
+          url_no_handler      = 6
+          service_inactive    = 7
+          cyclic_alias_error  = 8
+          broken_alias_error  = 9
+          OTHERS              = 10.
+      IF sy-subrc <> 0.
+        /atrm/cx_exception=>raise( iv_message = |ICF service { lv_url } not found or inactive| ).
+      ENDIF.
+      IF ls_actlogin-protsec = 'S' OR ls_actlogin-protsec = 'X'.
+        lv_scheme = 'https'.
+      ENDIF.
+    ENDIF.
+
+    IF lv_scheme = 'https'.
+      lv_protocol = 2.
+    ELSE.
+      lv_protocol = 1.
+    ENDIF.
+
+    CALL FUNCTION 'TH_GET_VIRT_HOST_DATA'
+      EXPORTING
+        protocol       = lv_protocol
+        virt_idx       = lv_virt_idx
+      IMPORTING
+        hostname       = lv_host
+        port           = lv_port
+      EXCEPTIONS
+        not_found      = 1
+        internal_error = 2
+        OTHERS         = 3.
+    IF sy-subrc <> 0 AND lv_protocol = 1.
+      " HTTP port not active: try HTTPS
+      lv_protocol = 2.
+      CALL FUNCTION 'TH_GET_VIRT_HOST_DATA'
+        EXPORTING
+          protocol       = lv_protocol
+          virt_idx       = lv_virt_idx
+        IMPORTING
+          hostname       = lv_host
+          port           = lv_port
+        EXCEPTIONS
+          not_found      = 1
+          internal_error = 2
+          OTHERS         = 3.
+      IF sy-subrc = 0.
+        lv_scheme = 'https'.
+      ENDIF.
+    ENDIF.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( iv_message = 'No active HTTP/HTTPS port found in ICM' ).
+    ENDIF.
+
+    " lv_url is the normalized service path (empty if no service was passed)
+    CONCATENATE lv_scheme '://' lv_host ':' lv_port lv_url INTO base_url.
+    TRANSLATE base_url TO LOWER CASE.
   ENDMETHOD.
 ENDCLASS.
