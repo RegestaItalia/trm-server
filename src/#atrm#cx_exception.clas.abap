@@ -67,7 +67,7 @@ CLASS /atrm/cx_exception DEFINITION
                 it_log     TYPE tyt_log OPTIONAL
       RAISING   /atrm/cx_exception.
 
-    DATA: message TYPE symsg READ-ONLY.
+    DATA: message TYPE /atrm/symsg READ-ONLY.
   PROTECTED SECTION.
     DATA: gv_reason TYPE string,
           gt_log    TYPE tyt_log,

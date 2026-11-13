@@ -832,7 +832,7 @@
      <TABLES>
       <RSTBL>
        <PARAMETER>MESSAGES</PARAMETER>
-       <DBSTRUCT>SYMSG</DBSTRUCT>
+       <DBSTRUCT>/ATRM/SYMSG</DBSTRUCT>
       </RSTBL>
      </TABLES>
      <EXCEPTION>
@@ -1444,6 +1444,52 @@
       </RSFDO>
       <RSFDO>
        <PARAMETER>NOT_FOUND</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>GENERIC</PARAMETER>
+       <KIND>X</KIND>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+    <item>
+     <FUNCNAME>/ATRM/GET_HTTP_BASE_URL</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>Get ICF HTTP(S) base URL</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>SERVICE</PARAMETER>
+       <OPTIONAL>X</OPTIONAL>
+       <TYP>STRING</TYP>
+      </RSIMP>
+     </IMPORT>
+     <EXPORT>
+      <RSEXP>
+       <PARAMETER>BASE_URL</PARAMETER>
+       <TYP>STRING</TYP>
+      </RSEXP>
+     </EXPORT>
+     <EXCEPTION>
+      <RSEXC>
+       <EXCEPTION>TRM_RFC_UNAUTHORIZED</EXCEPTION>
+      </RSEXC>
+      <RSEXC>
+       <EXCEPTION>GENERIC</EXCEPTION>
+      </RSEXC>
+     </EXCEPTION>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>SERVICE</PARAMETER>
+       <KIND>P</KIND>
+       <STEXT>ICF service path (e.g. /ztrmserver), appended to the URL</STEXT>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>BASE_URL</PARAMETER>
+       <KIND>P</KIND>
+       <STEXT>URL (protocol://host:port[/service])</STEXT>
+      </RSFDO>
+      <RSFDO>
+       <PARAMETER>TRM_RFC_UNAUTHORIZED</PARAMETER>
        <KIND>X</KIND>
       </RSFDO>
       <RSFDO>

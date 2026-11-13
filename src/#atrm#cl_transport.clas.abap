@@ -25,6 +25,7 @@ CLASS /atrm/cl_transport DEFINITION
     CLASS-METHODS create_workbench
       IMPORTING text             TYPE as4text
                 target           TYPE tr_target
+                with_task        TYPE flag OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
@@ -251,6 +252,10 @@ CLASS /atrm/cl_transport DEFINITION
                 exported      TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(status) TYPE trstatus
       RAISING   /atrm/cx_exception.
+    "! Remove every object entry of the request and of its tasks, with its object lock
+    "! @raising /atrm/cx_exception | First entry that couldn't be removed (the others are attempted)
+    METHODS delete_entries
+      RAISING /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -267,6 +272,7 @@ CLASS /atrm/cl_transport DEFINITION
                 target           TYPE tr_target
                 type             TYPE trfunction
                 attributes       TYPE scts_attrs OPTIONAL
+                users            TYPE scts_users OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 METHODS complete_shi3_entries
@@ -574,11 +580,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD create_workbench.
+    DATA: lt_users TYPE scts_users,
+          ls_user  LIKE LINE OF lt_users.
+    "a task of the current user, for objects recorded in the request (e.g. by RS_CORR_INSERT)
+    IF with_task = 'X'.
+      ls_user-user = sy-uname.
+      ls_user-type = 'S'.
+      APPEND ls_user TO lt_users.
+    ENDIF.
     create(
       EXPORTING
         text      = text
         target    = target
         type      = 'K'
+        users     = lt_users
       RECEIVING
         transport = transport
     ).
@@ -628,6 +643,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         iv_type           = type
         iv_target         = target
         it_attributes     = attributes
+        it_users          = users
       IMPORTING
         es_request_header = ls_header
       EXCEPTIONS
@@ -1680,5 +1696,54 @@ METHOD execute_import.
       INTO TABLE layers
       WHERE version EQ version AND intsys EQ sy-sysid AND consys EQ target.
     SORT layers.
+  ENDMETHOD.
+
+  METHOD delete_entries.
+    DATA: lt_requests TYPE trwbo_requests,
+          ls_request  TYPE trwbo_request,
+          lt_e071     TYPE trwbo_t_e071,
+          ls_e071     TYPE e071,
+          lx_first    TYPE REF TO /atrm/cx_exception,
+          lx_entry    TYPE REF TO /atrm/cx_exception.
+
+    "the request and its tasks, with their entries
+    CALL FUNCTION 'TR_READ_REQUEST_WITH_TASKS'
+      EXPORTING
+        iv_trkorr   = gv_trkorr
+      IMPORTING
+        et_requests = lt_requests
+      EXCEPTIONS
+        OTHERS      = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    "every entry is attempted, the first failure is raised afterwards
+    LOOP AT lt_requests INTO ls_request.
+      lt_e071 = ls_request-objects.
+      LOOP AT lt_e071 INTO ls_e071.
+        TRY.
+            CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
+              EXPORTING
+                is_e071_delete = ls_e071
+                iv_dialog_flag = ' '
+              CHANGING
+                cs_request     = ls_request
+              EXCEPTIONS
+                OTHERS         = 1.
+            IF sy-subrc <> 0.
+              /atrm/cx_exception=>raise( ).
+            ENDIF.
+          CATCH /atrm/cx_exception INTO lx_entry.
+            IF lx_first IS NOT BOUND.
+              lx_first = lx_entry.
+            ENDIF.
+        ENDTRY.
+      ENDLOOP.
+    ENDLOOP.
+
+    IF lx_first IS BOUND.
+      RAISE EXCEPTION lx_first.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.
