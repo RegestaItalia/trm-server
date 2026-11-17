@@ -125,7 +125,7 @@ Installation of either package can be performed at any time through this report.
 
 <details>
   <summary>Online install (From registry)</summary><br>
-The online installation is only possible if your system is allowed to connect to the external server <a href="https://trmregistry.com">https://trmregistry.com</a>.
+The online installation is only possible if your system is allowed to <a href="https://trmregistry.com">https://trmregistry.com</a> and your release supports it (in older releases the tab is not visible).
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/online.png" alt="ZTRM_INSTALLER">
