@@ -132,9 +132,10 @@ CLASS lcl_strust IMPLEMENTATION.
           pse_password    TYPE ssfpabpw,
           temporary_file  TYPE localfile,
           distribute      TYPE ssfflag,
-          credential_name TYPE icm_credname,
+          credential_name TYPE REF TO data,
           is_locked       TYPE flag,
           authority_error TYPE REF TO cx_root.
+    FIELD-SYMBOLS <credential_name> TYPE any.
 
     IF certificate IS INITIAL.
       error = 'Cannot install an empty certificate'.
@@ -246,16 +247,31 @@ CLASS lcl_strust IMPLEMENTATION.
         EXIT.
       ENDIF.
 
-      credential_name = pse_name.
-      CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
-        EXPORTING
-          global              = 1
-          cred_name           = credential_name
-        EXCEPTIONS
-          icm_op_failed       = 1
-          icm_get_serv_failed = 2
-          icm_auth_failed     = 3
-          OTHERS              = 4.
+      " ICM_CREDNAME (and the CRED_NAME parameter) don't exist on older
+      " releases: there, refresh all SSL credentials (GLOBAL = 1) without a name
+      TRY.
+          CREATE DATA credential_name TYPE ('ICM_CREDNAME').
+          ASSIGN credential_name->* TO <credential_name>.
+          <credential_name> = pse_name.
+          CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
+            EXPORTING
+              global              = 1
+              cred_name           = <credential_name>
+            EXCEPTIONS
+              icm_op_failed       = 1
+              icm_get_serv_failed = 2
+              icm_auth_failed     = 3
+              OTHERS              = 4.
+        CATCH cx_sy_create_data_error cx_sy_dyn_call_error.
+          CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
+            EXPORTING
+              global              = 1
+            EXCEPTIONS
+              icm_op_failed       = 1
+              icm_get_serv_failed = 2
+              icm_auth_failed     = 3
+              OTHERS              = 4.
+      ENDTRY.
       IF sy-subrc <> 0.
         error = get_system_error( 'Certificate was saved, but ICM could not be refreshed' ).
       ENDIF.
@@ -555,8 +571,6 @@ CLASS lcl_report IMPLEMENTATION.
     DATA: encoded_certificates TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
           encoded_certificate  TYPE string,
           certificate          TYPE xstring,
-          certificate_object   TYPE REF TO cl_abap_x509_certificate,
-          certificate_error    TYPE REF TO cx_abap_x509_certificate,
           install_error        TYPE string.
 
 * BEGIN AUTO-GENERATED REGISTRY CERTIFICATES
@@ -658,15 +672,21 @@ CLASS lcl_report IMPLEMENTATION.
 * END AUTO-GENERATED REGISTRY CERTIFICATES
 
     LOOP AT encoded_certificates INTO encoded_certificate.
-      TRY.
-          CREATE OBJECT certificate_object
-            EXPORTING
-              if_certificate = encoded_certificate.
-          certificate = certificate_object->get_certificate( ).
-        CATCH cx_abap_x509_certificate INTO certificate_error.
-          MESSAGE certificate_error TYPE 'I' DISPLAY LIKE 'E'.
-          RETURN.
-      ENDTRY.
+      " CL_ABAP_X509_CERTIFICATE doesn't exist on older releases (e.g. 7.0):
+      " the certificates are base64 DER, so decoding them is all that's needed
+      CLEAR certificate.
+      CALL FUNCTION 'SSFC_BASE64_DECODE'
+        EXPORTING
+          b64data = encoded_certificate
+        IMPORTING
+          bindata = certificate
+        EXCEPTIONS
+          OTHERS  = 1.
+      IF sy-subrc <> 0 OR certificate IS INITIAL.
+        install_error = 'Registry certificate could not be decoded'.
+        MESSAGE install_error TYPE 'I' DISPLAY LIKE 'E'.
+        RETURN.
+      ENDIF.
 
       install_error = lcl_strust=>add_certificate(
         application = p_id
@@ -1172,6 +1192,8 @@ CLASS lcl_report IMPLEMENTATION.
   METHOD run_online.
     DATA:
       code        TYPE i,
+      code_text   TYPE string,
+      log_text    TYPE string,
       request_ok  TYPE flag,
       download_ok TYPE flag,
       client      TYPE REF TO if_http_client,
@@ -1203,7 +1225,9 @@ CLASS lcl_report IMPLEMENTATION.
         code   = code
         reason = reason ).
     IF code <> 200.
-      write_log( 'TRM Registry is unreachable! Code ' && code ).
+      code_text = code.
+      CONCATENATE 'TRM Registry is unreachable! Code' code_text INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'TRM Registry is unreachable!' ).
       client->close( ).
       RETURN.
@@ -1283,11 +1307,12 @@ CLASS lcl_report IMPLEMENTATION.
     SELECT SINGLE filesys INTO file_sys FROM opsystem WHERE opsys = sy-opsys.
   ENDMETHOD.
   METHOD delete_from_tms_queue.
-    DATA: ls_tmsbuffer    TYPE tmsbuffer,
-          lt_tp_maintains TYPE stms_tp_maintains,
-          ls_tp_maintains LIKE LINE OF lt_tp_maintains,
-          ls_tpstdout     TYPE tpstdout,
-          ls_exception    TYPE stmscalert.
+    " STMS_TP_MAINTAINS / ET_TP_MAINTAINS don't exist on older releases (e.g. 7.0):
+    " for a single request TT_STDOUT holds the same tp output
+    DATA: ls_tmsbuffer TYPE tmsbuffer,
+          lt_tpstdout  TYPE t_tpstdout,
+          ls_tpstdout  TYPE tpstdout,
+          ls_exception TYPE stmscalert.
 
     SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ trkorr.
     CHECK sy-subrc EQ 0.
@@ -1302,20 +1327,18 @@ CLASS lcl_report IMPLEMENTATION.
         iv_monitor                 = ' '
         iv_verbose                 = ' '
       IMPORTING
-        et_tp_maintains            = lt_tp_maintains
         es_exception               = ls_exception
+      TABLES
+        tt_stdout                  = lt_tpstdout
       EXCEPTIONS
         read_config_failed         = 1
         table_of_requests_is_empty = 2
         OTHERS                     = 3.
 
     IF sy-subrc <> 0 OR ( ls_exception-error <> 'OK' AND ls_exception-error <> space ).
-      IF lt_tp_maintains[] IS NOT INITIAL.
-        READ TABLE lt_tp_maintains INTO ls_tp_maintains INDEX 1.
-        LOOP AT ls_tp_maintains-tp_stdout INTO ls_tpstdout.
-          WRITE: /, ls_tpstdout-line.
-        ENDLOOP.
-      ENDIF.
+      LOOP AT lt_tpstdout INTO ls_tpstdout.
+        WRITE: /, ls_tpstdout-line.
+      ENDLOOP.
       subrc = 1.
     ELSE.
       subrc = 0.
@@ -1356,9 +1379,11 @@ CLASS lcl_report IMPLEMENTATION.
           msgv1   TYPE sy-msgv1,
           msgv2   TYPE sy-msgv2,
           msgv3   TYPE sy-msgv3,
-          msgv4   TYPE sy-msgv4,
-          imports TYPE stms_tp_imports,
-          import  LIKE LINE OF imports.
+          msgv4     TYPE sy-msgv4,
+          exception TYPE stmscalert.
+    " STMS_TP_IMPORTS / ET_TP_IMPORTS don't exist on older releases (e.g. 7.0):
+    " for a single request ES_EXCEPTION and TT_STDOUT hold the same alert and tp output
+    CLEAR tpstdout.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
       EXPORTING
         iv_system             = system
@@ -1379,7 +1404,9 @@ CLASS lcl_report IMPLEMENTATION.
         iv_monitor            = 'X'
         iv_verbose            = 'X'
       IMPORTING
-        et_tp_imports         = imports
+        es_exception          = exception
+      TABLES
+        tt_stdout             = tpstdout
       EXCEPTIONS
         error_message         = 1
         OTHERS                = 2.
@@ -1392,24 +1419,18 @@ CLASS lcl_report IMPLEMENTATION.
     msgv3 = sy-msgv3.
     msgv4 = sy-msgv4.
 
-    READ TABLE imports INDEX 1 INTO import.
-    IF sy-subrc <> 0.
-      subrc = 1.
-      RETURN.
-    ENDIF.
-    tpstdout = import-tp_stdout.
-    IF import-alert-severity = 'E'
-        OR import-alert-msgty = 'E'
-        OR import-alert-msgty = 'A'.
-      IF import-alert-msgid IS NOT INITIAL
-        AND import-alert-msgno IS NOT INITIAL.
-        sy-msgid = import-alert-msgid.
-        sy-msgty = import-alert-msgty.
-        sy-msgno = import-alert-msgno.
-        sy-msgv1 = import-alert-msgv1.
-        sy-msgv2 = import-alert-msgv2.
-        sy-msgv3 = import-alert-msgv3.
-        sy-msgv4 = import-alert-msgv4.
+    IF exception-severity = 'E'
+        OR exception-msgty = 'E'
+        OR exception-msgty = 'A'.
+      IF exception-msgid IS NOT INITIAL
+        AND exception-msgno IS NOT INITIAL.
+        sy-msgid = exception-msgid.
+        sy-msgty = exception-msgty.
+        sy-msgno = exception-msgno.
+        sy-msgv1 = exception-msgv1.
+        sy-msgv2 = exception-msgv2.
+        sy-msgv3 = exception-msgv3.
+        sy-msgv4 = exception-msgv4.
         subrc = 1.
         RETURN.
       ENDIF.
@@ -1663,6 +1684,7 @@ CLASS lcl_report IMPLEMENTATION.
       header_file_name     TYPE string,
       data_file_path       TYPE string,
       header_file_path     TYPE string,
+      log_text             TYPE string,
       data_file            TYPE xstring,
       header_file          TYPE xstring,
       zip                  TYPE REF TO cl_abap_zip,
@@ -1707,20 +1729,41 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
     get_dir_trans( IMPORTING dir_trans = dirtrans ).
     CONCATENATE 'dist/' trkorr INTO release_entry.
-    data_file_name = 'R' && trkorr+4(6) && '.' && trkorr(3).
-    header_file_name =  'K' && trkorr+4(6) && '.' && trkorr(3).
-    data_file_path = dirtrans && file_path_separator && 'data' && file_path_separator && data_file_name.
-    header_file_path =  dirtrans && file_path_separator && 'cofiles' && file_path_separator && header_file_name.
+    CONCATENATE 'R' trkorr+4(6) '.' trkorr(3) INTO data_file_name.
+    CONCATENATE 'K' trkorr+4(6) '.' trkorr(3) INTO header_file_name.
+    CONCATENATE dirtrans file_path_separator 'data' file_path_separator data_file_name INTO data_file_path.
+    CONCATENATE dirtrans file_path_separator 'cofiles' file_path_separator header_file_name INTO header_file_path.
     WRITE: /, 'Release data: ', data_file_name, ' Release header: ', header_file_name.
+    " CL_ABAP_MESSAGE_DIGEST doesn't exist on older releases (e.g. 7.0):
+    " fall back to function module CALCULATE_HASH_FOR_RAW
     TRY.
-        cl_abap_message_digest=>calculate_hash_for_raw(
+        CALL METHOD ('CL_ABAP_MESSAGE_DIGEST')=>('CALCULATE_HASH_FOR_RAW')
           EXPORTING
             if_algorithm     = 'SHA512'
             if_data          = release
           IMPORTING
-            ef_hashb64string = integrity
-        ).
-      CATCH cx_abap_message_digest.
+            ef_hashb64string = integrity.
+      CATCH cx_sy_dyn_call_error.
+        TRY.
+            CALL FUNCTION 'CALCULATE_HASH_FOR_RAW'
+              EXPORTING
+                alg           = 'SHA512'
+                data          = release
+              IMPORTING
+                hashb64string = integrity
+              EXCEPTIONS
+                OTHERS        = 1.
+            IF sy-subrc <> 0.
+              CLEAR integrity.
+            ENDIF.
+          CATCH cx_sy_dyn_call_error.
+            CLEAR integrity.
+        ENDTRY.
+        IF integrity IS INITIAL.
+          display_error( 'Error in release checksum' ).
+          RETURN.
+        ENDIF.
+      CATCH cx_root.
         display_error( 'Error in release checksum' ).
         RETURN.
     ENDTRY.
@@ -1848,7 +1891,8 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
 
     write_log( 'All files extracted from release, ready to import into application server.' ).
-    write_log( 'Release data: ' && data_file_path && ' Release header: ' && header_file_path ).
+    CONCATENATE 'Release data:' data_file_path 'Release header:' header_file_path INTO log_text SEPARATED BY space.
+    write_log( log_text ).
 
     CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
       EXPORTING
@@ -1977,9 +2021,7 @@ CLASS lcl_report IMPLEMENTATION.
             unexpected_error             = 15
             intern_err                   = 16
             no_access                    = 17
-            invalid_translation_depth    = 18
-            wrong_mainpack_value         = 19
-            OTHERS                       = 20
+            OTHERS                       = 18
         ).
         IF sy-subrc <> 0.
           display_error( 'Error in package create' ).
@@ -2082,11 +2124,8 @@ INITIALIZATION.
   ENDIF.
 
 AT SELECTION-SCREEN.
-  p_proxy = replace(
-    val   = p_proxy
-    regex = 'http(s?)://'
-    with  = ''
-    occ   = 1 ).
+  " replace( ) built-in function is 7.02+, use the classic statement for 7.0
+  REPLACE FIRST OCCURRENCE OF REGEX 'http(s?)://' IN p_proxy WITH ''.
   IF sy-ucomm <> 'CERT'.
     CLEAR suppress_certificate_command.
   ENDIF.
