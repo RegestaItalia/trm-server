@@ -313,6 +313,422 @@ CLASS lcl_strust IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.
 
+* SHA-512 in plain ABAP, for releases without CL_ABAP_MESSAGE_DIGEST (e.g. 7.0).
+* 64-bit words are kept as x LENGTH 8 for bit operations; rotations and
+* additions work on four 16-bit limbs held in type i (no int8 before 7.50).
+CLASS lcl_sha512 DEFINITION FINAL.
+  PUBLIC SECTION.
+    TYPES ty_word TYPE x LENGTH 8.
+    CLASS-METHODS hash_b64
+      IMPORTING
+        data        TYPE xstring
+      RETURNING
+        VALUE(hash) TYPE string.
+  PRIVATE SECTION.
+    TYPES: BEGIN OF ty_limbs,
+             l0 TYPE i,
+             l1 TYPE i,
+             l2 TYPE i,
+             l3 TYPE i,
+           END OF ty_limbs.
+    CLASS-DATA constants TYPE xstring.
+    CLASS-METHODS split
+      IMPORTING
+        word         TYPE ty_word
+      RETURNING
+        VALUE(limbs) TYPE ty_limbs.
+    CLASS-METHODS join
+      IMPORTING
+        limbs       TYPE ty_limbs
+      RETURNING
+        VALUE(word) TYPE ty_word.
+    CLASS-METHODS accumulate
+      IMPORTING
+        word TYPE ty_word
+      CHANGING
+        sum  TYPE ty_limbs.
+    CLASS-METHODS rotate
+      IMPORTING
+        limbs       TYPE ty_limbs
+        bits        TYPE i
+        shift_only  TYPE abap_bool DEFAULT abap_false
+      RETURNING
+        VALUE(word) TYPE ty_word.
+    CLASS-METHODS sigma
+      IMPORTING
+        word         TYPE ty_word
+        r1           TYPE i
+        r2           TYPE i
+        r3           TYPE i
+        r3_is_shift  TYPE abap_bool DEFAULT abap_false
+      RETURNING
+        VALUE(result) TYPE ty_word.
+    CLASS-METHODS base64
+      IMPORTING
+        data           TYPE xstring
+      RETURNING
+        VALUE(encoded) TYPE string.
+    CLASS-METHODS load_constants.
+ENDCLASS.
+
+CLASS lcl_sha512 IMPLEMENTATION.
+  METHOD hash_b64.
+    DATA: message    TYPE xstring,
+          padding    TYPE xstring,
+          bit_length TYPE x LENGTH 4,
+          byte_80    TYPE x LENGTH 1 VALUE '80',
+          byte_00    TYPE x LENGTH 1 VALUE '00',
+          length     TYPE i,
+          zeros      TYPE i,
+          blocks     TYPE i,
+          offset     TYPE i,
+          t          TYPE i,
+          w_off      TYPE i,
+          schedule   TYPE x LENGTH 640,
+          h          TYPE x LENGTH 64,
+          digest     TYPE xstring,
+          a          TYPE ty_word,
+          b          TYPE ty_word,
+          c          TYPE ty_word,
+          d          TYPE ty_word,
+          e          TYPE ty_word,
+          f          TYPE ty_word,
+          g          TYPE ty_word,
+          hh         TYPE ty_word,
+          w1         TYPE ty_word,
+          w2         TYPE ty_word,
+          s0         TYPE ty_word,
+          s1         TYPE ty_word,
+          ch         TYPE ty_word,
+          maj        TYPE ty_word,
+          not_e      TYPE ty_word,
+          k          TYPE ty_word,
+          wt         TYPE ty_word,
+          t1         TYPE ty_word,
+          sum        TYPE ty_limbs,
+          i          TYPE i,
+          block      TYPE i,
+          percentage TYPE i,
+          shown      TYPE i VALUE -1,
+          percent_c  TYPE c LENGTH 3,
+          progress   TYPE string.
+
+    IF constants IS INITIAL.
+      load_constants( ).
+    ENDIF.
+
+    " padding: 0x80, zeros up to 112 mod 128, 128-bit big-endian bit length
+    length = xstrlen( data ).
+    zeros = ( 111 - length MOD 128 ) MOD 128.
+    CONCATENATE padding byte_80 INTO padding IN BYTE MODE.
+    DO zeros TIMES.
+      CONCATENATE padding byte_00 INTO padding IN BYTE MODE.
+    ENDDO.
+    DO 12 TIMES.
+      CONCATENATE padding byte_00 INTO padding IN BYTE MODE.
+    ENDDO.
+    bit_length = length * 8.
+    CONCATENATE data padding bit_length INTO message IN BYTE MODE.
+
+    h = constants+640(64).
+    blocks = xstrlen( message ) / 128.
+    offset = 0.
+    DO blocks TIMES.
+      " this is slow (no 64-bit integers before 7.50): show progress, at most once per percent
+      block = sy-index.
+      percentage = ( block * 100 ) DIV blocks.
+      IF percentage <> shown.
+        shown = percentage.
+        percent_c = percentage.
+        CONDENSE percent_c.
+        CONCATENATE 'Calculating release checksum (SHA512 in ABAP):' percent_c INTO progress SEPARATED BY space.
+        CONCATENATE progress '%' INTO progress.
+        CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+          EXPORTING
+            percentage = percentage
+            text       = progress.
+      ENDIF.
+      schedule+0(128) = message+offset(128).
+      t = 16.
+      WHILE t < 80.
+        w_off = ( t - 2 ) * 8.
+        w1 = schedule+w_off(8).
+        w_off = ( t - 15 ) * 8.
+        w2 = schedule+w_off(8).
+        s1 = sigma( word = w1 r1 = 19 r2 = 61 r3 = 6 r3_is_shift = abap_true ).
+        s0 = sigma( word = w2 r1 = 1 r2 = 8 r3 = 7 r3_is_shift = abap_true ).
+        CLEAR sum.
+        accumulate( EXPORTING word = s1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = s0 CHANGING sum = sum ).
+        w_off = ( t - 7 ) * 8.
+        w1 = schedule+w_off(8).
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        w_off = ( t - 16 ) * 8.
+        w1 = schedule+w_off(8).
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        w_off = t * 8.
+        schedule+w_off(8) = join( sum ).
+        t = t + 1.
+      ENDWHILE.
+
+      a = h+0(8).
+      b = h+8(8).
+      c = h+16(8).
+      d = h+24(8).
+      e = h+32(8).
+      f = h+40(8).
+      g = h+48(8).
+      hh = h+56(8).
+
+      t = 0.
+      WHILE t < 80.
+        w_off = t * 8.
+        k = constants+w_off(8).
+        wt = schedule+w_off(8).
+        s1 = sigma( word = e r1 = 14 r2 = 18 r3 = 41 ).
+        not_e = BIT-NOT e.
+        ch = ( e BIT-AND f ) BIT-XOR ( not_e BIT-AND g ).
+        CLEAR sum.
+        accumulate( EXPORTING word = hh CHANGING sum = sum ).
+        accumulate( EXPORTING word = s1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = ch CHANGING sum = sum ).
+        accumulate( EXPORTING word = k CHANGING sum = sum ).
+        accumulate( EXPORTING word = wt CHANGING sum = sum ).
+        t1 = join( sum ).
+        s0 = sigma( word = a r1 = 28 r2 = 34 r3 = 39 ).
+        maj = ( a BIT-AND b ) BIT-XOR ( a BIT-AND c ) BIT-XOR ( b BIT-AND c ).
+        hh = g.
+        g = f.
+        f = e.
+        CLEAR sum.
+        accumulate( EXPORTING word = d CHANGING sum = sum ).
+        accumulate( EXPORTING word = t1 CHANGING sum = sum ).
+        e = join( sum ).
+        d = c.
+        c = b.
+        b = a.
+        CLEAR sum.
+        accumulate( EXPORTING word = t1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = s0 CHANGING sum = sum ).
+        accumulate( EXPORTING word = maj CHANGING sum = sum ).
+        a = join( sum ).
+        t = t + 1.
+      ENDWHILE.
+
+      i = 0.
+      DO 8 TIMES.
+        w_off = i * 8.
+        CASE i.
+          WHEN 0. w1 = a.
+          WHEN 1. w1 = b.
+          WHEN 2. w1 = c.
+          WHEN 3. w1 = d.
+          WHEN 4. w1 = e.
+          WHEN 5. w1 = f.
+          WHEN 6. w1 = g.
+          WHEN 7. w1 = hh.
+        ENDCASE.
+        w2 = h+w_off(8).
+        CLEAR sum.
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = w2 CHANGING sum = sum ).
+        h+w_off(8) = join( sum ).
+        i = i + 1.
+      ENDDO.
+
+      offset = offset + 128.
+    ENDDO.
+
+    digest = h.
+    hash = base64( digest ).
+  ENDMETHOD.
+
+  METHOD split.
+    DATA half TYPE x LENGTH 2.
+    half = word+0(2).
+    limbs-l0 = half.
+    half = word+2(2).
+    limbs-l1 = half.
+    half = word+4(2).
+    limbs-l2 = half.
+    half = word+6(2).
+    limbs-l3 = half.
+  ENDMETHOD.
+
+  METHOD join.
+    DATA: normalized TYPE ty_limbs,
+          carry      TYPE i,
+          half       TYPE x LENGTH 2.
+    normalized = limbs.
+    carry = normalized-l3 DIV 65536.
+    normalized-l3 = normalized-l3 MOD 65536.
+    normalized-l2 = normalized-l2 + carry.
+    carry = normalized-l2 DIV 65536.
+    normalized-l2 = normalized-l2 MOD 65536.
+    normalized-l1 = normalized-l1 + carry.
+    carry = normalized-l1 DIV 65536.
+    normalized-l1 = normalized-l1 MOD 65536.
+    normalized-l0 = ( normalized-l0 + carry ) MOD 65536.
+    half = normalized-l0.
+    word+0(2) = half.
+    half = normalized-l1.
+    word+2(2) = half.
+    half = normalized-l2.
+    word+4(2) = half.
+    half = normalized-l3.
+    word+6(2) = half.
+  ENDMETHOD.
+
+  METHOD accumulate.
+    DATA limbs TYPE ty_limbs.
+    limbs = split( word ).
+    sum-l0 = sum-l0 + limbs-l0.
+    sum-l1 = sum-l1 + limbs-l1.
+    sum-l2 = sum-l2 + limbs-l2.
+    sum-l3 = sum-l3 + limbs-l3.
+  ENDMETHOD.
+
+  METHOD rotate.
+    " rotate (or shift) right a 64-bit word given as limbs, l0 most significant
+    DATA: moved    TYPE ty_limbs,
+          result   TYPE ty_limbs,
+          wrap     TYPE i,
+          divisor  TYPE i,
+          factor   TYPE i,
+          bit_part TYPE i,
+          quarter  TYPE i.
+
+    quarter = bits DIV 16.
+    CASE quarter.
+      WHEN 0.
+        moved = limbs.
+      WHEN 1.
+        moved-l0 = limbs-l3.
+        moved-l1 = limbs-l0.
+        moved-l2 = limbs-l1.
+        moved-l3 = limbs-l2.
+      WHEN 2.
+        moved-l0 = limbs-l2.
+        moved-l1 = limbs-l3.
+        moved-l2 = limbs-l0.
+        moved-l3 = limbs-l1.
+      WHEN 3.
+        moved-l0 = limbs-l1.
+        moved-l1 = limbs-l2.
+        moved-l2 = limbs-l3.
+        moved-l3 = limbs-l0.
+    ENDCASE.
+
+    " shift_only is used with bits < 16 only (SHA-512 shifts by 6 and 7)
+    IF shift_only = abap_true.
+      wrap = 0.
+    ELSE.
+      wrap = moved-l3.
+    ENDIF.
+
+    bit_part = bits MOD 16.
+    IF bit_part = 0.
+      result = moved.
+      IF shift_only = abap_true.
+        CLEAR result-l0.
+      ENDIF.
+    ELSE.
+      divisor = 1.
+      DO bit_part TIMES.
+        divisor = divisor * 2.
+      ENDDO.
+      factor = 65536 DIV divisor.
+      result-l0 = moved-l0 DIV divisor + ( wrap MOD divisor ) * factor.
+      result-l1 = moved-l1 DIV divisor + ( moved-l0 MOD divisor ) * factor.
+      result-l2 = moved-l2 DIV divisor + ( moved-l1 MOD divisor ) * factor.
+      result-l3 = moved-l3 DIV divisor + ( moved-l2 MOD divisor ) * factor.
+    ENDIF.
+    word = join( result ).
+  ENDMETHOD.
+
+  METHOD sigma.
+    DATA: limbs TYPE ty_limbs,
+          x1    TYPE ty_word,
+          x2    TYPE ty_word,
+          x3    TYPE ty_word.
+    limbs = split( word ).
+    x1 = rotate( limbs = limbs bits = r1 ).
+    x2 = rotate( limbs = limbs bits = r2 ).
+    x3 = rotate( limbs = limbs bits = r3 shift_only = r3_is_shift ).
+    result = x1 BIT-XOR x2 BIT-XOR x3.
+  ENDMETHOD.
+
+  METHOD base64.
+    DATA alphabet TYPE c LENGTH 64
+      VALUE 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.
+    DATA: length TYPE i,
+          offset TYPE i,
+          rest   TYPE i,
+          group  TYPE x LENGTH 3,
+          value  TYPE i,
+          index  TYPE i,
+          chars  TYPE c LENGTH 4.
+
+    length = xstrlen( data ).
+    offset = 0.
+    WHILE offset < length.
+      rest = length - offset.
+      CLEAR group.
+      IF rest >= 3.
+        group = data+offset(3).
+      ELSE.
+        group+0(rest) = data+offset(rest).
+      ENDIF.
+      value = group.
+      index = value DIV 262144.
+      chars+0(1) = alphabet+index(1).
+      index = ( value DIV 4096 ) MOD 64.
+      chars+1(1) = alphabet+index(1).
+      index = ( value DIV 64 ) MOD 64.
+      chars+2(1) = alphabet+index(1).
+      index = value MOD 64.
+      chars+3(1) = alphabet+index(1).
+      IF rest = 1.
+        chars+2(2) = '=='.
+      ELSEIF rest = 2.
+        chars+3(1) = '='.
+      ENDIF.
+      CONCATENATE encoded chars INTO encoded.
+      offset = offset + 3.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD load_constants.
+    DATA hex TYPE string.
+    " 80 round constants (640 bytes), then the 8 initial hash values (64 bytes)
+    CONCATENATE
+      '428A2F98D728AE227137449123EF65CDB5C0FBCFEC4D3B2FE9B5DBA58189DBBC'
+      '3956C25BF348B53859F111F1B605D019923F82A4AF194F9BAB1C5ED5DA6D8118'
+      'D807AA98A303024212835B0145706FBE243185BE4EE4B28C550C7DC3D5FFB4E2'
+      '72BE5D74F27B896F80DEB1FE3B1696B19BDC06A725C71235C19BF174CF692694'
+      'E49B69C19EF14AD2EFBE4786384F25E30FC19DC68B8CD5B5240CA1CC77AC9C65'
+      '2DE92C6F592B02754A7484AA6EA6E4835CB0A9DCBD41FBD476F988DA831153B5'
+      '983E5152EE66DFABA831C66D2DB43210B00327C898FB213FBF597FC7BEEF0EE4'
+      'C6E00BF33DA88FC2D5A79147930AA72506CA6351E003826F142929670A0E6E70'
+      '27B70A8546D22FFC2E1B21385C26C9264D2C6DFC5AC42AED53380D139D95B3DF'
+      '650A73548BAF63DE766A0ABB3C77B2A881C2C92E47EDAEE692722C851482353B'
+      'A2BFE8A14CF10364A81A664BBC423001C24B8B70D0F89791C76C51A30654BE30'
+      'D192E819D6EF5218D69906245565A910F40E35855771202A106AA07032BBD1B8'
+      '19A4C116B8D2D0C81E376C085141AB532748774CDF8EEB9934B0BCB5E19B48A8'
+      '391C0CB3C5C95A634ED8AA4AE3418ACB5B9CCA4F7763E373682E6FF3D6B2B8A3'
+      '748F82EE5DEFB2FC78A5636F43172F6084C87814A1F0AB728CC702081A6439EC'
+      '90BEFFFA23631E28A4506CEBDE82BDE9BEF9A3F7B2C67915C67178F2E372532B'
+      'CA273ECEEA26619CD186B8C721C0C207EADA7DD6CDE0EB1EF57D4F7FEE6ED178'
+      '06F067AA72176FBA0A637DC5A2C898A6113F9804BEF90DAE1B710B35131C471B'
+      '28DB77F523047D8432CAAB7B40C724933C9EBE0A15C9BEBC431D67C49C100D4C'
+      '4CC5D4BECB3E42B6597F299CFC657E2A5FCB6FAB3AD6FAEC6C44198C4A475817'
+      '6A09E667F3BCC908BB67AE8584CAA73B3C6EF372FE94F82BA54FF53A5F1D36F1'
+      '510E527FADE682D19B05688C2B3E6C1F1F83D9ABFB41BD6B5BE0CD19137E2179'
+      INTO hex.
+    constants = hex.
+  ENDMETHOD.
+ENDCLASS.
+
 CLASS lcl_report DEFINITION.
 
   PUBLIC SECTION.
@@ -384,6 +800,12 @@ CLASS lcl_report DEFINITION.
     METHODS write_log
       IMPORTING
         iv_response TYPE string.
+    METHODS log_missing_zip_entry
+      IMPORTING
+        zip      TYPE REF TO cl_abap_zip
+        expected TYPE string
+        context  TYPE string
+        prefix   TYPE string OPTIONAL.
     METHODS run_offline
       EXPORTING
         ok_server TYPE flag
@@ -421,7 +843,8 @@ CLASS lcl_report DEFINITION.
     CLASS-METHODS write_binary_file
       IMPORTING file_path      TYPE string
                 file           TYPE xstring
-      RETURNING VALUE(written) TYPE flag.
+      EXPORTING written        TYPE flag
+                error          TYPE string.
     CLASS-METHODS get_file_sys
       EXPORTING file_sys TYPE filesys.
     CLASS-METHODS delete_from_tms_queue
@@ -1143,6 +1566,39 @@ CLASS lcl_report IMPLEMENTATION.
         txt2  = ''.
   ENDMETHOD.
 
+  METHOD log_missing_zip_entry.
+    DATA: file     TYPE cl_abap_zip=>t_file,
+          log_text TYPE string,
+          size     TYPE string,
+          found    TYPE flag,
+          pattern  TYPE string.
+    CONCATENATE prefix '*' INTO pattern.
+    CONCATENATE 'Expected entry' expected 'in' context 'but it was not found.'
+      INTO log_text SEPARATED BY space.
+    write_log( log_text ).
+    IF prefix IS INITIAL.
+      write_log( 'Entries found:' ).
+    ELSE.
+      CONCATENATE 'Entries found in' prefix INTO log_text SEPARATED BY space.
+      CONCATENATE log_text ':' INTO log_text.
+      write_log( log_text ).
+    ENDIF.
+    LOOP AT zip->files INTO file.
+      IF prefix IS NOT INITIAL AND file-name NP pattern.
+        CONTINUE.
+      ENDIF.
+      found = 'X'.
+      size = file-size.
+      CONDENSE size.
+      CONCATENATE '  -' file-name '(' INTO log_text SEPARATED BY space.
+      CONCATENATE log_text size ' bytes)' INTO log_text.
+      write_log( log_text ).
+    ENDLOOP.
+    IF found IS INITIAL.
+      write_log( '  (none)' ).
+    ENDIF.
+  ENDMETHOD.
+
   METHOD write_log.
     DATA:
       lt_lines TYPE TABLE OF string,
@@ -1293,15 +1749,28 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS          = 1.
   ENDMETHOD.
   METHOD write_binary_file.
-    OPEN DATASET file_path FOR OUTPUT IN BINARY MODE.
-    IF sy-subrc <> 0.
-      RETURN.
-    ENDIF.
-    TRANSFER file TO file_path.
-    IF sy-subrc = 0.
-      written = 'X'.
-    ENDIF.
-    CLOSE DATASET file_path.
+    DATA: os_message TYPE c LENGTH 255,
+          exception  TYPE REF TO cx_root.
+    CLEAR: written, error.
+    TRY.
+        OPEN DATASET file_path FOR OUTPUT IN BINARY MODE MESSAGE os_message.
+        IF sy-subrc <> 0.
+          " os_message holds the operating system error (e.g. path not found, access denied)
+          error = os_message.
+          IF error IS INITIAL.
+            error = 'OPEN DATASET failed (no operating system message)'.
+          ENDIF.
+          RETURN.
+        ENDIF.
+        TRANSFER file TO file_path.
+        written = 'X'.
+        CLOSE DATASET file_path.
+      CATCH cx_root INTO exception.
+        " e.g. CX_SY_FILE_AUTHORITY (missing S_DATASET), CX_SY_FILE_OPEN, CX_SY_FILE_IO
+        error = exception->get_text( ).
+        CLEAR written.
+        CLOSE DATASET file_path.
+    ENDTRY.
   ENDMETHOD.
   METHOD get_file_sys.
     SELECT SINGLE filesys INTO file_sys FROM opsystem WHERE opsys = sy-opsys.
@@ -1685,6 +2154,8 @@ CLASS lcl_report IMPLEMENTATION.
       data_file_path       TYPE string,
       header_file_path     TYPE string,
       log_text             TYPE string,
+      file_error           TYPE string,
+      file_written         TYPE flag,
       data_file            TYPE xstring,
       header_file          TYPE xstring,
       zip                  TYPE REF TO cl_abap_zip,
@@ -1709,7 +2180,9 @@ CLASS lcl_report IMPLEMENTATION.
       tpstdout             TYPE t_tpstdout,
       tpstdout_line        LIKE LINE OF tpstdout,
       log                  TYPE string,
-      dummy_message        TYPE string.
+      dummy_message        TYPE string,
+      hash_error           TYPE string,
+      hash_exception       TYPE REF TO cx_root.
 
     CLEAR: installed, integrity, manifest.
     transport_id = trkorr.
@@ -1734,8 +2207,9 @@ CLASS lcl_report IMPLEMENTATION.
     CONCATENATE dirtrans file_path_separator 'data' file_path_separator data_file_name INTO data_file_path.
     CONCATENATE dirtrans file_path_separator 'cofiles' file_path_separator header_file_name INTO header_file_path.
     WRITE: /, 'Release data: ', data_file_name, ' Release header: ', header_file_name.
-    " CL_ABAP_MESSAGE_DIGEST doesn't exist on older releases (e.g. 7.0):
-    " fall back to function module CALCULATE_HASH_FOR_RAW
+    " CL_ABAP_MESSAGE_DIGEST (kernel SHA512) doesn't exist on older releases (e.g. 7.0),
+    " and CALCULATE_HASH_FOR_RAW can't do SHA512 (HASHALG is CHAR4): only when the
+    " class is missing, fall back to the plain ABAP implementation in LCL_SHA512
     TRY.
         CALL METHOD ('CL_ABAP_MESSAGE_DIGEST')=>('CALCULATE_HASH_FOR_RAW')
           EXPORTING
@@ -1744,29 +2218,19 @@ CLASS lcl_report IMPLEMENTATION.
           IMPORTING
             ef_hashb64string = integrity.
       CATCH cx_sy_dyn_call_error.
-        TRY.
-            CALL FUNCTION 'CALCULATE_HASH_FOR_RAW'
-              EXPORTING
-                alg           = 'SHA512'
-                data          = release
-              IMPORTING
-                hashb64string = integrity
-              EXCEPTIONS
-                OTHERS        = 1.
-            IF sy-subrc <> 0.
-              CLEAR integrity.
-            ENDIF.
-          CATCH cx_sy_dyn_call_error.
-            CLEAR integrity.
-        ENDTRY.
-        IF integrity IS INITIAL.
-          display_error( 'Error in release checksum' ).
-          RETURN.
-        ENDIF.
-      CATCH cx_root.
+        write_log( 'Kernel SHA512 not available, calculating release checksum in ABAP...' ).
+        integrity = lcl_sha512=>hash_b64( release ).
+      CATCH cx_root INTO hash_exception.
+        hash_error = hash_exception->get_text( ).
+        CONCATENATE 'CL_ABAP_MESSAGE_DIGEST:' hash_error INTO hash_error SEPARATED BY space.
+        write_log( hash_error ).
         display_error( 'Error in release checksum' ).
         RETURN.
     ENDTRY.
+    IF integrity IS INITIAL.
+      display_error( 'Error in release checksum' ).
+      RETURN.
+    ENDIF.
     IF checksum IS NOT INITIAL.
       WRITE: /, 'Verifying release integrity, to match', / checksum.
       IF integrity <> checksum.
@@ -1798,6 +2262,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF manifest IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = 'manifest.json' context = 'release' prefix = 'dist/' ).
       display_error( 'Error in release content: manifest not found' ).
       RETURN.
     ENDIF.
@@ -1833,6 +2298,8 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF transport_files IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = release_entry context = 'release' prefix = 'dist/' ).
+      write_log( 'Make sure the file is an installer release of trm-server/trm-rest (e.g. downloaded from trmregistry.com).' ).
       display_error( 'Error in release content: transport files not found' ).
       RETURN.
     ENDIF.
@@ -1858,6 +2325,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF header_file IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = header_file_name context = release_entry ).
       display_error( 'Error in release content: header file not found' ).
       RETURN.
     ENDIF.
@@ -1872,6 +2340,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF data_file IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = data_file_name context = release_entry ).
       display_error( 'Error in release content: data file not found' ).
       RETURN.
     ENDIF.
@@ -1898,11 +2367,29 @@ CLASS lcl_report IMPLEMENTATION.
       EXPORTING
         text = 'Copying release files into application server'.
 
-    IF write_binary_file( file_path = header_file_path file = header_file ) <> 'X'.
+    CALL METHOD write_binary_file
+      EXPORTING
+        file_path = header_file_path
+        file      = header_file
+      IMPORTING
+        written   = file_written
+        error     = file_error.
+    IF file_written <> 'X'.
+      CONCATENATE 'Cannot write' header_file_path ':' file_error INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'Error writing transport header file.' ).
       RETURN.
     ENDIF.
-    IF write_binary_file( file_path = data_file_path file = data_file ) <> 'X'.
+    CALL METHOD write_binary_file
+      EXPORTING
+        file_path = data_file_path
+        file      = data_file
+      IMPORTING
+        written   = file_written
+        error     = file_error.
+    IF file_written <> 'X'.
+      CONCATENATE 'Cannot write' data_file_path ':' file_error INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'Error writing transport data file.' ).
       RETURN.
     ENDIF.
