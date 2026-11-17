@@ -11,7 +11,7 @@
 | Regesta S.p.A.                                  | [https://www.regestaitalia.eu/](https://www.regestaitalia.eu/) |
 | Clarex S.r.l.                                   | [https://www.clarex.it/](https://www.clarex.it/)               |
 
-**Minimum tested release**: SAP_BASIS 702 SP12 (SAP ECC 6.0 EHP2)
+**Minimum tested release**: 7.02 SP6
 
 [trm-server](https://trmregistry.com/package/trm-server) is the server-side component of TRM.
 

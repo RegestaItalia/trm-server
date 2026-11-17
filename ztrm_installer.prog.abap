@@ -840,8 +840,17 @@ CLASS lcl_report IMPLEMENTATION.
           RECEIVING
             data               = file.
       CATCH cx_sy_dyn_call_error.
-        file = client->response->get_data(
-          vscan_scan_always = vscan_check ).
+        " older releases: GET_DATA has no VIRUS_SCAN_PROFILE parameter
+        TRY.
+            CALL METHOD client->response->('GET_DATA')
+              EXPORTING
+                vscan_scan_always = vscan_check
+              RECEIVING
+                data              = file.
+          CATCH cx_sy_dyn_call_error.
+            " even older releases: no virus scan parameters at all
+            file = client->response->get_data( ).
+        ENDTRY.
     ENDTRY.
     client->close( ).
     IF file IS INITIAL.
@@ -1970,8 +1979,7 @@ CLASS lcl_report IMPLEMENTATION.
             no_access                    = 17
             invalid_translation_depth    = 18
             wrong_mainpack_value         = 19
-            superpackage_invalid         = 20
-            OTHERS                       = 21
+            OTHERS                       = 20
         ).
         IF sy-subrc <> 0.
           display_error( 'Error in package create' ).
