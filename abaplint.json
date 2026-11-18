@@ -10,7 +10,7 @@
     }
   ],
   "syntax": {
-    "version": "v702",
+    "version": "v700",
     "errorNamespace": "^(/ATRM/|LCL_|TY_|LIF_)"
   },
   "rules": {

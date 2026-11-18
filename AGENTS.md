@@ -1,20 +1,11 @@
-# ECC 6.0 EHP2 / SAP_BASIS 702 compatibility
+# Old-release compatibility (SAP_BASIS 700 / 702)
 
-The lowest supported target is ECC 6.0 EHP2 with SAP_BASIS 702 SP12. Modern S/4
-activation and a clean abaplint run are necessary, but they do not prove that an import
-will generate successfully on that release.
-
-## What abaplint can enforce
-
-`abaplint.json` pins `syntax.version` to `v702` and enables the syntax, parser, DDIC,
-unknown-type, include, implementation and XML consistency checks. Keep that version
-pinned and run `npm run lint` before considering a change complete. It reliably catches
-language constructs that are outside the configured release and many unresolved static
-references represented by the configured dependency model.
+"Review the code and apply the AGENTS.md rules" means: go through this object by object,
+not just run `npm run lint`.
 
 Do not treat a zero-issue abaplint result as an ECC import simulation. The dependency
 bundle is not the target system's exact DDIC/API catalog, and abaplint currently does not
-reliably catch all of these SAP_BASIS 702 differences:
+reliably catch all of these SAP_BASIS 700 differences:
 
 - a type, class, interface, method or function module that exists in the lint dependency
   set or on S/4 but not on the real ECC system;
@@ -23,11 +14,6 @@ reliably catch all of these SAP_BASIS 702 differences:
   functional call;
 - generated function-group/include syntax and other errors that only appear during the
   target system's import generation phase.
-
-The actual ECC import generation log remains the final compatibility check.
-
-## Rules learned from the 7.02 import campaign
-
 - Never use release-specific system aliases such as `SYST_BATCH`, `SYST_SUBRC`,
   `SYST_MSGID`, `SYST_MSGNO`, `SYST_MSGTY` or `SYST_MSGV`. Type saved system values with
   the corresponding fields: `TYPE sy-batch`, `sy-subrc`, `sy-msgid`, `sy-msgno`,
@@ -50,24 +36,31 @@ The actual ECC import generation log remains the final compatibility check.
   degrades cleanly.
 - Do not depend on standard type `SYMSG`/`SYMSG_TAB` being present. The project-owned
   `/ATRM/SYMSG` structure and `/ATRM/SYMSG_TAB` table type are the portable contract.
-- Features unavailable on the target must disappear completely from the UI. Do not
-  leave an empty or untitled tab when online installation is unsupported.
-- After ARC-1 changes, verify the active SAP source again before releasing the request.
-  In particular, check function-module includes: a later synchronization from an older
-  mirror can silently restore an incompatible call. `src/` is still never edited
-  locally; update the mirror only through the normal SAP/abapGit workflow.
-
-For a compatibility sweep, search at least for:
-
-```text
-ORDER BY PRIMARY KEY
-TYPE SYST_
-=>method( followed by EXPORTING/IMPORTING/RECEIVING/CHANGING/EXCEPTIONS
-CALL METHOD class=>method followed by parameter sections
-```
-
-Then run SAP syntax checks, activate every changed object (including function modules,
-not only their function group), and confirm that the inactive-object list is empty.
+- **No `&&` string operator.** Use `CONCATENATE ... INTO ...`, with `SEPARATED BY space`
+  where a blank is wanted. Operands must be character-like, so move an integer into a
+  `string` variable first (`code_text = code.`). abaplint does **not** flag `&&` even with
+  `syntax.version` `v700`.
+- **No string templates (`|...{ }...|`).** abaplint `v700` does flag these.
+- **No 7.02 built-in string/predicate functions**: `replace( )`, `condense( )`,
+  `to_upper( )`, `to_lower( )`, `substring*( )`, `shift_left/right( )`, `boolc( )`,
+  `concat_lines_of( )`, `escape( )`, `matches( )`, `contains*( )`, `line_exists( )`,
+  `line_index( )`, `cmax/cmin/nmax/nmin( )`, etc. Use the classic statements
+  (`REPLACE [FIRST|ALL] OCCURRENCES OF [REGEX] ... IN ... WITH ...`, `CONDENSE`,
+  `TRANSLATE ... TO UPPER CASE`, `READ TABLE ... TRANSPORTING NO FIELDS`). The 7.0 parser
+  reports an unknown function as a broken method call ("The syntax for a method
+  specification is objref->method or class=>method"). `strlen( )`, `xstrlen( )` and
+  `lines( )` are fine.
+- **No calculation expressions as operands of control statements.** `CASE bits DIV 16.`
+  fails ("." expected after "BITS"). Compute into a variable first, then use it in
+  `CASE`, `WHEN`, `IF`, `ELSEIF`, `WHILE` or `CHECK`. Plain assignments
+  (`x = ( a - 2 ) * 8.`) and functional method calls in `IF` are fine.
+- **A method cannot have `RETURNING` together with `EXPORTING` or `CHANGING`.** Make the
+  result an `EXPORTING` parameter and call it with classic
+  `CALL METHOD ... EXPORTING ... IMPORTING ...`.
+- **No pragmas (`##...`).** Use pseudo-comments (`"#EC ...`) instead. abaplint `v700`
+  flags these.
+- `CONCATENATE ... IN BYTE MODE` needs byte-like operands: use `x` variables
+  (`DATA byte_80 TYPE x LENGTH 1 VALUE '80'.`), not character literals.
 
 # Writing an object dependency handler
 
@@ -258,14 +251,15 @@ convention — it isolates one missing dependency from the rest of the handler's
 
 ## abaplint
 
-`abaplint.json` pins `syntax.version` to `v702`. Concretely, that means:
+`abaplint.json` pins `syntax.version` to `v700`. Concretely, that means:
 
 - No inline declarations (`DATA(x) = ...`, `NEW #( )`) — classic `DATA:`/`TYPES:` blocks
   and `CREATE OBJECT`/`CREATE DATA`, as in every existing handler.
 - Fully-dynamic invocation (`CALL METHOD (class)=>(method)`, `CALL METHOD obj->(method)`)
   needs the old `CALL METHOD` syntax — functional call syntax (`obj->method( )`) can't
   express a dynamic method name, so don't try to "modernize" it.
-- String templates (`|...|`) are fine.
+- String templates (`|...|`) and `&&` are **not** fine: they don't exist on 7.0 (see
+  "Rules learned from the 7.0 campaign"). Use `CONCATENATE`.
 
 Before considering a handler done, run `SAPLint` on it. A static `TYPE` reference to a
 DDIC object, or a static `CALL FUNCTION '...'`/method call naming something that doesn't
