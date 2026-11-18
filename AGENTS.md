@@ -53,17 +53,53 @@ reliably catch all of these SAP_BASIS 700 differences:
 - **No calculation expressions as operands of control statements.** `CASE bits DIV 16.`
   fails ("." expected after "BITS"). Compute into a variable first, then use it in
   `CASE`, `WHEN`, `IF`, `ELSEIF`, `WHILE` or `CHECK`. Plain assignments
-  (`x = ( a - 2 ) * 8.`) and functional method calls in `IF` are fine.
+  (`x = ( a - 2 ) * 8.`) and functional method calls in `IF` are fine. The same applies to
+  other operand positions: `READ TABLE ... INDEX lv_index - 1.` fails ("Unable to
+  interpret '-'"); compute `lv_position = lv_index - 1.` first.
+- **No method call as an operand of `APPEND`/`INSERT`.** `APPEND cl=>get( ... ) TO tab.`
+  fails ("Field 'GET(' is unknown"). Assign the result to a variable, then append it.
+- **No method call as an actual parameter of another call.** `meth( p = other( ) )`,
+  `cl_aunit_assert=>assert_equals( act = lo_x->reason( ) ... )` and
+  `set_msg_vars_for_clike( lo_root->get_text( ) )` all fail on 7.00. Call the inner method
+  into a variable first. No method chaining either (`a->b( )->c( )`).
+- **Declare every type group you use.** 7.00 does not load type groups implicitly: a
+  class, program or function group that uses `abap_true`/`abap_bool`/`abap_parmbind_tab`
+  needs `TYPE-POOLS abap.` (in a class: first statement of `PUBLIC SECTION`; in a
+  function group: the TOP include). The same goes for `trwbo` (`TRWBO_REQUEST`, ...),
+  `slis`, `icon`. Some type-group types do not exist on 7.00 at all, e.g. `STMS_FLAG`,
+  `STMS_TP_IMPORT(S)`, `STMS_TP_FORWARDS`, `STMS_TP_MAINTAINS`, `STMS_TR_REQUESTS`. Use a
+  project-owned type (`/atrm/cl_transport=>ty_tp_result`, `FLAG`) or create the data
+  dynamically by absolute name (`CREATE DATA lr TYPE ('\TYPE-POOL=SEOP\TYPE=...')` inside
+  `TRY ... CATCH cx_sy_create_data_error`). To bind a function-module parameter whose type
+  differs by release, use `/atrm/cl_transport=>create_fm_param_data` (it reads the type from
+  FUPARAREF).
+- **DDIC types missing on 7.00 must be dynamic too**, not only classes. Examples found:
+  `WBOBJTYPE`, `CLS_ATTRIBUTE`, `CLS_ATTRIBUTE_NAME`, `CLS_LINKED_OBJECTS`,
+  `PAK_OBJECT_KEY`, `SEOP_METHODS_W_INCLUDE`, `SYSUUID_C32`, `DECFLOAT34`. Use
+  `CREATE DATA ... TYPE ('NAME')` + `ASSIGN COMPONENT`, or `SELECT ... FROM (lv_table)`.
+- **Classes missing on 7.00:** `CL_ABAP_CODEPAGE` (use
+  `/atrm/cl_object=>utf8_to_string`, which wraps `CL_ABAP_CONV_IN_CE`),
+  `CL_ABAP_UNIT_ASSERT` (use `CL_AUNIT_ASSERT`, always with named parameters;
+  its `assert_subrc` has no default for `act`, so pass `act = sy-subrc`), `CL_SYSTEM_UUID`
+  static methods (use FM `GUID_CREATE`).
+- **Test classes:** no `RISK LEVEL`/`DURATION` additions. Write
+  `CLASS ltc DEFINITION FOR TESTING` followed by the pseudo-comments
+  `"#AU Risk_Level Harmless` and `"#AU Duration Short` on their own lines, then `.`.
+- **The import log shows only the first error per program**, and in a class pool the local
+  test classes (CCAU) are compiled before the method includes (CM*). A fixed CCAU error
+  can reveal errors in methods in the next import round: sweep the whole class.
 - **A method cannot have `RETURNING` together with `EXPORTING` or `CHANGING`.** Make the
   result an `EXPORTING` parameter and call it with classic
   `CALL METHOD ... EXPORTING ... IMPORTING ...`.
 - **No pragmas (`##...`).** Use pseudo-comments (`"#EC ...`) instead. abaplint `v700`
   flags these.
-- `/ATRM/CX_EXCEPTION`'s constructor is hand-written: it fills `message` and
-  `if_t100_message~t100key` from `sy`. It used to be protected by
-  `##ADT_SUPPRESS_GENERATION`, which had to go (no pragmas on 7.00). Edit it only as
-  source, and never accept the class editor's offer to regenerate the constructor. The
-  unit test `ltc_exception->message_from_sy` fails if that happens.
+- `/ATRM/CX_EXCEPTION` has **no own constructor**: it inherits the one of
+  `CX_STATIC_CHECK`. `message` and `if_t100_message~t100key` are filled from `sy` in
+  `raise`, the only place that creates the exception (the class is `CREATE PROTECTED`).
+  Do not add a hand-written constructor back. ADT re-inserts `##ADT_SUPPRESS_GENERATION`
+  into any constructor that differs from the generated one, even if you remove it from the
+  source, and that pragma breaks the 7.00 import. The unit test
+  `ltc_exception->message_from_sy` guards the message behavior.
 - `CONCATENATE ... IN BYTE MODE` needs byte-like operands: use `x` variables
   (`DATA byte_80 TYPE x LENGTH 1 VALUE '80'.`), not character literals.
 
