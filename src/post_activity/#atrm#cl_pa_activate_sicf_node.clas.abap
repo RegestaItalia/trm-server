@@ -7,7 +7,7 @@ CLASS /atrm/cl_pa_activate_sicf_node DEFINITION
 
   PUBLIC SECTION.
 
-    CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
+    CONSTANTS trm_pa TYPE flag VALUE 'X'.                   "#EC NOTEXT
 
     TYPES: ty_icfname   TYPE c LENGTH 15,
            ty_icfurlbuf TYPE c LENGTH 116.
