@@ -371,8 +371,12 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       INNER JOIN e070 ON e070~trkorr = /atrm/packages~trkorr
       INTO CORRESPONDING FIELDS OF TABLE packages.
     IF package_name IS NOT INITIAL.
-      " assume that package_name and package_registry are unique together, so we can filter out all other packages
-      DELETE packages WHERE package_name <> package_name AND package_registry <> package_registry.
+      " package_name and package_registry are unique together: keep only the rows matching both
+      " (a package can be installed from more than one registry, e.g. local and public)
+      DELETE packages WHERE package_name <> package_name.
+      IF package_registry IS NOT INITIAL.
+        DELETE packages WHERE package_registry <> package_registry.
+      ENDIF.
     ENDIF.
     LOOP AT packages ASSIGNING <row>.
       CLEAR package.
