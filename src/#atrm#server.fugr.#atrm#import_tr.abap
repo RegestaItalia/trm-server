@@ -13,7 +13,7 @@ FUNCTION /atrm/import_tr.
 *"      GENERIC
 *"----------------------------------------------------------------------
   PERFORM check_auth.
-  DATA import TYPE stms_tp_import.
+  DATA import TYPE /atrm/cl_transport=>ty_tp_result.
 
   TRY.
       CREATE OBJECT go_transport EXPORTING trkorr = trkorr.

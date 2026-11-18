@@ -46,8 +46,8 @@ CLASS ltc_action_lock IMPLEMENTATION.
         SELECT SINGLE * FROM /atrm/act_lock INTO ls_row
           WHERE resource_type = ls_key-resource_type
             AND resource_hash = ls_key-resource_hash.
-        cl_abap_unit_assert=>assert_equals( act = lv_conflict exp = abap_true ).
-        cl_abap_unit_assert=>assert_equals( act = ls_row-owner_token exp = lv_owner ).
+        cl_aunit_assert=>assert_equals( act = lv_conflict exp = abap_true ).
+        cl_aunit_assert=>assert_equals( act = ls_row-owner_token exp = lv_owner ).
         /atrm/cl_action_lock=>release(
           it_keys = lt_keys
           iv_owner_token = lv_owner ).
@@ -55,7 +55,7 @@ CLASS ltc_action_lock IMPLEMENTATION.
         SELECT SINGLE * FROM /atrm/act_lock INTO ls_row
           WHERE resource_type = ls_key-resource_type
             AND resource_hash = ls_key-resource_hash.
-        cl_abap_unit_assert=>assert_subrc( exp = 4 ).
+        cl_aunit_assert=>assert_subrc( act = sy-subrc exp = 4 ).
       CATCH /atrm/cx_exception.
         TRY.
             /atrm/cl_action_lock=>release(
@@ -63,7 +63,7 @@ CLASS ltc_action_lock IMPLEMENTATION.
               iv_owner_token = lv_owner ).
           CATCH /atrm/cx_exception.
         ENDTRY.
-        cl_abap_unit_assert=>fail( msg = 'Action lock operation failed' ).
+        cl_aunit_assert=>fail( msg = 'Action lock operation failed' ).
     ENDTRY.
   ENDMETHOD.
 ENDCLASS.
@@ -83,6 +83,6 @@ CLASS ltc_lock_table IMPLEMENTATION.
       WHERE tabname = '/ATRM/ACT_LOCK'
         AND fieldname = 'MANDT'
         AND as4local = 'A'.
-    cl_abap_unit_assert=>assert_subrc( exp = 4 ).
+    cl_aunit_assert=>assert_subrc( act = sy-subrc exp = 4 ).
   ENDMETHOD.
 ENDCLASS.

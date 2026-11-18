@@ -4,6 +4,7 @@ CLASS /atrm/cl_post_activity DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
 
     TYPES: BEGIN OF ty_pa_parameter,
              name  TYPE string,

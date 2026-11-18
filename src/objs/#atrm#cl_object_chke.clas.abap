@@ -14,8 +14,10 @@ ENDCLASS.
 CLASS /atrm/cl_object_chke IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
+    FIELD-SYMBOLS: <ls_object_type> TYPE any,
+                   <lv_wb_type_part> TYPE any.
     DATA:
-      ls_object_type TYPE wbobjtype,
+      lr_object_type TYPE REF TO data,
       lo_operator    TYPE REF TO object,
       lo_data_model  TYPE REF TO object,
       lr_data        TYPE REF TO data,
@@ -32,11 +34,15 @@ CLASS /atrm/cl_object_chke IMPLEMENTATION.
       <lv_check_class> TYPE any.
 
     TRY.
-        ls_object_type-objtype_tr = 'CHKE'.
-        ls_object_type-subtype_wb = 'TYP'.
+        CREATE DATA lr_object_type TYPE ('WBOBJTYPE').
+        ASSIGN lr_object_type->* TO <ls_object_type>.
+        ASSIGN COMPONENT 'OBJTYPE_TR' OF STRUCTURE <ls_object_type> TO <lv_wb_type_part>.
+        <lv_wb_type_part> = 'CHKE'.
+        ASSIGN COMPONENT 'SUBTYPE_WB' OF STRUCTURE <ls_object_type> TO <lv_wb_type_part>.
+        <lv_wb_type_part> = 'TYP'.
 
         CALL METHOD ('CL_WB_OBJECT_OPERATOR')=>('CREATE_INSTANCE')
-          EXPORTING object_type = ls_object_type object_key = me->key-obj_name
+          EXPORTING object_type = <ls_object_type> object_key = me->key-obj_name
           RECEIVING result = lo_operator.
         CALL METHOD lo_operator->('IF_WB_OBJECT_OPERATOR~READ')
           EXPORTING version = 'A' data_selection = 'AL'
@@ -95,3 +101,4 @@ CLASS /atrm/cl_object_chke IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

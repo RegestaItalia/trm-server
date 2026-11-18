@@ -21,18 +21,24 @@ CLASS /atrm/cl_object_char IMPLEMENTATION.
       END OF lty_field.
 
     DATA:
-      ls_attribute  TYPE cls_attribute,
+      lv_table      TYPE tabname,
+      lr_attribute  TYPE REF TO data,
       lt_fields     TYPE STANDARD TABLE OF lty_field,
       ls_field      TYPE lty_field,
       ls_dependency TYPE /atrm/object_dependency.
 
     FIELD-SYMBOLS:
-      <lv_obj_name> TYPE any.
+      <ls_attribute> TYPE any,
+      <lv_obj_name>  TYPE any.
 
     TRY.
+        " CLS_ATTRIBUTE (classification) is not on every release: read it dynamically
+        lv_table = 'CLS_ATTRIBUTE'.
+        CREATE DATA lr_attribute TYPE (lv_table).
+        ASSIGN lr_attribute->* TO <ls_attribute>.
         SELECT SINGLE *
-          FROM cls_attribute
-          INTO ls_attribute
+          FROM (lv_table)
+          INTO <ls_attribute>
           WHERE name = me->key-obj_name
             AND activation_state = 'A'.
 
@@ -55,7 +61,7 @@ CLASS /atrm/cl_object_char IMPLEMENTATION.
         APPEND ls_field TO lt_fields.
 
         LOOP AT lt_fields INTO ls_field.
-          ASSIGN COMPONENT ls_field-component OF STRUCTURE ls_attribute
+          ASSIGN COMPONENT ls_field-component OF STRUCTURE <ls_attribute>
             TO <lv_obj_name>.
           CHECK sy-subrc = 0.
           CHECK <lv_obj_name> IS NOT INITIAL.

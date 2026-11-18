@@ -10,14 +10,16 @@ CLASS ltc_abapgit IMPLEMENTATION.
 
   METHOD dot_abapgit_missing_repo.
     " Message built with CONCATENATE ... SEPARATED BY space (no && on 7.00)
-    DATA lo_exception TYPE REF TO /atrm/cx_exception.
+    DATA: lo_exception TYPE REF TO /atrm/cx_exception,
+          lv_reason    TYPE string.
     TRY.
         /atrm/cl_abapgit=>get_dot_abapgit( devclass = '/ATRM/ZZ_NONE' ).
       CATCH /atrm/cx_exception INTO lo_exception.
     ENDTRY.
     cl_aunit_assert=>assert_bound( act = lo_exception msg = 'Exception expected' ).
+    lv_reason = lo_exception->reason( ).
     cl_aunit_assert=>assert_equals(
-      act = lo_exception->reason( )
+      act = lv_reason
       exp = /atrm/cx_exception=>c_reason-abapgit_intergration ).
     cl_aunit_assert=>assert_equals(
       act = lo_exception->message-msgv1

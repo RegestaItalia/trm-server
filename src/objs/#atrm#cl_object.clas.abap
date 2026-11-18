@@ -70,6 +70,10 @@ CLASS /atrm/cl_object DEFINITION
                 where_clause TYPE string
                 class_field  TYPE fieldname
       CHANGING  dependencies TYPE /atrm/object_dependency_t.
+CLASS-METHODS utf8_to_string
+      IMPORTING utf8          TYPE xstring
+      RETURNING VALUE(string) TYPE string
+      RAISING   cx_sy_conversion_codepage.
   PRIVATE SECTION.
 ENDCLASS.
 
@@ -725,6 +729,14 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       CATCH cx_root.
         " document-model APIs may not exist in the target system
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD utf8_to_string.
+    " CL_ABAP_CODEPAGE is not on 7.00: CL_ABAP_CONV_IN_CE is
+    DATA lo_conv TYPE REF TO cl_abap_conv_in_ce.
+    CHECK utf8 IS NOT INITIAL.
+    lo_conv = cl_abap_conv_in_ce=>create( input = utf8 encoding = 'UTF-8' ).
+    lo_conv->read( IMPORTING data = string ).
   ENDMETHOD.
 ENDCLASS.
 

@@ -8,6 +8,8 @@ CLASS ltc_object DEFINITION FOR TESTING
   PRIVATE SECTION.
     METHODS tadir_missing_message FOR TESTING.
     METHODS tfdir_missing_message FOR TESTING.
+    METHODS utf8_decoded FOR TESTING RAISING cx_static_check.
+    METHODS utf8_empty FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 CLASS ltc_object IMPLEMENTATION.
@@ -37,6 +39,27 @@ CLASS ltc_object IMPLEMENTATION.
     cl_aunit_assert=>assert_equals(
       act = lo_exception->message-msgv1
       exp = 'Cannot find function group of /ATRM/ZZ_NONE' ).
+  ENDMETHOD.
+
+  METHOD utf8_decoded.
+    " Replaces CL_ABAP_CODEPAGE=>CONVERT_FROM (not on 7.00): UTF-8 multi-byte
+    " characters must be decoded, '<A>' + e acute (C3A9) + '</A>'
+    DATA: lv_utf8     TYPE xstring,
+          lv_actual   TYPE string,
+          lv_expected TYPE string,
+          lv_char     TYPE string.
+    lv_utf8 = '3C413EC3A93C2F413E'.
+    lv_actual = /atrm/cl_object=>utf8_to_string( lv_utf8 ).
+    lv_char = cl_abap_conv_in_ce=>uccp( '00E9' ).
+    CONCATENATE '<A>' lv_char '</A>' INTO lv_expected.
+    cl_aunit_assert=>assert_equals( act = lv_actual exp = lv_expected ).
+  ENDMETHOD.
+
+  METHOD utf8_empty.
+    DATA: lv_utf8   TYPE xstring,
+          lv_actual TYPE string.
+    lv_actual = /atrm/cl_object=>utf8_to_string( lv_utf8 ).
+    cl_aunit_assert=>assert_initial( act = lv_actual ).
   ENDMETHOD.
 
 ENDCLASS.

@@ -63,27 +63,27 @@ CLASS ltc_action_log IMPLEMENTATION.
           iv_action_id = mv_action_id
           iv_status = /atrm/cl_action_log=>c_status-rolled_back ).
       CATCH /atrm/cx_exception.
-        cl_abap_unit_assert=>fail( msg = 'Action log operation failed' ).
+        cl_aunit_assert=>fail( msg = 'Action log operation failed' ).
     ENDTRY.
 
     SELECT SINGLE * FROM /atrm/log_act INTO ls_action WHERE action_id = mv_action_id.
-    cl_abap_unit_assert=>assert_equals( act = ls_action-status exp = 'B' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_action-created_by exp = sy-uname ).
-    cl_abap_unit_assert=>assert_not_initial( ls_action-started_at ).
-    cl_abap_unit_assert=>assert_not_initial( ls_action-ended_at ).
+    cl_aunit_assert=>assert_equals( act = ls_action-status exp = 'B' ).
+    cl_aunit_assert=>assert_equals( act = ls_action-created_by exp = sy-uname ).
+    cl_aunit_assert=>assert_not_initial( act = ls_action-started_at ).
+    cl_aunit_assert=>assert_not_initial( act = ls_action-ended_at ).
 
     " The first non-empty role wins.
     SELECT SINGLE * FROM /atrm/log_tr INTO ls_link
       WHERE action_id = mv_action_id AND trkorr = 'TRMK999999'.
-    cl_abap_unit_assert=>assert_equals( act = ls_link-role exp = 'TADIR' ).
+    cl_aunit_assert=>assert_equals( act = ls_link-role exp = 'TADIR' ).
 
     SELECT * FROM /atrm/log_evt INTO TABLE lt_rows
       WHERE action_id = mv_action_id ORDER BY seq.
     lv_lines = lines( lt_rows ).
-    cl_abap_unit_assert=>assert_equals( act = lv_lines exp = 3 ).
+    cl_aunit_assert=>assert_equals( act = lv_lines exp = 3 ).
     READ TABLE lt_rows INTO ls_row INDEX 3.
-    cl_abap_unit_assert=>assert_equals( act = ls_row-seq exp = '000003' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_row-event exp = 'RESTORE' ).
+    cl_aunit_assert=>assert_equals( act = ls_row-seq exp = '000003' ).
+    cl_aunit_assert=>assert_equals( act = ls_row-event exp = 'RESTORE' ).
   ENDMETHOD.
 
   METHOD duplicate_start_fails.
@@ -94,7 +94,7 @@ CLASS ltc_action_log IMPLEMENTATION.
           iv_session_id = 'abap-unit-session'
           iv_action_name = 'publish' ).
       CATCH /atrm/cx_exception.
-        cl_abap_unit_assert=>fail( msg = 'First start failed' ).
+        cl_aunit_assert=>fail( msg = 'First start failed' ).
     ENDTRY.
     TRY.
         /atrm/cl_action_log=>start_action(
@@ -104,7 +104,7 @@ CLASS ltc_action_log IMPLEMENTATION.
       CATCH /atrm/cx_exception.
         lv_failed = abap_true.
     ENDTRY.
-    cl_abap_unit_assert=>assert_equals( act = lv_failed exp = abap_true ).
+    cl_aunit_assert=>assert_equals( act = lv_failed exp = abap_true ).
   ENDMETHOD.
 
   METHOD invalid_status_fails.
@@ -116,7 +116,7 @@ CLASS ltc_action_log IMPLEMENTATION.
       CATCH /atrm/cx_exception.
         lv_failed = abap_true.
     ENDTRY.
-    cl_abap_unit_assert=>assert_equals( act = lv_failed exp = abap_true ).
+    cl_aunit_assert=>assert_equals( act = lv_failed exp = abap_true ).
   ENDMETHOD.
 
   METHOD events_need_action.
@@ -131,7 +131,7 @@ CLASS ltc_action_log IMPLEMENTATION.
       CATCH /atrm/cx_exception.
         lv_failed = abap_true.
     ENDTRY.
-    cl_abap_unit_assert=>assert_equals( act = lv_failed exp = abap_true ).
+    cl_aunit_assert=>assert_equals( act = lv_failed exp = abap_true ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -150,6 +150,6 @@ CLASS ltc_log_tables IMPLEMENTATION.
       WHERE tabname IN ('/ATRM/LOG_ACT', '/ATRM/LOG_TR', '/ATRM/LOG_EVT')
         AND fieldname = 'MANDT'
         AND as4local = 'A'.
-    cl_abap_unit_assert=>assert_subrc( exp = 4 ).
+    cl_aunit_assert=>assert_subrc( act = sy-subrc exp = 4 ).
   ENDMETHOD.
 ENDCLASS.

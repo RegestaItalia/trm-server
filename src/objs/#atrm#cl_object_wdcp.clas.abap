@@ -14,8 +14,10 @@ ENDCLASS.
 CLASS /atrm/cl_object_wdcp IMPLEMENTATION.
 
   METHOD /atrm/if_object~get_dependencies.
+    FIELD-SYMBOLS: <ls_object_type> TYPE any,
+                   <lv_wb_type_part> TYPE any.
     DATA:
-      ls_object_type TYPE wbobjtype,
+      lr_object_type TYPE REF TO data,
       lo_operator    TYPE REF TO object,
       lo_data_model  TYPE REF TO object,
       ls_chip        TYPE wdy_chip_def_xt_ui,
@@ -23,11 +25,15 @@ CLASS /atrm/cl_object_wdcp IMPLEMENTATION.
       ls_dependency  TYPE /atrm/object_dependency.
 
     TRY.
-        ls_object_type-objtype_tr = 'WDCP'.
-        ls_object_type-subtype_wb = 'YP'.
+        CREATE DATA lr_object_type TYPE ('WBOBJTYPE').
+        ASSIGN lr_object_type->* TO <ls_object_type>.
+        ASSIGN COMPONENT 'OBJTYPE_TR' OF STRUCTURE <ls_object_type> TO <lv_wb_type_part>.
+        <lv_wb_type_part> = 'WDCP'.
+        ASSIGN COMPONENT 'SUBTYPE_WB' OF STRUCTURE <ls_object_type> TO <lv_wb_type_part>.
+        <lv_wb_type_part> = 'YP'.
 
         CALL METHOD ('CL_WB_OBJECT_OPERATOR')=>('CREATE_INSTANCE')
-          EXPORTING object_type = ls_object_type object_key = me->key-obj_name
+          EXPORTING object_type = <ls_object_type> object_key = me->key-obj_name
           RECEIVING result = lo_operator.
         CALL METHOD lo_operator->('IF_WB_OBJECT_OPERATOR~READ')
           EXPORTING version = 'A' data_selection = 'AL'
@@ -98,3 +104,4 @@ CLASS /atrm/cl_object_wdcp IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

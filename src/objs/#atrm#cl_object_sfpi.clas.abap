@@ -46,7 +46,7 @@ CLASS /atrm/cl_object_sfpi IMPLEMENTATION.
           SELECT SINGLE ('INTERFACE') FROM (lv_table) INTO lv_raw WHERE (lv_where).
         ENDIF.
         CHECK lv_raw IS NOT INITIAL.
-        lv_xml = cl_abap_codepage=>convert_from( lv_raw ).
+        lv_xml = utf8_to_string( lv_raw ).
       CATCH cx_root.
         RETURN.
     ENDTRY.
@@ -152,3 +152,4 @@ CLASS /atrm/cl_object_sfpi IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+

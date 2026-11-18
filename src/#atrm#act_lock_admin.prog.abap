@@ -1,6 +1,6 @@
 REPORT /atrm/act_lock_admin.
 
-TYPE-POOLS slis.
+TYPE-POOLS: abap, slis.
 
 TYPES: BEGIN OF ty_row,
          resource_type TYPE /atrm/act_lock-resource_type,

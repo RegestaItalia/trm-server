@@ -14,10 +14,14 @@ ENDCLASS.
 CLASS /atrm/cl_senvi_ueno IMPLEMENTATION.
 
   METHOD determine.
-    APPEND /atrm/cl_object=>get_tadir_dependency(
+    DATA ls_dependency TYPE /atrm/object_dependency.
+    DATA lv_obj_name TYPE string.
+    lv_obj_name = sanitize_object_name( raw_name = senvi-object max_length = 26 ).
+    ls_dependency = /atrm/cl_object=>get_tadir_dependency(
       object   = 'UENO'
-      obj_name = sanitize_object_name( raw_name = senvi-object max_length = 26 )
-    ) TO dependencies.
+      obj_name = lv_obj_name
+    ).
+    APPEND ls_dependency TO dependencies.
   ENDMETHOD.
 
 ENDCLASS.
