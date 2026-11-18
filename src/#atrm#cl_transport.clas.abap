@@ -282,6 +282,14 @@ METHODS complete_shi3_entries
 METHODS record_fdt0_entries
       IMPORTING e071 TYPE tyt_e071
       RAISING   /atrm/cx_exception.
+CLASS-METHODS add_fm_value
+      IMPORTING name   TYPE abap_parmname
+                value  TYPE any
+      CHANGING  params TYPE abap_func_parmbind_tab.
+CLASS-METHODS fm_has_parameter
+      IMPORTING funcname     TYPE rs38l_fnam
+                parameter    TYPE rs38l_par_
+      RETURNING VALUE(found) TYPE flag.
 
     DATA: gv_trkorr TYPE trkorr,
           gt_e071   TYPE tyt_e071,
@@ -1329,6 +1337,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
 
 METHOD execute_import.
+    CONSTANTS: lc_kind_importing TYPE i VALUE 20. " = abap_func_importing
     DATA: imports  TYPE stms_tp_imports,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
@@ -1343,7 +1352,11 @@ METHOD execute_import.
           msgv1    TYPE sy-msgv1,
           msgv2    TYPE sy-msgv2,
           msgv3    TYPE sy-msgv3,
-          msgv4    TYPE sy-msgv4.
+          msgv4    TYPE sy-msgv4,
+          lt_params TYPE abap_func_parmbind_tab,
+          ls_param  TYPE abap_func_parmbind,
+          lt_excps  TYPE abap_func_excpbind_tab,
+          ls_excp   TYPE abap_func_excpbind.
 
     IF transport = 'SOME'.
       subset = 'X'.
@@ -1352,35 +1365,50 @@ METHOD execute_import.
       offline = 'X'.
     ENDIF.
 
+    " Parameters are bound dynamically because the signature differs by release:
+    " IV_IGNORE_CVERS does not exist on 7.00, and a static call passing it dumps
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = system CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = transport CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CLIENT' value = sy-mandt CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CTC_ACTIVE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OVERTAKE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IMPORT_AGAIN' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_ORIGINALITY' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_REPAIRS' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TRANSTYPE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TABLETYPE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_PREDEC' value = 'X' CHANGING params = lt_params.
+    IF fm_has_parameter( funcname = 'TMS_MGR_IMPORT_TR_REQUEST' parameter = 'IV_IGNORE_CVERS' ) = 'X'.
+      CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_CVERS' value = 'X' CHANGING params = lt_params.
+    ENDIF.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TEST_IMPORT' value = test CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SUBSET' value = subset CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OFFLINE' value = offline CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IT_REQUESTS' value = requests CHANGING params = lt_params.
+    ls_param-name = 'ET_TP_IMPORTS'.
+    ls_param-kind = lc_kind_importing.
+    GET REFERENCE OF imports INTO ls_param-value.
+    INSERT ls_param INTO TABLE lt_params.
+    ls_excp-name = 'READ_CONFIG_FAILED'.
+    ls_excp-value = 1.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'TABLE_OF_REQUESTS_IS_EMPTY'.
+    ls_excp-value = 2.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'ERROR_MESSAGE'.
+    ls_excp-value = 3.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'OTHERS'.
+    ls_excp-value = 4.
+    INSERT ls_excp INTO TABLE lt_excps.
+
     batch = sy-batch.
     sy-batch = 'X'.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
-      EXPORTING
-        iv_system                  = system
-        iv_request                 = transport
-        iv_client                  = sy-mandt
-        iv_ctc_active              = ' '
-        iv_overtake                = ' '
-        iv_import_again            = 'X'
-        iv_ignore_originality      = 'X'
-        iv_ignore_repairs          = ' '
-        iv_ignore_transtype        = ' '
-        iv_ignore_tabletype        = ' '
-        iv_ignore_predec           = 'X'
-        iv_ignore_cvers            = 'X'
-        iv_test_import             = test
-        iv_subset                  = subset
-        iv_offline                 = offline
-        iv_monitor                 = ' '
-        iv_verbose                 = 'X'
-        it_requests                = requests
-      IMPORTING
-        et_tp_imports              = imports
-      EXCEPTIONS
-        read_config_failed         = 1
-        table_of_requests_is_empty = 2
-        error_message              = 3
-        OTHERS                     = 4.
+      PARAMETER-TABLE lt_params
+      EXCEPTION-TABLE lt_excps.
 
     subrc = sy-subrc.
     msgty = sy-msgty.
@@ -1744,6 +1772,30 @@ METHOD execute_import.
 
     IF lx_first IS BOUND.
       RAISE EXCEPTION lx_first.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD add_fm_value.
+    " Bind a by-value input of a dynamic function call (copied, so literals are safe)
+    CONSTANTS lc_kind_exporting TYPE i VALUE 10. " = abap_func_exporting
+    DATA ls_param TYPE abap_func_parmbind.
+    FIELD-SYMBOLS <value> TYPE any.
+    ls_param-name = name.
+    ls_param-kind = lc_kind_exporting.
+    CREATE DATA ls_param-value LIKE value.
+    ASSIGN ls_param-value->* TO <value>.
+    <value> = value.
+    INSERT ls_param INTO TABLE params.
+  ENDMETHOD.
+
+  METHOD fm_has_parameter.
+    DATA lv_parameter TYPE fupararef-parameter.
+    SELECT SINGLE parameter FROM fupararef INTO lv_parameter
+      WHERE funcname  = funcname
+        AND r3state   = 'A'
+        AND parameter = parameter.
+    IF sy-subrc = 0.
+      found = 'X'.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.
