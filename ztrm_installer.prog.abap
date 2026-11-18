@@ -69,6 +69,9 @@ PARAMETERS:
 
 SELECTION-SCREEN SKIP.
 
+SELECTION-SCREEN COMMENT /1(77) json_err MODIF ID njs.
+SELECTION-SCREEN COMMENT /1(1) json_spc MODIF ID njs.
+
 SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 15 LINES,
 TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
 TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100 MODIF ID jsn,
@@ -2566,6 +2569,7 @@ INITIALIZATION.
     online               = '@Y4@ From registry'.
   ELSE.
     sc_txt3              = 'You can provide a release via file upload.'.
+    json_err             = '@0S@ Online install is not possible: UI add-on/SAP_UI is missing.'.
   ENDIF.
   sc_txt6                = '@X1@ TRM Installer v5.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
@@ -2675,6 +2679,10 @@ AT SELECTION-SCREEN OUTPUT.
   %_p_lrest_%_app_%-text  = 'trm-rest package'.
   LOOP AT SCREEN.
     IF screen-group1 EQ 'JSN' AND json_supported <> 'X'.
+      screen-active = 0.
+      MODIFY SCREEN.
+    ENDIF.
+    IF screen-group1 EQ 'NJS' AND json_supported EQ 'X'.
       screen-active = 0.
       MODIFY SCREEN.
     ENDIF.
