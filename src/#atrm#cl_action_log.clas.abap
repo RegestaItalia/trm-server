@@ -4,6 +4,7 @@ CLASS /atrm/cl_action_log DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES tyt_events TYPE STANDARD TABLE OF /atrm/log_evt_in WITH DEFAULT KEY.
     CONSTANTS:
       BEGIN OF c_status,

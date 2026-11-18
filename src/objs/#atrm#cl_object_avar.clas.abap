@@ -4,6 +4,7 @@ CLASS /atrm/cl_object_avar DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     METHODS /atrm/if_object~get_dependencies REDEFINITION.
   PROTECTED SECTION.
   PRIVATE SECTION.

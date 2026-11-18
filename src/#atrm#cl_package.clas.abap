@@ -4,6 +4,7 @@ CLASS /atrm/cl_package DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
 
     METHODS constructor
       IMPORTING devclass TYPE devclass.
@@ -16,8 +17,9 @@ CLASS /atrm/cl_package DEFINITION
     METHODS delete_tmp
       RAISING /atrm/cx_exception.
 
+    "! All subpackages of the package (recursively), the package itself excluded
     METHODS get_subpackages
-      RETURNING VALUE(subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
+      RETURNING VALUE(subpackages) TYPE /atrm/package_devclass_t.
 
     METHODS get_all_packages
       RETURNING VALUE(packages) TYPE /atrm/package_devclass_t.
@@ -231,8 +233,6 @@ CLASS /atrm/cl_package IMPLEMENTATION.
              objecttype TYPE char4,
            END OF ty_ddls_gen_view.
     DATA: lt_devclass      TYPE STANDARD TABLE OF devclass,
-          lt_subpackages   TYPE cl_pak_package_queries=>tt_subpackage_info,
-          ls_subpackage    LIKE LINE OF lt_subpackages,
           lv_devclass      TYPE devclass,
           lt_tadir         LIKE tadir,
           ls_tadir         LIKE LINE OF tadir,
@@ -396,48 +396,38 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD get_subpackages.
-    TRY.
-        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
-          EXPORTING
-            im_package                    = gv_devclass
-            im_also_local_packages        = 'X'
-          IMPORTING
-            et_subpackages                = subpackages
-          EXCEPTIONS
-            no_package_specified          = 1
-            package_has_no_tdevc_record   = 2
-            package_has_no_tadir_record   = 3
-            package_does_not_exist        = 4
-            invalid_superpackage          = 5
-            no_output_parameter_requested = 6
-            OTHERS                        = 7.
-      CATCH cx_dynamic_check.
-        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
-         EXPORTING
-           im_package                    = gv_devclass
-         IMPORTING
-            et_subpackages                = subpackages
-          EXCEPTIONS
-           no_package_specified          = 1
-           package_has_no_tdevc_record   = 2
-           package_has_no_tadir_record   = 3
-            package_does_not_exist        = 4
-            invalid_superpackage          = 5
-           no_output_parameter_requested = 6
-           OTHERS                        = 7
-.
-    ENDTRY.
+    " Walks TDEVC-PARENTCL level by level instead of calling
+    " CL_PAK_PACKAGE_QUERIES=>GET_ALL_SUBPACKAGES: its result type
+    " TT_SUBPACKAGE_INFO does not exist on SAP_BASIS 700, TDEVC does everywhere.
+    " Local ($) subpackages are included, as with IM_ALSO_LOCAL_PACKAGES = 'X'.
+    DATA: lt_level    TYPE /atrm/package_devclass_t,
+          lt_children TYPE /atrm/package_devclass_t,
+          lv_child    TYPE devclass.
+
+    APPEND gv_devclass TO lt_level.
+    WHILE lt_level IS NOT INITIAL.
+      CLEAR lt_children.
+      SELECT devclass FROM tdevc INTO TABLE lt_children
+        FOR ALL ENTRIES IN lt_level
+        WHERE parentcl = lt_level-table_line.
+      CLEAR lt_level.
+      LOOP AT lt_children INTO lv_child.
+        " guard against inconsistent TDEVC hierarchies (cycles)
+        CHECK lv_child <> gv_devclass.
+        READ TABLE subpackages TRANSPORTING NO FIELDS WITH KEY table_line = lv_child.
+        CHECK sy-subrc <> 0.
+        APPEND lv_child TO subpackages.
+        APPEND lv_child TO lt_level.
+      ENDLOOP.
+    ENDWHILE.
   ENDMETHOD.
 
 
   METHOD get_all_packages.
-    DATA: subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
-          subpackage  LIKE LINE OF subpackages.
+    DATA subpackages TYPE /atrm/package_devclass_t.
     subpackages = get_subpackages( ).
     APPEND gv_devclass TO packages.
-    LOOP AT subpackages INTO subpackage.
-      APPEND subpackage-package TO packages.
-    ENDLOOP.
+    APPEND LINES OF subpackages TO packages.
   ENDMETHOD.
 
 

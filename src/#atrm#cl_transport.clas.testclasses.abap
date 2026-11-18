@@ -1,6 +1,7 @@
 CLASS ltc_transport DEFINITION FOR TESTING
-  DURATION SHORT
-  RISK LEVEL HARMLESS.
+  "#AU Risk_Level Harmless
+  "#AU Duration Short
+.
   PRIVATE SECTION.
     METHODS constructor_keeps_request FOR TESTING.
     METHODS shi3_untouched_without_shi3 FOR TESTING RAISING /atrm/cx_exception.

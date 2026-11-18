@@ -17,6 +17,8 @@ CLASS /atrm/cl_log_polling DEFINITION
       IMPORTING message TYPE /atrm/polling_last_msg.
   PROTECTED SECTION.
   PRIVATE SECTION.
+CLASS-METHODS new_id
+      RETURNING VALUE(id) TYPE /atrm/polling_id.
 ENDCLASS.
 
 
@@ -34,18 +36,17 @@ CLASS /atrm/cl_log_polling IMPLEMENTATION.
   METHOD create.
     DATA polling TYPE /atrm/polling.
     polling-mandt = sy-mandt.
-    TRY.
-        polling-polling_id = cl_system_uuid=>create_uuid_x16_static( ).
-        polling-polling_event = event.
-        polling-last_update_user = sy-uname.
-        polling-last_update_time = sy-uzeit.
-        polling-last_update_date = sy-datum.
-        INSERT /atrm/polling FROM polling.
-        COMMIT WORK AND WAIT.
-        CREATE OBJECT log EXPORTING id = polling-polling_id.
-      CATCH cx_uuid_error.
-      /atrm/cx_exception=>raise( ).
-    ENDTRY.
+    polling-polling_id = new_id( ).
+    IF polling-polling_id IS INITIAL.
+      /atrm/cx_exception=>raise( iv_message = 'Could not create polling ID' ).
+    ENDIF.
+    polling-polling_event = event.
+    polling-last_update_user = sy-uname.
+    polling-last_update_time = sy-uzeit.
+    polling-last_update_date = sy-datum.
+    INSERT /atrm/polling FROM polling.
+    COMMIT WORK AND WAIT.
+    CREATE OBJECT log EXPORTING id = polling-polling_id.
   ENDMETHOD.
 
   METHOD update_message.
@@ -63,4 +64,11 @@ CLASS /atrm/cl_log_polling IMPLEMENTATION.
     COMMIT WORK AND WAIT.
   ENDMETHOD.
 
+  METHOD new_id.
+    " GUID_CREATE instead of CL_SYSTEM_UUID=>CREATE_UUID_X16_STATIC,
+    " which does not exist on SAP_BASIS 700
+    CALL FUNCTION 'GUID_CREATE'
+      IMPORTING
+        ev_guid_16 = id.
+  ENDMETHOD.
 ENDCLASS.

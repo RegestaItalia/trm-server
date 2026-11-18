@@ -4,6 +4,7 @@ CLASS /atrm/cl_abapgit DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES: BEGIN OF ty_ser_obj,
              pgmid     TYPE pgmid,
              object    TYPE trobjtype,
@@ -42,8 +43,10 @@ ENDCLASS.
 CLASS /atrm/cl_abapgit IMPLEMENTATION.
 
   METHOD get_dot_abapgit.
-    DATA: lo_srv  TYPE REF TO lcl_abapgit_repo_srv,
-          lo_repo TYPE REF TO lcl_abapgit_repo.
+    DATA: lo_srv         TYPE REF TO lcl_abapgit_repo_srv,
+          lo_repo        TYPE REF TO lcl_abapgit_repo,
+          lo_dot_abapgit TYPE REF TO lcl_abapgit_dot_abapgit,
+          lv_message     TYPE string.
     lo_srv = lcl_abapgit_repo_srv=>get_instance( ).
     CALL METHOD lo_srv->get_repo_from_package
       EXPORTING
@@ -52,12 +55,14 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
         eo_repo    = lo_repo
     .
     IF lo_repo IS NOT BOUND.
+      CONCATENATE 'Repository for package' devclass 'not found' INTO lv_message SEPARATED BY space. "#EC NOTEXT
       /atrm/cx_exception=>raise(
         iv_reason  = /atrm/cx_exception=>c_reason-abapgit_intergration
-        iv_message = 'Repository for package ' && devclass && ' not found' "#EC NOTEXT
+        iv_message = lv_message
       ).
     ENDIF.
-    dot_abapgit = lo_repo->get_dot_abapgit( )->serialize( ).
+    lo_dot_abapgit = lo_repo->get_dot_abapgit( ).
+    dot_abapgit = lo_dot_abapgit->serialize( ).
   ENDMETHOD.
 
   METHOD serialize.
@@ -112,7 +117,7 @@ CLASS /atrm/cl_abapgit IMPLEMENTATION.
       ls_ser_obj-pgmid = 'R3TR'.
       ls_ser_obj-object = ls_file-item-obj_type.
       ls_ser_obj-obj_name = ls_file-item-obj_name.
-      ls_ser_obj-full_path = ls_file-file-path && ls_file-file-filename.
+      CONCATENATE ls_file-file-path ls_file-file-filename INTO ls_ser_obj-full_path.
       APPEND ls_ser_obj TO objects.
     ENDLOOP.
   ENDMETHOD.

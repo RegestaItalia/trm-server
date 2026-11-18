@@ -4,6 +4,7 @@ CLASS /atrm/cl_abap DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES: ty_program        TYPE c LENGTH 180,
            ty_program_src    TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
            ty_src_tokens     TYPE TABLE OF stoken WITH DEFAULT KEY,

@@ -1,6 +1,7 @@
 CLASS ltc_exception DEFINITION FOR TESTING
-  DURATION SHORT
-  RISK LEVEL HARMLESS.
+  "#AU Risk_Level Harmless
+  "#AU Duration Short
+.
   PRIVATE SECTION.
     METHODS default_reason FOR TESTING.
     METHODS supplied_reason_and_log FOR TESTING.

@@ -74,7 +74,9 @@ CLASS /atrm/cl_senvi_map IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD sanitize_object_name.
-    DATA raw_copy TYPE string.
+    DATA: raw_copy      TYPE string,
+          lv_max_length TYPE string,
+          lv_message    TYPE string.
     raw_copy = raw_name.
     TRANSLATE raw_copy TO UPPER CASE.
     CONDENSE raw_copy.
@@ -87,7 +89,11 @@ CLASS /atrm/cl_senvi_map IMPLEMENTATION.
     IF strlen( raw_copy ) <= max_length.
       sanitized = raw_copy.
     ELSE.
-      /atrm/cx_exception=>raise( iv_message = 'Object name ' && raw_copy && ' exceedes max. length ' && max_length ).
+      lv_max_length = max_length.
+      CONDENSE lv_max_length.
+      CONCATENATE 'Object name' raw_copy 'exceedes max. length' lv_max_length
+        INTO lv_message SEPARATED BY space.
+      /atrm/cx_exception=>raise( iv_message = lv_message ).
     ENDIF.
   ENDMETHOD.
 

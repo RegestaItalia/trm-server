@@ -1,6 +1,7 @@
 CLASS ltc_action_log DEFINITION FOR TESTING
-  DURATION SHORT
-  RISK LEVEL DANGEROUS.
+  "#AU Risk_Level Dangerous
+  "#AU Duration Short
+.
   PRIVATE SECTION.
     DATA mv_action_id TYPE /atrm/log_action_id.
     METHODS setup.
@@ -13,11 +14,9 @@ ENDCLASS.
 
 CLASS ltc_action_log IMPLEMENTATION.
   METHOD setup.
-    TRY.
-        mv_action_id = cl_system_uuid=>create_uuid_c32_static( ).
-      CATCH cx_uuid_error.
-        cl_abap_unit_assert=>fail( msg = 'Could not create test action ID' ).
-    ENDTRY.
+    CALL FUNCTION 'GUID_CREATE'
+      IMPORTING
+        ev_guid_32 = mv_action_id.
   ENDMETHOD.
 
   METHOD teardown.
@@ -33,7 +32,8 @@ CLASS ltc_action_log IMPLEMENTATION.
           ls_action TYPE /atrm/log_act,
           ls_link   TYPE /atrm/log_tr,
           lt_rows   TYPE STANDARD TABLE OF /atrm/log_evt,
-          ls_row    TYPE /atrm/log_evt.
+          ls_row    TYPE /atrm/log_evt,
+          lv_lines  TYPE i.
 
     TRY.
         /atrm/cl_action_log=>start_action(
@@ -79,7 +79,8 @@ CLASS ltc_action_log IMPLEMENTATION.
 
     SELECT * FROM /atrm/log_evt INTO TABLE lt_rows
       WHERE action_id = mv_action_id ORDER BY seq.
-    cl_abap_unit_assert=>assert_equals( act = lines( lt_rows ) exp = 3 ).
+    lv_lines = lines( lt_rows ).
+    cl_abap_unit_assert=>assert_equals( act = lv_lines exp = 3 ).
     READ TABLE lt_rows INTO ls_row INDEX 3.
     cl_abap_unit_assert=>assert_equals( act = ls_row-seq exp = '000003' ).
     cl_abap_unit_assert=>assert_equals( act = ls_row-event exp = 'RESTORE' ).
@@ -135,8 +136,9 @@ CLASS ltc_action_log IMPLEMENTATION.
 ENDCLASS.
 
 CLASS ltc_log_tables DEFINITION FOR TESTING
-  DURATION SHORT
-  RISK LEVEL HARMLESS.
+  "#AU Risk_Level Harmless
+  "#AU Duration Short
+.
   PRIVATE SECTION.
     METHODS no_client_field FOR TESTING.
 ENDCLASS.

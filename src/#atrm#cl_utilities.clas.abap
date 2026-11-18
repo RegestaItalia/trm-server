@@ -660,7 +660,8 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           lv_virt_idx   TYPE sy-index,
           lv_scheme     TYPE string,
           lv_host       TYPE string,
-          lv_port       TYPE string.
+          lv_port       TYPE string,
+          lv_message    TYPE string.
 
     SELECT SINGLE hostnumber FROM icfvirhost INTO lv_hostnumber
       WHERE icf_name = 'DEFAULT_HOST'
@@ -698,7 +699,8 @@ CLASS /atrm/cl_utilities IMPLEMENTATION.
           broken_alias_error  = 9
           OTHERS              = 10.
       IF sy-subrc <> 0.
-        /atrm/cx_exception=>raise( iv_message = |ICF service { lv_url } not found or inactive| ).
+        CONCATENATE 'ICF service' lv_url 'not found or inactive' INTO lv_message SEPARATED BY space.
+        /atrm/cx_exception=>raise( iv_message = lv_message ).
       ENDIF.
       IF ls_actlogin-protsec = 'S' OR ls_actlogin-protsec = 'X'.
         lv_scheme = 'https'.

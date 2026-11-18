@@ -6,6 +6,7 @@ CLASS /atrm/cl_transport DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
 
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF /atrm/devclass_range WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
@@ -138,7 +139,7 @@ CLASS /atrm/cl_transport DEFINITION
     "! @raising /atrm/cx_exception | Raised if import fails
     METHODS import
       IMPORTING system        TYPE tmssysnam
-                test          TYPE stms_flag
+                test          TYPE flag
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
@@ -231,7 +232,7 @@ CLASS /atrm/cl_transport DEFINITION
     CLASS-METHODS import_multiple
       IMPORTING system        TYPE tmssysnam
                 transports    TYPE /atrm/trkorr_t
-                test          TYPE stms_flag
+                test          TYPE flag
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
 
@@ -262,7 +263,7 @@ CLASS /atrm/cl_transport DEFINITION
     CLASS-METHODS execute_import
       IMPORTING system        TYPE tmssysnam
                 transport     TYPE trkorr
-                test          TYPE stms_flag
+                test          TYPE flag
                 requests      TYPE stms_tr_requests OPTIONAL
       RETURNING VALUE(import) TYPE stms_tp_import
       RAISING   /atrm/cx_exception.
@@ -1336,14 +1337,14 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
 
-METHOD execute_import.
+  METHOD execute_import.
     CONSTANTS: lc_kind_importing TYPE i VALUE 20. " = abap_func_importing
     DATA: imports  TYPE stms_tp_imports,
           stdout   TYPE /atrm/cx_exception=>tyt_log,
           tpstdout TYPE tpstdout,
           batch    TYPE sy-batch,
-          subset   TYPE stms_flag,
-          offline  TYPE stms_flag,
+          subset   TYPE flag,
+          offline  TYPE flag,
           found    TYPE flag,
           subrc    TYPE sy-subrc,
           msgid    TYPE sy-msgid,

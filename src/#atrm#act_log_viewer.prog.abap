@@ -1,6 +1,6 @@
 REPORT /atrm/act_log_viewer.
 
-TYPE-POOLS icon.
+TYPE-POOLS: abap, icon.
 
 TYPES: BEGIN OF ty_out,
          at       TYPE c LENGTH 19,
@@ -60,17 +60,17 @@ START-OF-SELECTION.
     MESSAGE 'Not authorized to view the TRM action log'(e01) TYPE 'E'.
   ENDIF.
 
-  /atrm/cl_action_log_reader=>read(
+  CALL METHOD /atrm/cl_action_log_reader=>read
     EXPORTING
-      ir_session = s_sess[]
-      ir_action = s_action[]
-      ir_package = s_pkg[]
-      ir_user = s_user[]
-      ir_date = s_date[]
+      ir_session    = s_sess[]
+      ir_action     = s_action[]
+      ir_package    = s_pkg[]
+      ir_user       = s_user[]
+      ir_date       = s_date[]
     IMPORTING
-      et_actions = gt_actions
+      et_actions    = gt_actions
       et_transports = gt_transports
-      et_events = gt_events ).
+      et_events     = gt_events.
   IF gt_actions IS INITIAL.
     MESSAGE 'No TRM actions found'(e02) TYPE 'S' DISPLAY LIKE 'W'.
     RETURN.
@@ -213,7 +213,8 @@ ENDFORM.
 FORM add_links USING iv_node_key TYPE salv_de_node_key
                      is_out TYPE ty_out
                      is_target TYPE ty_node_target.
-  DATA: lo_node   TYPE REF TO cl_salv_node,
+  DATA: lo_nodes  TYPE REF TO cl_salv_nodes,
+        lo_node   TYPE REF TO cl_salv_node,
         lo_item   TYPE REF TO cl_salv_item,
         ls_target TYPE ty_node_target,
         lv_icon   TYPE salv_de_tree_image.
@@ -221,7 +222,8 @@ FORM add_links USING iv_node_key TYPE salv_de_node_key
   ls_target-node_key = iv_node_key.
   INSERT ls_target INTO TABLE gt_node_targets.
   TRY.
-      lo_node = go_tree->get_nodes( )->get_node( iv_node_key ).
+      lo_nodes = go_tree->get_nodes( ).
+      lo_node = lo_nodes->get_node( iv_node_key ).
       IF is_out-contents IS NOT INITIAL.
         lo_item = lo_node->get_item( gc_col_contents ).
         lo_item->set_type( if_salv_c_item_type=>link ).
@@ -356,6 +358,7 @@ FORM display_tree.
         lo_settings  TYPE REF TO cl_salv_tree_settings,
         lo_columns   TYPE REF TO cl_salv_columns_tree,
         lo_events    TYPE REF TO cl_salv_events_tree,
+        lo_functions TYPE REF TO cl_salv_functions_tree,
         lx_error     TYPE REF TO cx_salv_error.
 
   " Sessions: earliest action defines time and user.
@@ -372,7 +375,11 @@ FORM display_tree.
 
   CLEAR: gt_out, gt_node_targets.
   TRY.
-      cl_salv_tree=>factory( IMPORTING r_salv_tree = go_tree CHANGING t_table = gt_out ).
+      CALL METHOD cl_salv_tree=>factory
+        IMPORTING
+          r_salv_tree = go_tree
+        CHANGING
+          t_table     = gt_out.
     CATCH cx_salv_error INTO lx_error.
       MESSAGE lx_error TYPE 'E'.
   ENDTRY.
@@ -420,7 +427,8 @@ FORM display_tree.
   SET HANDLER lcl_events=>on_link_click FOR lo_events.
   SET HANDLER lcl_events=>on_double_click FOR lo_events.
 
-  go_tree->get_functions( )->set_all( abap_true ).
+  lo_functions = go_tree->get_functions( ).
+  lo_functions->set_all( abap_true ).
   go_tree->display( ).
 ENDFORM.
 

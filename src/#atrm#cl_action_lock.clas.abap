@@ -4,6 +4,7 @@ CLASS /atrm/cl_action_lock DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES tyt_keys TYPE STANDARD TABLE OF /atrm/act_lock_k WITH DEFAULT KEY.
     TYPES ty_token TYPE c LENGTH 32.
     TYPES ty_action TYPE c LENGTH 40.
