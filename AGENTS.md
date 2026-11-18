@@ -59,6 +59,11 @@ reliably catch all of these SAP_BASIS 700 differences:
   `CALL METHOD ... EXPORTING ... IMPORTING ...`.
 - **No pragmas (`##...`).** Use pseudo-comments (`"#EC ...`) instead. abaplint `v700`
   flags these.
+- `/ATRM/CX_EXCEPTION`'s constructor is hand-written: it fills `message` and
+  `if_t100_message~t100key` from `sy`. It used to be protected by
+  `##ADT_SUPPRESS_GENERATION`, which had to go (no pragmas on 7.00). Edit it only as
+  source, and never accept the class editor's offer to regenerate the constructor. The
+  unit test `ltc_exception->message_from_sy` fails if that happens.
 - `CONCATENATE ... IN BYTE MODE` needs byte-like operands: use `x` variables
   (`DATA byte_80 TYPE x LENGTH 1 VALUE '80'.`), not character literals.
 
