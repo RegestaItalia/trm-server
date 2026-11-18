@@ -2324,7 +2324,7 @@ CLASS lcl_report IMPLEMENTATION.
           CHANGING
             data  = release_manifest.
       CATCH cx_sy_dyn_call_error.
-        WRITE: /, 'Package manifest was not validated.'.
+        WRITE: /, 'Package manifest was not validated: UI add-on/SAP_UI is missing?, install continues.'.
     ENDTRY.
     IF release_manifest IS NOT INITIAL.
       IF release_manifest-name <> name.
@@ -2619,7 +2619,7 @@ INITIALIZATION.
     sc_txt3              = 'You can provide a release via file upload.'.
     json_err             = '@0S@ Online install is not possible: UI add-on/SAP_UI is missing.'.
   ENDIF.
-  sc_txt6                = '@X1@ TRM Installer v5.0.0 - RegestaItalia'.
+  sc_txt6                = '@X1@ TRM Installer v6.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
