@@ -865,6 +865,14 @@ CLASS lcl_report DEFINITION.
                 system   TYPE tmssysnam
       EXPORTING subrc    TYPE i
                 tpstdout TYPE t_tpstdout.
+    CLASS-METHODS add_fm_value
+      IMPORTING name   TYPE abap_parmname
+                value  TYPE any
+      CHANGING  params TYPE abap_func_parmbind_tab.
+    CLASS-METHODS fm_has_parameter
+      IMPORTING funcname     TYPE rs38l_fnam
+                parameter    TYPE rs38l_par_
+      RETURNING VALUE(found) TYPE flag.
     CLASS-METHODS rebuild_hierarchy
       IMPORTING
         it_packages         TYPE ty_package_tab
@@ -1844,6 +1852,28 @@ CLASS lcl_report IMPLEMENTATION.
       subrc = 0.
     ENDIF.
   ENDMETHOD.
+  METHOD add_fm_value.
+    " Bind a by-value input of a dynamic function call (copied, so literals are safe)
+    CONSTANTS lc_kind_exporting TYPE i VALUE 10. " = abap_func_exporting
+    DATA ls_param TYPE abap_func_parmbind.
+    FIELD-SYMBOLS <value> TYPE any.
+    ls_param-name = name.
+    ls_param-kind = lc_kind_exporting.
+    CREATE DATA ls_param-value LIKE value.
+    ASSIGN ls_param-value->* TO <value>.
+    <value> = value.
+    INSERT ls_param INTO TABLE params.
+  ENDMETHOD.
+  METHOD fm_has_parameter.
+    DATA lv_parameter TYPE fupararef-parameter.
+    SELECT SINGLE parameter FROM fupararef INTO lv_parameter
+      WHERE funcname = funcname
+        AND r3state  = 'A'
+        AND parameter = parameter.
+    IF sy-subrc = 0.
+      found = 'X'.
+    ENDIF.
+  ENDMETHOD.
   METHOD import.
     DATA: msgid   TYPE sy-msgid,
           msgno   TYPE sy-msgno,
@@ -1852,36 +1882,54 @@ CLASS lcl_report IMPLEMENTATION.
           msgv2   TYPE sy-msgv2,
           msgv3   TYPE sy-msgv3,
           msgv4     TYPE sy-msgv4,
-          exception TYPE stmscalert.
-    " STMS_TP_IMPORTS / ET_TP_IMPORTS don't exist on older releases (e.g. 7.0):
-    " for a single request ES_EXCEPTION and TT_STDOUT hold the same alert and tp output
+          exception TYPE stmscalert,
+          lt_params TYPE abap_func_parmbind_tab,
+          ls_param  TYPE abap_func_parmbind,
+          lt_excps  TYPE abap_func_excpbind_tab,
+          ls_excp   TYPE abap_func_excpbind.
+    CONSTANTS: lc_kind_importing TYPE i VALUE 20, " = abap_func_importing
+               lc_kind_tables    TYPE i VALUE 30. " = abap_func_tables
+    " ES_EXCEPTION and TT_STDOUT are used instead of ET_TP_IMPORTS: for a single
+    " request they hold the same alert and tp output, and are present on every release
     CLEAR tpstdout.
+    " Parameters are bound dynamically because the signature differs by release:
+    " IV_IGNORE_CVERS does not exist on 7.00, and a static call passing it dumps
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = system CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = trkorr CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CLIENT' value = sy-mandt CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CTC_ACTIVE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OVERTAKE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IMPORT_AGAIN' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_ORIGINALITY' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_REPAIRS' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TRANSTYPE' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TABLETYPE' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_PREDEC' value = 'X' CHANGING params = lt_params.
+    IF fm_has_parameter( funcname = 'TMS_MGR_IMPORT_TR_REQUEST' parameter = 'IV_IGNORE_CVERS' ) = 'X'.
+      CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_CVERS' value = 'X' CHANGING params = lt_params.
+    ENDIF.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TEST_IMPORT' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SUBSET' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OFFLINE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
+    ls_param-name = 'ES_EXCEPTION'.
+    ls_param-kind = lc_kind_importing.
+    GET REFERENCE OF exception INTO ls_param-value.
+    INSERT ls_param INTO TABLE lt_params.
+    ls_param-name = 'TT_STDOUT'.
+    ls_param-kind = lc_kind_tables.
+    GET REFERENCE OF tpstdout INTO ls_param-value.
+    INSERT ls_param INTO TABLE lt_params.
+    ls_excp-name = 'ERROR_MESSAGE'.
+    ls_excp-value = 1.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'OTHERS'.
+    ls_excp-value = 2.
+    INSERT ls_excp INTO TABLE lt_excps.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
-      EXPORTING
-        iv_system             = system
-        iv_request            = trkorr
-        iv_client             = sy-mandt
-        iv_ctc_active         = ' '
-        iv_overtake           = ' '
-        iv_import_again       = 'X'
-        iv_ignore_originality = 'X'
-        iv_ignore_repairs     = ' '
-        iv_ignore_transtype   = 'X'
-        iv_ignore_tabletype   = 'X'
-        iv_ignore_predec      = 'X'
-        iv_ignore_cvers       = 'X'
-        iv_test_import        = ' '
-        iv_subset             = ' '
-        iv_offline            = ' '
-        iv_monitor            = 'X'
-        iv_verbose            = 'X'
-      IMPORTING
-        es_exception          = exception
-      TABLES
-        tt_stdout             = tpstdout
-      EXCEPTIONS
-        error_message         = 1
-        OTHERS                = 2.
+      PARAMETER-TABLE lt_params
+      EXCEPTION-TABLE lt_excps.
     subrc = sy-subrc.
     msgty = sy-msgty.
     msgid = sy-msgid.
