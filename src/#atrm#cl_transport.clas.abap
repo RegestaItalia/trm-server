@@ -892,19 +892,70 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           lv_without_lock = 'X'.
         ENDIF.
 
-        CALL FUNCTION 'TRINT_RELEASE_REQUEST'
-          EXPORTING
-            iv_trkorr                = gv_trkorr
-            iv_dialog                = ' '
-            iv_success_message       = ' '
-            iv_display_export_log    = ' '
-            iv_without_objects_check = 'X'
-            iv_without_locking       = lv_without_lock
-            " objects deleted by an already released request have no TADIR entry:
-            " skip their lock (TK313) instead of failing the release with TR776
-            iv_ignore_warnings       = lock
-          EXCEPTIONS
-            OTHERS                   = 1.
+        " IV_IGNORE_WARNINGS does not exist on old releases (e.g. 7.00): passing it dumps
+        IF fm_has_parameter( funcname = 'TRINT_RELEASE_REQUEST' parameter = 'IV_IGNORE_WARNINGS' ) = 'X'.
+          CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+            EXPORTING
+              iv_trkorr                = gv_trkorr
+              iv_dialog                = ' '
+              iv_success_message       = ' '
+              iv_display_export_log    = ' '
+              iv_without_objects_check = 'X'
+              iv_without_locking       = lv_without_lock
+              " objects deleted by an already released request have no TADIR entry:
+              " skip their lock (TK313) instead of failing the release with TR776
+              iv_ignore_warnings       = lock
+            EXCEPTIONS
+              OTHERS                   = 1.
+        ELSE.
+          " Old releases cannot skip TK313 while locking, so a request holding objects
+          " deleted by an already released request fails with TR776 (OBJECT_LOCK_ERROR).
+          " The lock pass has already locked and committed every other object by then:
+          " when TK313 is the only lock error, release again without locking, which only
+          " skips the objects without TADIR entry - the same outcome as IV_IGNORE_WARNINGS
+          DATA: lt_messages   TYPE ctsgerrmsgs,
+                ls_message    TYPE ctsgerrmsg,
+                lv_subrc      TYPE sy-subrc,
+                lv_only_tk313 TYPE flag.
+          CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+            EXPORTING
+              iv_trkorr                = gv_trkorr
+              iv_dialog                = ' '
+              iv_success_message       = ' '
+              iv_display_export_log    = ' '
+              iv_without_objects_check = 'X'
+              iv_without_locking       = lv_without_lock
+            IMPORTING
+              et_messages              = lt_messages
+            EXCEPTIONS
+              object_lock_error        = 1
+              OTHERS                   = 2.
+          lv_subrc = sy-subrc.
+          IF lv_subrc = 1 AND lock = 'X'.
+            LOOP AT lt_messages INTO ls_message WHERE msgty CA 'EAX'.
+              IF ls_message-msgid = 'TK' AND ls_message-msgno = '313'.
+                lv_only_tk313 = 'X'.
+              ELSE.
+                CLEAR lv_only_tk313.
+                EXIT.
+              ENDIF.
+            ENDLOOP.
+            IF lv_only_tk313 = 'X'.
+              CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+                EXPORTING
+                  iv_trkorr                = gv_trkorr
+                  iv_dialog                = ' '
+                  iv_success_message       = ' '
+                  iv_display_export_log    = ' '
+                  iv_without_objects_check = 'X'
+                  iv_without_locking       = 'X'
+                EXCEPTIONS
+                  OTHERS                   = 1.
+              lv_subrc = sy-subrc.
+            ENDIF.
+          ENDIF.
+          sy-subrc = lv_subrc.
+        ENDIF.
         IF sy-subrc <> 0.
           /atrm/cx_exception=>raise( ).
         ENDIF.
