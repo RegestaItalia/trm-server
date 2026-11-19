@@ -819,9 +819,14 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     "once saved). A new package is checked with the layer it is created with
     SELECT SINGLE pdevclass FROM tdevc INTO lv_layer WHERE devclass = package->package_name.
     IF sy-subrc <> 0.
-      lv_layer = package->transport_layer.
+      lv_target = get_layer_target( package->transport_layer ).
+    ELSE.
+      lv_target = get_layer_target( lv_layer ).
+      IF lv_target IS INITIAL.
+        "a blank target would get the system's default target: LOCAL creates a local request
+        lv_target = 'LOCAL'.
+      ENDIF.
     ENDIF.
-    lv_target = get_layer_target( lv_layer ).
     "a package imported from another system is changed in a repair task (SAP_BASIS 700
     "refuses a correction task with TK 519 and prompts for a request)
     SELECT SINGLE srcsystem FROM tadir INTO lv_srcsystem
