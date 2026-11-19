@@ -802,7 +802,10 @@ CLASS /atrm/cl_package IMPLEMENTATION.
   METHOD save_in_temporary_request.
     DATA: lo_transport TYPE REF TO /atrm/cl_transport,
           lv_text      TYPE as4text,
+          lv_layer     TYPE tdevc-pdevclass,
           lv_target    TYPE tr_target,
+          lv_srcsystem TYPE tadir-srcsystem,
+          lv_task_type TYPE trfunction,
           lv_request   TYPE trkorr,
           lv_reason    TYPE string,
           lx_save      TYPE REF TO /atrm/cx_exception,
@@ -811,10 +814,27 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           lv_log       LIKE LINE OF lt_log.
 
     CLEAR request.
-    lv_target = get_layer_target( package->transport_layer ).
+    "RS_CORR_INSERT checks an existing package as stored: its stored transport layer
+    "decides between a transportable and a local request (a changed layer applies only
+    "once saved). A new package is checked with the layer it is created with
+    SELECT SINGLE pdevclass FROM tdevc INTO lv_layer WHERE devclass = package->package_name.
+    IF sy-subrc <> 0.
+      lv_layer = package->transport_layer.
+    ENDIF.
+    lv_target = get_layer_target( lv_layer ).
+    "a package imported from another system is changed in a repair task (SAP_BASIS 700
+    "refuses a correction task with TK 519 and prompts for a request)
+    SELECT SINGLE srcsystem FROM tadir INTO lv_srcsystem
+      WHERE pgmid = 'R3TR' AND object = 'DEVC' AND obj_name = package->package_name.
+    IF sy-subrc = 0 AND lv_srcsystem IS NOT INITIAL AND lv_srcsystem <> sy-sysid.
+      lv_task_type = 'R'.
+    ENDIF.
     CONCATENATE 'TRM package' package->package_name INTO lv_text SEPARATED BY space.
     "RS_CORR_INSERT records the package in a task of the current user
-    lo_transport = /atrm/cl_transport=>create_workbench( text = lv_text target = lv_target with_task = 'X' ).
+    lo_transport = /atrm/cl_transport=>create_workbench( text      = lv_text
+                                                         target    = lv_target
+                                                         with_task = 'X'
+                                                         task_type = lv_task_type ).
     request = lo_transport->get_trkorr( ).
 
     lv_request = request.

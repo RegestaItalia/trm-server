@@ -50,6 +50,7 @@ CLASS /atrm/cl_transport DEFINITION
       IMPORTING text             TYPE as4text
                 target           TYPE tr_target
                 with_task        TYPE flag OPTIONAL
+                task_type        TYPE trfunction OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
@@ -637,7 +638,12 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     "a task of the current user, for objects recorded in the request (e.g. by RS_CORR_INSERT)
     IF with_task = 'X'.
       ls_user-user = sy-uname.
-      ls_user-type = 'S'.
+      "development/correction task, unless the objects need another kind (e.g. R repair)
+      IF task_type IS INITIAL.
+        ls_user-type = 'S'.
+      ELSE.
+        ls_user-type = task_type.
+      ENDIF.
       APPEND ls_user TO lt_users.
     ENDIF.
     create(
