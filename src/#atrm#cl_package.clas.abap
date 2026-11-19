@@ -314,11 +314,20 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 * save package
     TRY.
-        CALL METHOD save
-          EXPORTING
-            package           = lo_package
-          CHANGING
-            transport_request = transport_request.
+        "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 700),
+        "and over RFC it asks for a request in a popup (DYNPRO_SEND_IN_BACKGROUND): record it in a temporary one
+        IF transport_request IS INITIAL
+          AND package_data-devclass(1) <> '$'
+          AND lo_package->wbo_korr_flag = 'X'
+          AND save_records_changes( ) = 'X'.
+          save_in_temporary_request( package = lo_package ).
+        ELSE.
+          CALL METHOD save
+            EXPORTING
+              package           = lo_package
+            CHANGING
+              transport_request = transport_request.
+        ENDIF.
       CATCH /atrm/cx_exception INTO lx_save.
 *   try to undo the changes, exceptions are tolerated
 *   (Note: if successful, this also unlocks the package)
@@ -371,7 +380,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      save( package = lo_package ).
+      "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 700),
+      "and over RFC it asks for a request in a popup (DYNPRO_SEND_IN_BACKGROUND): record it in a temporary one
+      IF gv_devclass(1) <> '$' AND lo_package->wbo_korr_flag = 'X' AND save_records_changes( ) = 'X'.
+        save_in_temporary_request( package = lo_package ).
+      ELSE.
+        save( package = lo_package ).
+      ENDIF.
       set_changeable( package                    = lo_package
                       changeable                 = ' '
                       suppress_dialog            = 'D'

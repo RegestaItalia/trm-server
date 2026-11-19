@@ -1095,8 +1095,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_from_tms_queue.
-    DATA: tmsbuffer TYPE tmsbuffer,
-          lt_params TYPE abap_func_parmbind_tab.
+    DATA: tmsbuffer  TYPE tmsbuffer,
+          lt_params  TYPE abap_func_parmbind_tab,
+          " typed like IV_COMMAND: 7.00 rejects a shorter literal in a dynamic call
+          lv_command TYPE stpa-command VALUE 'DELFROMBUFFER'.
 
     SELECT SINGLE domnam sysnam trkorr tarcli FROM tmsbuffer
       INTO CORRESPONDING FIELDS OF tmsbuffer
@@ -1104,7 +1106,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         AND trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
 
-    CALL METHOD add_fm_value EXPORTING name = 'IV_COMMAND' value = 'DELFROMBUFFER' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_COMMAND' value = lv_command CHANGING params = lt_params.
     CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = tmsbuffer-sysnam CHANGING params = lt_params.
     CALL METHOD add_fm_value EXPORTING name = 'IV_DOMAIN' value = tmsbuffer-domnam CHANGING params = lt_params.
     CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = tmsbuffer-trkorr CHANGING params = lt_params.
