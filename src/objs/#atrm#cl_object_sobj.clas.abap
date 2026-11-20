@@ -20,7 +20,8 @@ CLASS /atrm/cl_object_sobj IMPLEMENTATION.
       lv_table   TYPE tabname,
       lt_fnames  TYPE STANDARD TABLE OF rs38l_fnam WITH DEFAULT KEY,
       lv_fname   TYPE rs38l_fnam,
-      lv_fescape TYPE string.
+      lv_fescape TYPE string,
+      lv_self    TYPE string.
 
     super->/atrm/if_object~get_dependencies(
       IMPORTING dependencies = dependencies ).
@@ -102,7 +103,8 @@ CLASS /atrm/cl_object_sobj IMPLEMENTATION.
         CHANGING  dependencies = dependencies ).
     ENDLOOP.
 
-    DELETE dependencies WHERE tabname = 'TADIR' AND tabkey = 'R3TRSOBJ' && me->key-obj_name.
+    CONCATENATE 'R3TRSOBJ' me->key-obj_name INTO lv_self.
+    DELETE dependencies WHERE tabname = 'TADIR' AND tabkey = lv_self.
     SORT dependencies BY tabname tabkey.
     DELETE ADJACENT DUPLICATES FROM dependencies COMPARING tabname tabkey.
   ENDMETHOD.

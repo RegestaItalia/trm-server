@@ -4,6 +4,10 @@ CLASS /atrm/cl_core DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    " SAP_BASIS 700 does not load global interfaces implicitly for
+    " direct access to their components (/atrm/if_core=>..., /atrm/if_server=>...)
+    INTERFACE /atrm/if_core LOAD.
+    INTERFACE /atrm/if_server LOAD.
 
     TYPES: tyt_tdevc  TYPE STANDARD TABLE OF tdevc WITH DEFAULT KEY,
            tyt_tdevct TYPE STANDARD TABLE OF tdevct WITH DEFAULT KEY,
@@ -87,8 +91,7 @@ CLASS /atrm/cl_core IMPLEMENTATION.
           lo_package                 TYPE REF TO lcl_trm_package,
           lv_tabix                   TYPE i,
           lo_devclass                TYPE REF TO /atrm/cl_package,
-          lt_subpackages             TYPE cl_pak_package_queries=>tt_subpackage_info,
-          ls_subpackage              LIKE LINE OF lt_subpackages,
+          lt_subpackages             TYPE /atrm/package_devclass_t,
           lt_devclass                TYPE tyt_devclass,
           ls_trm_server              LIKE LINE OF packages,
           ls_trm_rest                LIKE LINE OF packages,
@@ -251,12 +254,9 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       CLEAR lo_devclass.
       CLEAR lt_devclass[].
       CLEAR lt_subpackages[].
-      CLEAR ls_subpackage.
       CREATE OBJECT lo_devclass EXPORTING devclass = lv_devclass.
       lt_subpackages = lo_devclass->get_subpackages( ).
-      LOOP AT lt_subpackages INTO ls_subpackage.
-        APPEND ls_subpackage-package TO lt_devclass.
-      ENDLOOP.
+      APPEND LINES OF lt_subpackages TO lt_devclass.
       APPEND lv_devclass TO lt_devclass.
       SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_server-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
     ENDIF.
@@ -299,12 +299,9 @@ CLASS /atrm/cl_core IMPLEMENTATION.
         CLEAR lo_devclass.
         CLEAR lt_devclass[].
         CLEAR lt_subpackages[].
-        CLEAR ls_subpackage.
         CREATE OBJECT lo_devclass EXPORTING devclass = lv_devclass.
         lt_subpackages = lo_devclass->get_subpackages( ).
-        LOOP AT lt_subpackages INTO ls_subpackage.
-          APPEND ls_subpackage-package TO lt_devclass.
-        ENDLOOP.
+        APPEND LINES OF lt_subpackages TO lt_devclass.
         APPEND lv_devclass TO lt_devclass.
         SELECT * FROM tdevc INTO CORRESPONDING FIELDS OF TABLE ls_trm_rest-tdevc FOR ALL ENTRIES IN lt_devclass WHERE devclass EQ lt_devclass-table_line.
       ENDIF.
@@ -374,8 +371,12 @@ CLASS /atrm/cl_core IMPLEMENTATION.
       INNER JOIN e070 ON e070~trkorr = /atrm/packages~trkorr
       INTO CORRESPONDING FIELDS OF TABLE packages.
     IF package_name IS NOT INITIAL.
-      " assume that package_name and package_registry are unique together, so we can filter out all other packages
-      DELETE packages WHERE package_name <> package_name AND package_registry <> package_registry.
+      " package_name and package_registry are unique together: keep only the rows matching both
+      " (a package can be installed from more than one registry, e.g. local and public)
+      DELETE packages WHERE package_name <> package_name.
+      IF package_registry IS NOT INITIAL.
+        DELETE packages WHERE package_registry <> package_registry.
+      ENDIF.
     ENDIF.
     LOOP AT packages ASSIGNING <row>.
       CLEAR package.

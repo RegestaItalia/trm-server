@@ -5,7 +5,7 @@ CLASS /atrm/cl_pa_sap_all_regen DEFINITION
 
   PUBLIC SECTION.
 
-    CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
+    CONSTANTS trm_pa TYPE flag VALUE 'X'.                   "#EC NOTEXT
 
     "! @raising /atrm/cx_exception | Raised if activation fails
     CLASS-METHODS execute

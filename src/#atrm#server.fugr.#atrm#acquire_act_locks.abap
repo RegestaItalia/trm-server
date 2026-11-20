@@ -1,8 +1,8 @@
-FUNCTION /atrm/acquire_act_locks.
+FUNCTION /ATRM/ACQUIRE_ACT_LOCKS.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
-*"     VALUE(OWNER_TOKEN) TYPE  SYSUUID_C32
+*"     VALUE(OWNER_TOKEN) TYPE  /ATRM/ACT_LOCK_OWNER_TOKEN
 *"     VALUE(ACTION_NAME) TYPE  CHAR40
 *"     VALUE(KEYS) TYPE  /ATRM/ACT_LOCK_T
 *"  EXCEPTIONS

@@ -6,11 +6,35 @@ CLASS /atrm/cl_transport DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS: abap, trwbo.
 
     TYPES: tyt_lxe_packg TYPE STANDARD TABLE OF /atrm/devclass_range WITH DEFAULT KEY,
            tyt_e071      TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY,
            tyt_e071k     TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY,
            tyt_tline     TYPE STANDARD TABLE OF tline WITH DEFAULT KEY.
+
+    "! Result of a TMS tp call (import, forward, queue maintenance).
+    "! Same component names as type group STMS's STMS_TP_IMPORT, which is not
+    "! on every release: trm-core reads it as XML (/ATRM/IMPORT_TR test_result)
+    TYPES: BEGIN OF ty_tr_request,
+             trkorr  TYPE trkorr,
+             tarcli  TYPE trtarcli,
+             project TYPE trkorr_p,
+             preflg  TYPE trtppreflg,
+             owner   TYPE tmsowner,
+           END OF ty_tr_request,
+           tyt_tp_stdout TYPE STANDARD TABLE OF tpstdout WITH DEFAULT KEY,
+           tyt_tp_logptr TYPE STANDARD TABLE OF tplogptr WITH DEFAULT KEY,
+           BEGIN OF ty_tp_result,
+             request     TYPE ty_tr_request,
+             tp_ret_code TYPE trretcode,
+             tp_alog     TYPE trfile,
+             tp_slog     TYPE trfile,
+             tp_pid      TYPE wppid,
+             tp_stdout   TYPE tyt_tp_stdout,
+             tp_logptr   TYPE tyt_tp_logptr,
+             alert       TYPE stmscalert,
+           END OF ty_tp_result.
 
     "! Constructor
     "! @parameter trkorr | Transport request number
@@ -25,6 +49,8 @@ CLASS /atrm/cl_transport DEFINITION
     CLASS-METHODS create_workbench
       IMPORTING text             TYPE as4text
                 target           TYPE tr_target
+                with_task        TYPE flag OPTIONAL
+                task_type        TYPE trfunction OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 
@@ -137,8 +163,8 @@ CLASS /atrm/cl_transport DEFINITION
     "! @raising /atrm/cx_exception | Raised if import fails
     METHODS import
       IMPORTING system        TYPE tmssysnam
-                test          TYPE stms_flag
-      RETURNING VALUE(import) TYPE stms_tp_import
+                test          TYPE flag
+      RETURNING VALUE(import) TYPE ty_tp_result
       RAISING   /atrm/cx_exception.
 
     "! Release the transport and wait until the update task has completed
@@ -230,8 +256,8 @@ CLASS /atrm/cl_transport DEFINITION
     CLASS-METHODS import_multiple
       IMPORTING system        TYPE tmssysnam
                 transports    TYPE /atrm/trkorr_t
-                test          TYPE stms_flag
-      RETURNING VALUE(import) TYPE stms_tp_import
+                test          TYPE flag
+      RETURNING VALUE(import) TYPE ty_tp_result
       RAISING   /atrm/cx_exception.
 
     METHODS get_entries
@@ -251,15 +277,19 @@ CLASS /atrm/cl_transport DEFINITION
                 exported      TYPE abap_bool DEFAULT abap_true
       RETURNING VALUE(status) TYPE trstatus
       RAISING   /atrm/cx_exception.
+    "! Remove every object entry of the request and of its tasks, with its object lock
+    "! @raising /atrm/cx_exception | First entry that couldn't be removed (the others are attempted)
+    METHODS delete_entries
+      RAISING /atrm/cx_exception.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
     CLASS-METHODS execute_import
       IMPORTING system        TYPE tmssysnam
                 transport     TYPE trkorr
-                test          TYPE stms_flag
-                requests      TYPE stms_tr_requests OPTIONAL
-      RETURNING VALUE(import) TYPE stms_tp_import
+                test          TYPE flag
+                transports    TYPE /atrm/trkorr_t OPTIONAL
+      RETURNING VALUE(import) TYPE ty_tp_result
       RAISING   /atrm/cx_exception.
 
     CLASS-METHODS create
@@ -267,6 +297,7 @@ CLASS /atrm/cl_transport DEFINITION
                 target           TYPE tr_target
                 type             TYPE trfunction
                 attributes       TYPE scts_attrs OPTIONAL
+                users            TYPE scts_users OPTIONAL
       RETURNING VALUE(transport) TYPE REF TO /atrm/cl_transport
       RAISING   /atrm/cx_exception.
 METHODS complete_shi3_entries
@@ -275,6 +306,34 @@ METHODS complete_shi3_entries
       RAISING  /atrm/cx_exception.
 METHODS record_fdt0_entries
       IMPORTING e071 TYPE tyt_e071
+      RAISING   /atrm/cx_exception.
+CLASS-METHODS add_fm_value
+      IMPORTING name   TYPE abap_parmname
+                value  TYPE any
+      CHANGING  params TYPE abap_func_parmbind_tab.
+CLASS-METHODS fm_has_parameter
+      IMPORTING funcname     TYPE rs38l_fnam
+                parameter    TYPE rs38l_par_
+      RETURNING VALUE(found) TYPE flag.
+CLASS-METHODS create_fm_param_data
+      IMPORTING funcname    TYPE rs38l_fnam
+                parameter   TYPE rs38l_par_
+      RETURNING VALUE(data) TYPE REF TO data.
+CLASS-METHODS copy_tp_result
+      IMPORTING source TYPE any
+      CHANGING  result TYPE ty_tp_result.
+CLASS-METHODS bind_fm_result
+      IMPORTING funcname TYPE rs38l_fnam
+                name     TYPE abap_parmname
+                kind     TYPE i
+      CHANGING  value    TYPE any
+                params   TYPE abap_func_parmbind_tab.
+CLASS-METHODS call_tms
+      IMPORTING funcname       TYPE rs38l_fnam
+                result_param   TYPE abap_parmname
+                params         TYPE abap_func_parmbind_tab
+                not_found_text TYPE string
+      RETURNING VALUE(result)  TYPE ty_tp_result
       RAISING   /atrm/cx_exception.
 
     DATA: gv_trkorr TYPE trkorr,
@@ -574,11 +633,25 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD create_workbench.
+    DATA: lt_users TYPE scts_users,
+          ls_user  LIKE LINE OF lt_users.
+    "a task of the current user, for objects recorded in the request (e.g. by RS_CORR_INSERT)
+    IF with_task = 'X'.
+      ls_user-user = sy-uname.
+      "development/correction task, unless the objects need another kind (e.g. R repair)
+      IF task_type IS INITIAL.
+        ls_user-type = 'S'.
+      ELSE.
+        ls_user-type = task_type.
+      ENDIF.
+      APPEND ls_user TO lt_users.
+    ENDIF.
     create(
       EXPORTING
         text      = text
         target    = target
         type      = 'K'
+        users     = lt_users
       RECEIVING
         transport = transport
     ).
@@ -628,6 +701,7 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         iv_type           = type
         iv_target         = target
         it_attributes     = attributes
+        it_users          = users
       IMPORTING
         es_request_header = ls_header
       EXCEPTIONS
@@ -703,89 +777,21 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD forward.
-    DATA: forwards TYPE stms_tp_forwards,
-          result   TYPE stms_tp_forward,
-          stdout   TYPE /atrm/cx_exception=>tyt_log,
-          tpstdout TYPE tpstdout,
-          batch    TYPE sy-batch,
-          found    TYPE flag,
-          subrc    TYPE sy-subrc,
-          msgid    TYPE sy-msgid,
-          msgno    TYPE sy-msgno,
-          msgty    TYPE sy-msgty,
-          msgv1    TYPE sy-msgv1,
-          msgv2    TYPE sy-msgv2,
-          msgv3    TYPE sy-msgv3,
-          msgv4    TYPE sy-msgv4.
+    DATA lt_params TYPE abap_func_parmbind_tab.
 
-    batch = sy-batch.
-    sy-batch = 'X'.
-    CALL FUNCTION 'TMS_MGR_FORWARD_TR_REQUEST'
-      EXPORTING
-        iv_request                 = gv_trkorr
-        iv_target                  = target
-        iv_source                  = source
-        iv_import_again            = import_again
-        iv_monitor                 = ' '
-        iv_verbose                 = 'X'
-      IMPORTING
-        et_tp_forwards             = forwards
-      EXCEPTIONS
-        read_config_failed         = 1
-        table_of_requests_is_empty = 2
-        error_message              = 3
-        OTHERS                     = 4.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = gv_trkorr CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TARGET' value = target CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SOURCE' value = source CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IMPORT_AGAIN' value = import_again CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
 
-    subrc = sy-subrc.
-    msgid = sy-msgid.
-    msgno = sy-msgno.
-    msgty = sy-msgty.
-    msgv1 = sy-msgv1.
-    msgv2 = sy-msgv2.
-    msgv3 = sy-msgv3.
-    msgv4 = sy-msgv4.
-    sy-batch = batch.
-
-    READ TABLE forwards INTO result INDEX 1.
-    IF sy-subrc = 0.
-      found = 'X'.
-      LOOP AT result-tp_stdout INTO tpstdout.
-        APPEND tpstdout-line TO stdout.
-      ENDLOOP.
-      IF result-alert-severity = 'E'
-        OR result-alert-msgty = 'E'
-        OR result-alert-msgty = 'A'.
-        IF result-alert-msgid IS NOT INITIAL
-          AND result-alert-msgno IS NOT INITIAL.
-          sy-msgid = result-alert-msgid.
-          sy-msgno = result-alert-msgno.
-          sy-msgty = result-alert-msgty.
-          sy-msgv1 = result-alert-msgv1.
-          sy-msgv2 = result-alert-msgv2.
-          sy-msgv3 = result-alert-msgv3.
-          sy-msgv4 = result-alert-msgv4.
-        ENDIF.
-        /atrm/cx_exception=>raise( it_log = stdout ).
-      ENDIF.
-    ENDIF.
-
-    IF subrc <> 0.
-      sy-msgid = msgid.
-      sy-msgno = msgno.
-      sy-msgty = msgty.
-      sy-msgv1 = msgv1.
-      sy-msgv2 = msgv2.
-      sy-msgv3 = msgv3.
-      sy-msgv4 = msgv4.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-    IF found IS INITIAL.
-      /atrm/cx_exception=>raise(
-        iv_message = 'No forward status found'              "#EC NOTEXT
-        iv_reason  = /atrm/cx_exception=>c_reason-generic
-      ).
-    ENDIF.
+    call_tms(
+      funcname       = 'TMS_MGR_FORWARD_TR_REQUEST'
+      result_param   = 'ET_TP_FORWARDS'
+      params         = lt_params
+      not_found_text = 'No forward status found'            "#EC NOTEXT
+    ).
   ENDMETHOD.
 
   METHOD import.
@@ -892,19 +898,70 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
           lv_without_lock = 'X'.
         ENDIF.
 
-        CALL FUNCTION 'TRINT_RELEASE_REQUEST'
-          EXPORTING
-            iv_trkorr                = gv_trkorr
-            iv_dialog                = ' '
-            iv_success_message       = ' '
-            iv_display_export_log    = ' '
-            iv_without_objects_check = 'X'
-            iv_without_locking       = lv_without_lock
-            " objects deleted by an already released request have no TADIR entry:
-            " skip their lock (TK313) instead of failing the release with TR776
-            iv_ignore_warnings       = lock
-          EXCEPTIONS
-            OTHERS                   = 1.
+        " IV_IGNORE_WARNINGS does not exist on old releases (e.g. 7.00): passing it dumps
+        IF fm_has_parameter( funcname = 'TRINT_RELEASE_REQUEST' parameter = 'IV_IGNORE_WARNINGS' ) = 'X'.
+          CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+            EXPORTING
+              iv_trkorr                = gv_trkorr
+              iv_dialog                = ' '
+              iv_success_message       = ' '
+              iv_display_export_log    = ' '
+              iv_without_objects_check = 'X'
+              iv_without_locking       = lv_without_lock
+              " objects deleted by an already released request have no TADIR entry:
+              " skip their lock (TK313) instead of failing the release with TR776
+              iv_ignore_warnings       = lock
+            EXCEPTIONS
+              OTHERS                   = 1.
+        ELSE.
+          " Old releases cannot skip TK313 while locking, so a request holding objects
+          " deleted by an already released request fails with TR776 (OBJECT_LOCK_ERROR).
+          " The lock pass has already locked and committed every other object by then:
+          " when TK313 is the only lock error, release again without locking, which only
+          " skips the objects without TADIR entry - the same outcome as IV_IGNORE_WARNINGS
+          DATA: lt_messages   TYPE ctsgerrmsgs,
+                ls_message    TYPE ctsgerrmsg,
+                lv_subrc      TYPE sy-subrc,
+                lv_only_tk313 TYPE flag.
+          CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+            EXPORTING
+              iv_trkorr                = gv_trkorr
+              iv_dialog                = ' '
+              iv_success_message       = ' '
+              iv_display_export_log    = ' '
+              iv_without_objects_check = 'X'
+              iv_without_locking       = lv_without_lock
+            IMPORTING
+              et_messages              = lt_messages
+            EXCEPTIONS
+              object_lock_error        = 1
+              OTHERS                   = 2.
+          lv_subrc = sy-subrc.
+          IF lv_subrc = 1 AND lock = 'X'.
+            LOOP AT lt_messages INTO ls_message WHERE msgty CA 'EAX'.
+              IF ls_message-msgid = 'TK' AND ls_message-msgno = '313'.
+                lv_only_tk313 = 'X'.
+              ELSE.
+                CLEAR lv_only_tk313.
+                EXIT.
+              ENDIF.
+            ENDLOOP.
+            IF lv_only_tk313 = 'X'.
+              CALL FUNCTION 'TRINT_RELEASE_REQUEST'
+                EXPORTING
+                  iv_trkorr                = gv_trkorr
+                  iv_dialog                = ' '
+                  iv_success_message       = ' '
+                  iv_display_export_log    = ' '
+                  iv_without_objects_check = 'X'
+                  iv_without_locking       = 'X'
+                EXCEPTIONS
+                  OTHERS                   = 1.
+              lv_subrc = sy-subrc.
+            ENDIF.
+          ENDIF.
+          sy-subrc = lv_subrc.
+        ENDIF.
         IF sy-subrc <> 0.
           /atrm/cx_exception=>raise( ).
         ENDIF.
@@ -1044,21 +1101,10 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD delete_from_tms_queue.
-    DATA: tmsbuffer TYPE tmsbuffer,
-          maintains TYPE stms_tp_maintains,
-          result    TYPE stms_tp_maintain,
-          stdout    TYPE /atrm/cx_exception=>tyt_log,
-          tpstdout  TYPE tpstdout,
-          batch     TYPE sy-batch,
-          found     TYPE flag,
-          subrc     TYPE sy-subrc,
-          msgid     TYPE sy-msgid,
-          msgno     TYPE sy-msgno,
-          msgty     TYPE sy-msgty,
-          msgv1     TYPE sy-msgv1,
-          msgv2     TYPE sy-msgv2,
-          msgv3     TYPE sy-msgv3,
-          msgv4     TYPE sy-msgv4.
+    DATA: tmsbuffer  TYPE tmsbuffer,
+          lt_params  TYPE abap_func_parmbind_tab,
+          " typed like IV_COMMAND: 7.00 rejects a shorter literal in a dynamic call
+          lv_command TYPE stpa-command VALUE 'DELFROMBUFFER'.
 
     SELECT SINGLE domnam sysnam trkorr tarcli FROM tmsbuffer
       INTO CORRESPONDING FIELDS OF tmsbuffer
@@ -1066,75 +1112,20 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
         AND trkorr EQ gv_trkorr.
     CHECK sy-subrc EQ 0.
 
-    batch = sy-batch.
-    sy-batch = 'X'.
-    CALL FUNCTION 'TMS_MGR_MAINTAIN_TR_QUEUE'
-      EXPORTING
-        iv_command                 = 'DELFROMBUFFER'
-        iv_system                  = tmsbuffer-sysnam
-        iv_domain                  = tmsbuffer-domnam
-        iv_request                 = tmsbuffer-trkorr
-        iv_tarcli                  = tmsbuffer-tarcli
-        iv_monitor                 = ' '
-        iv_verbose                 = 'X'
-      IMPORTING
-        et_tp_maintains            = maintains
-      EXCEPTIONS
-        read_config_failed         = 1
-        table_of_requests_is_empty = 2
-        error_message              = 3
-        OTHERS                     = 4.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_COMMAND' value = lv_command CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = tmsbuffer-sysnam CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_DOMAIN' value = tmsbuffer-domnam CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = tmsbuffer-trkorr CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TARCLI' value = tmsbuffer-tarcli CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
 
-    subrc = sy-subrc.
-    msgid = sy-msgid.
-    msgno = sy-msgno.
-    msgty = sy-msgty.
-    msgv1 = sy-msgv1.
-    msgv2 = sy-msgv2.
-    msgv3 = sy-msgv3.
-    msgv4 = sy-msgv4.
-    sy-batch = batch.
-
-    READ TABLE maintains INTO result INDEX 1.
-    IF sy-subrc = 0.
-      found = 'X'.
-      LOOP AT result-tp_stdout INTO tpstdout.
-        APPEND tpstdout-line TO stdout.
-      ENDLOOP.
-      IF result-alert-severity = 'E'
-        OR result-alert-msgty = 'E'
-        OR result-alert-msgty = 'A'.
-        IF result-alert-msgid IS NOT INITIAL
-          AND result-alert-msgno IS NOT INITIAL.
-          sy-msgid = result-alert-msgid.
-          sy-msgno = result-alert-msgno.
-          sy-msgty = result-alert-msgty.
-          sy-msgv1 = result-alert-msgv1.
-          sy-msgv2 = result-alert-msgv2.
-          sy-msgv3 = result-alert-msgv3.
-          sy-msgv4 = result-alert-msgv4.
-        ENDIF.
-        /atrm/cx_exception=>raise( it_log = stdout ).
-      ENDIF.
-    ENDIF.
-
-    IF subrc <> 0.
-      sy-msgid = msgid.
-      sy-msgno = msgno.
-      sy-msgty = msgty.
-      sy-msgv1 = msgv1.
-      sy-msgv2 = msgv2.
-      sy-msgv3 = msgv3.
-      sy-msgv4 = msgv4.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-    IF found IS INITIAL.
-      /atrm/cx_exception=>raise(
-        iv_message = 'No queue maintenance status found'    "#EC NOTEXT
-        iv_reason  = /atrm/cx_exception=>c_reason-generic
-      ).
-    ENDIF.
+    call_tms(
+      funcname       = 'TMS_MGR_MAINTAIN_TR_QUEUE'
+      result_param   = 'ET_TP_MAINTAINS'
+      params         = lt_params
+      not_found_text = 'No queue maintenance status found'  "#EC NOTEXT
+    ).
   ENDMETHOD.
 
   METHOD refresh_tms_txt.
@@ -1274,9 +1265,8 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD import_multiple.
-    DATA: requests TYPE stms_tr_requests,
-          request  TYPE stms_tr_request,
-          trkorr   TYPE trkorr.
+    DATA: lt_transports TYPE /atrm/trkorr_t,
+          trkorr        TYPE trkorr.
 
     IF transports[] IS INITIAL.
       /atrm/cx_exception=>raise(
@@ -1287,16 +1277,13 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
 
     LOOP AT transports INTO trkorr.
       CHECK trkorr IS NOT INITIAL.
-      READ TABLE requests TRANSPORTING NO FIELDS
-        WITH KEY trkorr = trkorr.
+      READ TABLE lt_transports TRANSPORTING NO FIELDS
+        WITH KEY table_line = trkorr.
       CHECK sy-subrc <> 0.
-      CLEAR request.
-      request-trkorr = trkorr.
-      request-tarcli = sy-mandt.
-      APPEND request TO requests.
+      APPEND trkorr TO lt_transports.
     ENDLOOP.
 
-    IF requests[] IS INITIAL.
+    IF lt_transports[] IS INITIAL.
       /atrm/cx_exception=>raise(
         iv_message = 'No valid transports supplied for batch import' "#EC NOTEXT
         iv_reason  = /atrm/cx_exception=>c_reason-invalid_input
@@ -1304,30 +1291,24 @@ CLASS /atrm/cl_transport IMPLEMENTATION.
     ENDIF.
 
     import = execute_import(
-      system    = system
-      transport = 'SOME'
-      test      = test
-      requests  = requests
+      system     = system
+      transport  = 'SOME'
+      test       = test
+      transports = lt_transports
     ).
   ENDMETHOD.
 
 
-METHOD execute_import.
-    DATA: imports  TYPE stms_tp_imports,
-          stdout   TYPE /atrm/cx_exception=>tyt_log,
-          tpstdout TYPE tpstdout,
-          batch    TYPE sy-batch,
-          subset   TYPE stms_flag,
-          offline  TYPE stms_flag,
-          found    TYPE flag,
-          subrc    TYPE sy-subrc,
-          msgid    TYPE sy-msgid,
-          msgno    TYPE sy-msgno,
-          msgty    TYPE sy-msgty,
-          msgv1    TYPE sy-msgv1,
-          msgv2    TYPE sy-msgv2,
-          msgv3    TYPE sy-msgv3,
-          msgv4    TYPE sy-msgv4.
+  METHOD execute_import.
+    DATA: subset      TYPE flag,
+          offline     TYPE flag,
+          trkorr      TYPE trkorr,
+          lr_requests TYPE REF TO data,
+          lr_request  TYPE REF TO data,
+          lt_params   TYPE abap_func_parmbind_tab.
+    FIELD-SYMBOLS: <lt_requests> TYPE STANDARD TABLE,
+                   <ls_request>  TYPE any,
+                   <lv_field>    TYPE any.
 
     IF transport = 'SOME'.
       subset = 'X'.
@@ -1336,86 +1317,62 @@ METHOD execute_import.
       offline = 'X'.
     ENDIF.
 
-    batch = sy-batch.
-    sy-batch = 'X'.
-    CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
-      EXPORTING
-        iv_system                  = system
-        iv_request                 = transport
-        iv_client                  = sy-mandt
-        iv_ctc_active              = ' '
-        iv_overtake                = ' '
-        iv_import_again            = 'X'
-        iv_ignore_originality      = 'X'
-        iv_ignore_repairs          = ' '
-        iv_ignore_transtype        = ' '
-        iv_ignore_tabletype        = ' '
-        iv_ignore_predec           = 'X'
-        iv_ignore_cvers            = 'X'
-        iv_test_import             = test
-        iv_subset                  = subset
-        iv_offline                 = offline
-        iv_monitor                 = ' '
-        iv_verbose                 = 'X'
-        it_requests                = requests
-      IMPORTING
-        et_tp_imports              = imports
-      EXCEPTIONS
-        read_config_failed         = 1
-        table_of_requests_is_empty = 2
-        error_message              = 3
-        OTHERS                     = 4.
+    " Parameters are bound dynamically because the signature differs by release:
+    " IV_IGNORE_CVERS does not exist on 7.00, and a static call passing it dumps
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = system CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = transport CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CLIENT' value = sy-mandt CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CTC_ACTIVE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OVERTAKE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IMPORT_AGAIN' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_ORIGINALITY' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_REPAIRS' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TRANSTYPE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TABLETYPE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_PREDEC' value = 'X' CHANGING params = lt_params.
+    IF fm_has_parameter( funcname = 'TMS_MGR_IMPORT_TR_REQUEST' parameter = 'IV_IGNORE_CVERS' ) = 'X'.
+      CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_CVERS' value = 'X' CHANGING params = lt_params.
+    ENDIF.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TEST_IMPORT' value = test CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SUBSET' value = subset CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OFFLINE' value = offline CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
 
-    subrc = sy-subrc.
-    msgty = sy-msgty.
-    msgid = sy-msgid.
-    msgno = sy-msgno.
-    msgv1 = sy-msgv1.
-    msgv2 = sy-msgv2.
-    msgv3 = sy-msgv3.
-    msgv4 = sy-msgv4.
-    sy-batch = batch.
-
-    READ TABLE imports INTO import INDEX 1.
-    IF sy-subrc = 0.
-      found = 'X'.
-      LOOP AT import-tp_stdout INTO tpstdout.
-        APPEND tpstdout-line TO stdout.
-      ENDLOOP.
-      IF import-alert-severity = 'E'
-        OR import-alert-msgty = 'E'
-        OR import-alert-msgty = 'A'.
-        IF import-alert-msgid IS NOT INITIAL
-          AND import-alert-msgno IS NOT INITIAL.
-          sy-msgid = import-alert-msgid.
-          sy-msgty = import-alert-msgty.
-          sy-msgno = import-alert-msgno.
-          sy-msgv1 = import-alert-msgv1.
-          sy-msgv2 = import-alert-msgv2.
-          sy-msgv3 = import-alert-msgv3.
-          sy-msgv4 = import-alert-msgv4.
-        ENDIF.
-        /atrm/cx_exception=>raise( it_log = stdout ).
+    " IT_REQUESTS is typed with type group STMS: build it with the type the
+    " function module declares on this release
+    IF transports[] IS NOT INITIAL.
+      lr_requests = create_fm_param_data( funcname = 'TMS_MGR_IMPORT_TR_REQUEST' parameter = 'IT_REQUESTS' ).
+      IF lr_requests IS NOT BOUND.
+        /atrm/cx_exception=>raise(
+          iv_message = 'Batch import is not supported on this release' "#EC NOTEXT
+          iv_reason  = /atrm/cx_exception=>c_reason-generic
+        ).
       ENDIF.
+      ASSIGN lr_requests->* TO <lt_requests>.
+      CREATE DATA lr_request LIKE LINE OF <lt_requests>.
+      ASSIGN lr_request->* TO <ls_request>.
+      LOOP AT transports INTO trkorr.
+        CLEAR <ls_request>.
+        ASSIGN COMPONENT 'TRKORR' OF STRUCTURE <ls_request> TO <lv_field>.
+        IF sy-subrc = 0.
+          <lv_field> = trkorr.
+        ENDIF.
+        ASSIGN COMPONENT 'TARCLI' OF STRUCTURE <ls_request> TO <lv_field>.
+        IF sy-subrc = 0.
+          <lv_field> = sy-mandt.
+        ENDIF.
+        APPEND <ls_request> TO <lt_requests>.
+      ENDLOOP.
+      CALL METHOD add_fm_value EXPORTING name = 'IT_REQUESTS' value = <lt_requests> CHANGING params = lt_params.
     ENDIF.
 
-    IF subrc <> 0.
-      sy-msgid = msgid.
-      sy-msgty = msgty.
-      sy-msgno = msgno.
-      sy-msgv1 = msgv1.
-      sy-msgv2 = msgv2.
-      sy-msgv3 = msgv3.
-      sy-msgv4 = msgv4.
-      /atrm/cx_exception=>raise( ).
-    ENDIF.
-
-    IF found IS INITIAL.
-      /atrm/cx_exception=>raise(
-        iv_message = 'No import status found'               "#EC NOTEXT
-        iv_reason  = /atrm/cx_exception=>c_reason-generic
-      ).
-    ENDIF.
+    import = call_tms(
+      funcname       = 'TMS_MGR_IMPORT_TR_REQUEST'
+      result_param   = 'ET_TP_IMPORTS'
+      params         = lt_params
+      not_found_text = 'No import status found'             "#EC NOTEXT
+    ).
   ENDMETHOD.
 
   METHOD sort_and_compress.
@@ -1680,5 +1637,312 @@ METHOD execute_import.
       INTO TABLE layers
       WHERE version EQ version AND intsys EQ sy-sysid AND consys EQ target.
     SORT layers.
+  ENDMETHOD.
+
+  METHOD delete_entries.
+    DATA: lt_requests TYPE trwbo_requests,
+          ls_request  TYPE trwbo_request,
+          lt_e071     TYPE trwbo_t_e071,
+          ls_e071     TYPE e071,
+          lx_first    TYPE REF TO /atrm/cx_exception,
+          lx_entry    TYPE REF TO /atrm/cx_exception.
+
+    "the request and its tasks, with their entries
+    CALL FUNCTION 'TR_READ_REQUEST_WITH_TASKS'
+      EXPORTING
+        iv_trkorr   = gv_trkorr
+      IMPORTING
+        et_requests = lt_requests
+      EXCEPTIONS
+        OTHERS      = 1.
+    IF sy-subrc <> 0.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    "every entry is attempted, the first failure is raised afterwards
+    LOOP AT lt_requests INTO ls_request.
+      lt_e071 = ls_request-objects.
+      LOOP AT lt_e071 INTO ls_e071.
+        TRY.
+            CALL FUNCTION 'TR_DELETE_COMM_OBJECT_KEYS'
+              EXPORTING
+                is_e071_delete = ls_e071
+                iv_dialog_flag = ' '
+              CHANGING
+                cs_request     = ls_request
+              EXCEPTIONS
+                OTHERS         = 1.
+            IF sy-subrc <> 0.
+              /atrm/cx_exception=>raise( ).
+            ENDIF.
+          CATCH /atrm/cx_exception INTO lx_entry.
+            IF lx_first IS NOT BOUND.
+              lx_first = lx_entry.
+            ENDIF.
+        ENDTRY.
+      ENDLOOP.
+    ENDLOOP.
+
+    IF lx_first IS BOUND.
+      RAISE EXCEPTION lx_first.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD add_fm_value.
+    " Bind a by-value input of a dynamic function call (copied, so literals are safe)
+    CONSTANTS lc_kind_exporting TYPE i VALUE 10. " = abap_func_exporting
+    DATA ls_param TYPE abap_func_parmbind.
+    FIELD-SYMBOLS <value> TYPE any.
+    ls_param-name = name.
+    ls_param-kind = lc_kind_exporting.
+    CREATE DATA ls_param-value LIKE value.
+    ASSIGN ls_param-value->* TO <value>.
+    <value> = value.
+    INSERT ls_param INTO TABLE params.
+  ENDMETHOD.
+
+  METHOD fm_has_parameter.
+    DATA lv_parameter TYPE fupararef-parameter.
+    SELECT SINGLE parameter FROM fupararef INTO lv_parameter
+      WHERE funcname  = funcname
+        AND r3state   = 'A'
+        AND parameter = parameter.
+    IF sy-subrc = 0.
+      found = 'X'.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD create_fm_param_data.
+    " Data object typed like a function module parameter, or unbound when the
+    " parameter (or its type) does not exist on this release. Type group types
+    " (e.g. STMS_TP_IMPORTS) are resolved by absolute name.
+    DATA: lv_type     TYPE fupararef-structure,
+          lv_group    TYPE string,
+          lv_rest     TYPE string,
+          lv_absolute TYPE string.
+
+    SELECT SINGLE structure FROM fupararef INTO lv_type
+      WHERE funcname  = funcname
+        AND r3state   = 'A'
+        AND parameter = parameter.
+    IF sy-subrc <> 0 OR lv_type IS INITIAL.
+      RETURN.
+    ENDIF.
+    TRY.
+        CREATE DATA data TYPE (lv_type).
+      CATCH cx_sy_create_data_error.
+        SPLIT lv_type AT '_' INTO lv_group lv_rest.
+        CONCATENATE '\TYPE-POOL=' lv_group '\TYPE=' lv_type INTO lv_absolute.
+        TRY.
+            CREATE DATA data TYPE (lv_absolute).
+          CATCH cx_sy_create_data_error.
+            CLEAR data.
+        ENDTRY.
+    ENDTRY.
+  ENDMETHOD.
+
+  METHOD copy_tp_result.
+    " Copy one row of a STMS_TP_* table (type group STMS) by component name
+    DATA: ls_stdout TYPE tpstdout,
+          ls_logptr TYPE tplogptr.
+    FIELD-SYMBOLS: <lv_value> TYPE any,
+                   <lt_rows>  TYPE ANY TABLE,
+                   <ls_row>   TYPE any.
+
+    ASSIGN COMPONENT 'REQUEST' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      MOVE-CORRESPONDING <lv_value> TO result-request.
+    ENDIF.
+    ASSIGN COMPONENT 'ALERT' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      MOVE-CORRESPONDING <lv_value> TO result-alert.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_RET_CODE' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      result-tp_ret_code = <lv_value>.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_ALOG' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      result-tp_alog = <lv_value>.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_SLOG' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      result-tp_slog = <lv_value>.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_PID' OF STRUCTURE source TO <lv_value>.
+    IF sy-subrc = 0.
+      result-tp_pid = <lv_value>.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_STDOUT' OF STRUCTURE source TO <lt_rows>.
+    IF sy-subrc = 0.
+      LOOP AT <lt_rows> ASSIGNING <ls_row>.
+        CLEAR ls_stdout.
+        MOVE-CORRESPONDING <ls_row> TO ls_stdout.
+        APPEND ls_stdout TO result-tp_stdout.
+      ENDLOOP.
+    ENDIF.
+    ASSIGN COMPONENT 'TP_LOGPTR' OF STRUCTURE source TO <lt_rows>.
+    IF sy-subrc = 0.
+      LOOP AT <lt_rows> ASSIGNING <ls_row>.
+        CLEAR ls_logptr.
+        MOVE-CORRESPONDING <ls_row> TO ls_logptr.
+        APPEND ls_logptr TO result-tp_logptr.
+      ENDLOOP.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD bind_fm_result.
+    " Bind an output of a dynamic function call, only if the function has it
+    DATA ls_param TYPE abap_func_parmbind.
+    DATA lv_parameter TYPE rs38l_par_.
+    lv_parameter = name.
+    IF fm_has_parameter( funcname = funcname parameter = lv_parameter ) IS INITIAL.
+      RETURN.
+    ENDIF.
+    ls_param-name = name.
+    ls_param-kind = kind.
+    GET REFERENCE OF value INTO ls_param-value.
+    INSERT ls_param INTO TABLE params.
+  ENDMETHOD.
+
+  METHOD call_tms.
+    " Call a TMS_MGR_* function and evaluate its tp result. The ET_TP_* result
+    " tables are typed with type group STMS and are missing on old releases
+    " (SAP_BASIS 700): there the classic single-request outputs are read.
+    CONSTANTS: lc_kind_importing TYPE i VALUE 20, " = abap_func_importing
+               lc_kind_tables    TYPE i VALUE 30. " = abap_func_tables
+    DATA: lt_params   TYPE abap_func_parmbind_tab,
+          ls_param    TYPE abap_func_parmbind,
+          lt_excps    TYPE abap_func_excpbind_tab,
+          ls_excp     TYPE abap_func_excpbind,
+          lr_results  TYPE REF TO data,
+          lv_funcname TYPE rs38l_fnam,
+          stdout      TYPE /atrm/cx_exception=>tyt_log,
+          tpstdout    TYPE tpstdout,
+          batch       TYPE sy-batch,
+          found       TYPE flag,
+          subrc       TYPE sy-subrc,
+          msgid       TYPE sy-msgid,
+          msgno       TYPE sy-msgno,
+          msgty       TYPE sy-msgty,
+          msgv1       TYPE sy-msgv1,
+          msgv2       TYPE sy-msgv2,
+          msgv3       TYPE sy-msgv3,
+          msgv4       TYPE sy-msgv4.
+    FIELD-SYMBOLS: <lt_results> TYPE ANY TABLE,
+                   <ls_result>  TYPE any.
+
+    lt_params = params.
+    lv_funcname = funcname.
+    lr_results = create_fm_param_data( funcname = lv_funcname parameter = result_param ).
+    IF lr_results IS BOUND.
+      ls_param-name = result_param.
+      ls_param-kind = lc_kind_importing.
+      ls_param-value = lr_results.
+      INSERT ls_param INTO TABLE lt_params.
+    ELSE.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'EV_TP_RET_CODE' kind = lc_kind_importing
+        CHANGING  value = result-tp_ret_code params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'EV_TP_ALOG' kind = lc_kind_importing
+        CHANGING  value = result-tp_alog params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'EV_TP_SLOG' kind = lc_kind_importing
+        CHANGING  value = result-tp_slog params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'EV_TP_PID' kind = lc_kind_importing
+        CHANGING  value = result-tp_pid params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'ES_EXCEPTION' kind = lc_kind_importing
+        CHANGING  value = result-alert params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'TT_STDOUT' kind = lc_kind_tables
+        CHANGING  value = result-tp_stdout params = lt_params.
+      CALL METHOD bind_fm_result
+        EXPORTING funcname = lv_funcname name = 'TT_LOGPTR' kind = lc_kind_tables
+        CHANGING  value = result-tp_logptr params = lt_params.
+    ENDIF.
+
+    ls_excp-name = 'READ_CONFIG_FAILED'.
+    ls_excp-value = 1.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'TABLE_OF_REQUESTS_IS_EMPTY'.
+    ls_excp-value = 2.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'ERROR_MESSAGE'.
+    ls_excp-value = 3.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'OTHERS'.
+    ls_excp-value = 4.
+    INSERT ls_excp INTO TABLE lt_excps.
+
+    batch = sy-batch.
+    sy-batch = 'X'.
+    CALL FUNCTION lv_funcname
+      PARAMETER-TABLE lt_params
+      EXCEPTION-TABLE lt_excps.
+
+    subrc = sy-subrc.
+    msgty = sy-msgty.
+    msgid = sy-msgid.
+    msgno = sy-msgno.
+    msgv1 = sy-msgv1.
+    msgv2 = sy-msgv2.
+    msgv3 = sy-msgv3.
+    msgv4 = sy-msgv4.
+    sy-batch = batch.
+
+    IF lr_results IS BOUND.
+      ASSIGN lr_results->* TO <lt_results>.
+      LOOP AT <lt_results> ASSIGNING <ls_result>.
+        found = 'X'.
+        CALL METHOD copy_tp_result
+          EXPORTING source = <ls_result>
+          CHANGING  result = result.
+        EXIT.
+      ENDLOOP.
+    ELSEIF subrc = 0.
+      found = 'X'.
+    ENDIF.
+
+    IF found = 'X'.
+      LOOP AT result-tp_stdout INTO tpstdout.
+        APPEND tpstdout-line TO stdout.
+      ENDLOOP.
+      IF result-alert-severity = 'E'
+        OR result-alert-msgty = 'E'
+        OR result-alert-msgty = 'A'.
+        IF result-alert-msgid IS NOT INITIAL
+          AND result-alert-msgno IS NOT INITIAL.
+          sy-msgid = result-alert-msgid.
+          sy-msgty = result-alert-msgty.
+          sy-msgno = result-alert-msgno.
+          sy-msgv1 = result-alert-msgv1.
+          sy-msgv2 = result-alert-msgv2.
+          sy-msgv3 = result-alert-msgv3.
+          sy-msgv4 = result-alert-msgv4.
+        ENDIF.
+        /atrm/cx_exception=>raise( it_log = stdout ).
+      ENDIF.
+    ENDIF.
+
+    IF subrc <> 0.
+      sy-msgid = msgid.
+      sy-msgty = msgty.
+      sy-msgno = msgno.
+      sy-msgv1 = msgv1.
+      sy-msgv2 = msgv2.
+      sy-msgv3 = msgv3.
+      sy-msgv4 = msgv4.
+      /atrm/cx_exception=>raise( ).
+    ENDIF.
+
+    IF found IS INITIAL.
+      /atrm/cx_exception=>raise(
+        iv_message = not_found_text
+        iv_reason  = /atrm/cx_exception=>c_reason-generic
+      ).
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.

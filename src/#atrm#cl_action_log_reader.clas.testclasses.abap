@@ -1,6 +1,7 @@
 CLASS ltc_attribution DEFINITION FOR TESTING
-  DURATION SHORT
-  RISK LEVEL HARMLESS.
+  "#AU Risk_Level Harmless
+  "#AU Duration Short
+.
   PRIVATE SECTION.
     DATA mt_links TYPE /atrm/cl_action_log_reader=>tyt_links.
     METHODS setup.
@@ -55,18 +56,20 @@ CLASS ltc_attribution IMPLEMENTATION.
   METHOD run_inside_action.
     DATA: lt_rows   TYPE /atrm/cl_action_log_reader=>tyt_tp_rows,
           lt_events TYPE /atrm/cl_action_log_reader=>tyt_events,
-          ls_event  TYPE /atrm/cl_action_log_reader=>ty_event.
+          ls_event  TYPE /atrm/cl_action_log_reader=>ty_event,
+          lv_lines  TYPE i.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100500' iv_step = 'H' CHANGING ct_rows = lt_rows ).
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100510' iv_step = 'A' iv_retcode = '0004' CHANGING ct_rows = lt_rows ).
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100520' iv_step = 'I' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
-    cl_abap_unit_assert=>assert_equals( act = lines( lt_events ) exp = 1 ).
+    lv_lines = lines( lt_events ).
+    cl_aunit_assert=>assert_equals( act = lv_lines exp = 1 ).
     READ TABLE lt_events INTO ls_event INDEX 1.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-action_id exp = 'A1' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-event exp = 'IMPORT' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-retcode exp = '0004' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-outside exp = abap_false ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-detail exp = 'HAI' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-action_id exp = 'A1' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-event exp = 'IMPORT' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-retcode exp = '0004' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-outside exp = abap_false ).
+    cl_aunit_assert=>assert_equals( act = ls_event-detail exp = 'HAI' ).
   ENDMETHOD.
 
   METHOD run_after_action_is_outside.
@@ -76,8 +79,8 @@ CLASS ltc_attribution IMPLEMENTATION.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261103090000' iv_step = 'I' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
     READ TABLE lt_events INTO ls_event INDEX 1.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-action_id exp = 'A1' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-outside exp = abap_true ).
+    cl_aunit_assert=>assert_equals( act = ls_event-action_id exp = 'A1' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-outside exp = abap_true ).
   ENDMETHOD.
 
   METHOD later_action_takes_reimport.
@@ -87,8 +90,8 @@ CLASS ltc_attribution IMPLEMENTATION.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261105100500' iv_step = 'I' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
     READ TABLE lt_events INTO ls_event INDEX 1.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-action_id exp = 'A2' ).
-    cl_abap_unit_assert=>assert_equals( act = ls_event-outside exp = abap_false ).
+    cl_aunit_assert=>assert_equals( act = ls_event-action_id exp = 'A2' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-outside exp = abap_false ).
   ENDMETHOD.
 
   METHOD run_before_any_action_ignored.
@@ -96,22 +99,24 @@ CLASS ltc_attribution IMPLEMENTATION.
           lt_events TYPE /atrm/cl_action_log_reader=>tyt_events.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261001100000' iv_step = 'E' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
-    cl_abap_unit_assert=>assert_initial( lt_events ).
+    cl_aunit_assert=>assert_initial( act = lt_events ).
   ENDMETHOD.
 
   METHOD export_and_import_split.
     DATA: lt_rows   TYPE /atrm/cl_action_log_reader=>tyt_tp_rows,
           lt_events TYPE /atrm/cl_action_log_reader=>tyt_events,
-          ls_event  TYPE /atrm/cl_action_log_reader=>ty_event.
+          ls_event  TYPE /atrm/cl_action_log_reader=>ty_event,
+          lv_lines  TYPE i.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100100' iv_step = 'f' CHANGING ct_rows = lt_rows ).
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100105' iv_step = 'E' CHANGING ct_rows = lt_rows ).
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100200' iv_step = 'I' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
-    cl_abap_unit_assert=>assert_equals( act = lines( lt_events ) exp = 2 ).
+    lv_lines = lines( lt_events ).
+    cl_aunit_assert=>assert_equals( act = lv_lines exp = 2 ).
     READ TABLE lt_events INTO ls_event INDEX 1.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-event exp = 'RELEASE' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-event exp = 'RELEASE' ).
     READ TABLE lt_events INTO ls_event INDEX 2.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-event exp = 'IMPORT' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-event exp = 'IMPORT' ).
   ENDMETHOD.
 
   METHOD run_keeps_monitor_key.
@@ -123,6 +128,6 @@ CLASS ltc_attribution IMPLEMENTATION.
     add_row( EXPORTING iv_trkorr = 'TRMK900010' iv_time = '20261101100510' iv_step = 'I' iv_tpstat = '20261101100510123456' CHANGING ct_rows = lt_rows ).
     lt_events = /atrm/cl_action_log_reader=>attribute_tp_runs( it_tp_rows = lt_rows it_links = mt_links iv_time_zone = 'UTC' ).
     READ TABLE lt_events INTO ls_event INDEX 1.
-    cl_abap_unit_assert=>assert_equals( act = ls_event-tpstat_key exp = '20261101100510123456' ).
+    cl_aunit_assert=>assert_equals( act = ls_event-tpstat_key exp = '20261101100510123456' ).
   ENDMETHOD.
 ENDCLASS.

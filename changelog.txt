@@ -8,6 +8,13 @@ Legend
 + : added
 - : removed
 
+2026-11-13 v8.2.0
+-------------------
++ http base url api (/atrm/get_http_base_url)
+! enho dependencies (r3tr objects, sub-object roots, enhanced function modules)
+* package create on releases without I_SUPPRESS_CORR_INSERT (temporary transport request)
+! /atrm/symsg instead of symsg in exception and post activity messages
+
 2026-11-10 v8.1.0
 -------------------
 + trm logs transaction (action, transport and event log viewer)

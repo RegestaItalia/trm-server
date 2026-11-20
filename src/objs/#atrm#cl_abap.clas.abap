@@ -4,6 +4,7 @@ CLASS /atrm/cl_abap DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES: ty_program        TYPE c LENGTH 180,
            ty_program_src    TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
            ty_src_tokens     TYPE TABLE OF stoken WITH DEFAULT KEY,
@@ -146,22 +147,46 @@ CLASS /atrm/cl_abap IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_clas_programs.
+    " SEOP_METHODS_W_INCLUDE belongs to type group SEOP, which is not loaded
+    " implicitly on 7.00: the result table is typed dynamically
     DATA: lv_classname TYPE seoclsname,
-          lt_includes  TYPE seop_methods_w_include,
-          ls_include   LIKE LINE OF lt_includes.
+          lr_includes  TYPE REF TO data.
+    FIELD-SYMBOLS: <lt_includes> TYPE ANY TABLE,
+                   <ls_include>  TYPE any,
+                   <lv_incname>  TYPE any.
     lv_classname = key-obj_name.
+    TRY.
+        CREATE DATA lr_includes TYPE ('\TYPE-POOL=SEOP\TYPE=SEOP_METHODS_W_INCLUDE').
+      CATCH cx_sy_create_data_error.
+        RETURN.
+    ENDTRY.
+    ASSIGN lr_includes->* TO <lt_includes>.
     TRY.
         CALL METHOD ('CL_OO_CLASSNAME_SERVICE')=>('GET_ALL_METHOD_INCLUDES')
           EXPORTING
             clsname           = lv_classname
             with_enhancements = 'X'
           RECEIVING
-            result = lt_includes
+            result = <lt_includes>
         .
-      CATCH cx_class_not_existent.
+      CATCH cx_sy_dyn_call_param_not_found.
+        " WITH_ENHANCEMENTS is not on every release
+        TRY.
+            CALL METHOD ('CL_OO_CLASSNAME_SERVICE')=>('GET_ALL_METHOD_INCLUDES')
+              EXPORTING
+                clsname = lv_classname
+              RECEIVING
+                result  = <lt_includes>
+            .
+          CATCH cx_root.
+        ENDTRY.
+      CATCH cx_root.
+        " class does not exist (cx_class_not_existent) or API not available
     ENDTRY.
-    LOOP AT lt_includes INTO ls_include.
-      APPEND ls_include-incname TO rt_programs.
+    LOOP AT <lt_includes> ASSIGNING <ls_include>.
+      ASSIGN COMPONENT 'INCNAME' OF STRUCTURE <ls_include> TO <lv_incname>.
+      CHECK sy-subrc = 0.
+      APPEND <lv_incname> TO rt_programs.
     ENDLOOP.
   ENDMETHOD.
 

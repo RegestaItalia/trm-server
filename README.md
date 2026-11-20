@@ -11,7 +11,7 @@
 | Regesta S.p.A.                                  | [https://www.regestaitalia.eu/](https://www.regestaitalia.eu/) |
 | Clarex S.r.l.                                   | [https://www.clarex.it/](https://www.clarex.it/)               |
 
-**Minimum tested release**: SAP_BASIS 702 SP12 (SAP ECC 6.0 EHP2)
+**Minimum tested release**: SAP_BASIS 700 SP12
 
 [trm-server](https://trmregistry.com/package/trm-server) is the server-side component of TRM.
 
@@ -125,7 +125,7 @@ Installation of either package can be performed at any time through this report.
 
 <details>
   <summary>Online install (From registry)</summary><br>
-The online installation is only possible if your system is allowed to connect to the external server <a href="https://trmregistry.com">https://trmregistry.com</a>.
+The online installation is only possible if your system is allowed to <a href="https://trmregistry.com">https://trmregistry.com</a> and the UI add-on/SAP_UI is installed (otherwise the tab is not visible).<br>
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/RegestaItalia/trm-docs/main/docs/assets/server/online.png" alt="ZTRM_INSTALLER">

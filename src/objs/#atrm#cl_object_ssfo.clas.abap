@@ -34,7 +34,8 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
       lo_renderer TYPE REF TO if_ixml_renderer,
       lv_xml     TYPE string,
       lt_results TYPE match_result_tab,
-      lv_value   TYPE string.
+      lv_value   TYPE string,
+      lv_self    TYPE string.
 
     FIELD-SYMBOLS:
       <ls_result>   TYPE match_result,
@@ -47,8 +48,11 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
         lo_form->load( im_formname = lv_form im_active = 'X' ).
         lo_ixml = cl_ixml=>create( ).
         lo_doc = lo_ixml->create_document( ).
-        lo_form->xml_download( EXPORTING parent   = lo_doc
-                               CHANGING  document = lo_doc ).
+        CALL METHOD lo_form->xml_download
+          EXPORTING
+            parent   = lo_doc
+          CHANGING
+            document = lo_doc.
         lo_factory = lo_ixml->create_stream_factory( ).
         lo_stream = lo_factory->create_ostream_cstring( string = lv_xml ).
         lo_renderer = lo_ixml->create_renderer( document = lo_doc
@@ -104,7 +108,8 @@ CLASS /atrm/cl_object_ssfo IMPLEMENTATION.
                      CHANGING  dependencies = dependencies ).
     ENDLOOP.
 
-    DELETE dependencies WHERE tabname = 'TADIR' AND tabkey = 'R3TRSSFO' && me->key-obj_name.
+    CONCATENATE 'R3TRSSFO' me->key-obj_name INTO lv_self.
+    DELETE dependencies WHERE tabname = 'TADIR' AND tabkey = lv_self.
     SORT dependencies BY tabname tabkey.
     DELETE ADJACENT DUPLICATES FROM dependencies COMPARING tabname tabkey.
   ENDMETHOD.

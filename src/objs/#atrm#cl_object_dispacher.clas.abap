@@ -21,6 +21,12 @@ CLASS /atrm/cl_object_dispacher DEFINITION
     CLASS-DATA: dependencies TYPE /atrm/object_dependencies_t,
                 log          TYPE REF TO /ATRM/CL_LOG_POLLING.
   PRIVATE SECTION.
+CLASS-METHODS reading_message
+      IMPORTING package        TYPE devclass
+      RETURNING VALUE(message) TYPE /atrm/polling_last_msg.
+CLASS-METHODS progress_message
+      IMPORTING percentage     TYPE p
+      RETURNING VALUE(message) TYPE /atrm/polling_last_msg.
 ENDCLASS.
 
 
@@ -34,16 +40,17 @@ CLASS /ATRM/CL_OBJECT_DISPACHER IMPLEMENTATION.
           ls_object      LIKE LINE OF lt_objects,
           ls_key         TYPE /atrm/object,
           lo_object      TYPE REF TO /atrm/if_object,
-          lv_total_objs  TYPE decfloat34,
-          lv_counter     TYPE decfloat34,
-          lv_percentage  TYPE decfloat34,
-          lv_percentagep TYPE p LENGTH 3 DECIMALS 1.
+          lv_total_objs  TYPE i,
+          lv_counter     TYPE i,
+          lv_percentage  TYPE p LENGTH 16 DECIMALS 4,
+          lv_message     TYPE /atrm/polling_last_msg.
     FIELD-SYMBOLS <fs_object_deps> TYPE /atrm/object_dependencies.
 
     CREATE OBJECT log EXPORTING id = log_id.
 
     CREATE OBJECT lo_package EXPORTING devclass = package.
-    log->update_message( |Reading "{ package }" objects| ).
+    lv_message = reading_message( package ).
+    log->update_message( lv_message ).
     CALL METHOD lo_package->get_objects
       EXPORTING
         incl_sub = incl_sub
@@ -52,25 +59,23 @@ CLASS /ATRM/CL_OBJECT_DISPACHER IMPLEMENTATION.
     .
     DESCRIBE TABLE lt_objects LINES lv_total_objs.
     CLEAR lv_percentage.
-    CLEAR lv_percentagep.
     CLEAR lv_counter.
     CLEAR /atrm/cl_object_dispacher=>dependencies[].
     LOOP AT lt_objects INTO ls_object.
       lv_counter = sy-tabix.
-      lv_percentagep = lv_percentage.
-      log->update_message( |Finding dependencies ({ lv_percentagep }%)| ).
+      lv_message = progress_message( lv_percentage ).
+      log->update_message( lv_message ).
       CLEAR ls_key.
       CLEAR lo_object.
       UNASSIGN <fs_object_deps>.
       MOVE-CORRESPONDING ls_object TO ls_key.
       APPEND INITIAL LINE TO /atrm/cl_object_dispacher=>dependencies ASSIGNING <fs_object_deps>.
       MOVE-CORRESPONDING ls_key TO <fs_object_deps>.
-      get(
+      CALL METHOD get
         EXPORTING
-          key = ls_key
+          key         = ls_key
         RECEIVING
-          ro_instance = lo_object
-      ).
+          ro_instance = lo_object.
       CALL METHOD lo_object->get_dependencies
         IMPORTING
           dependencies = <fs_object_deps>-dependencies
@@ -105,5 +110,18 @@ CLASS /ATRM/CL_OBJECT_DISPACHER IMPLEMENTATION.
             handler = ro_instance.
       CATCH cx_badi_not_implemented cx_badi_initial_reference.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD reading_message.
+    CONCATENATE 'Reading "' package '" objects' INTO message.
+  ENDMETHOD.
+
+  METHOD progress_message.
+    DATA: lv_percentage TYPE p LENGTH 3 DECIMALS 1,
+          lv_text       TYPE string.
+    lv_percentage = percentage.
+    lv_text = lv_percentage.
+    CONDENSE lv_text.
+    CONCATENATE 'Finding dependencies (' lv_text '%)' INTO message.
   ENDMETHOD.
 ENDCLASS.

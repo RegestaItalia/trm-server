@@ -4,6 +4,7 @@ CLASS /atrm/cl_package DEFINITION
   CREATE PUBLIC .
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
 
     METHODS constructor
       IMPORTING devclass TYPE devclass.
@@ -16,8 +17,9 @@ CLASS /atrm/cl_package DEFINITION
     METHODS delete_tmp
       RAISING /atrm/cx_exception.
 
+    "! All subpackages of the package (recursively), the package itself excluded
     METHODS get_subpackages
-      RETURNING VALUE(subpackages) TYPE cl_pak_package_queries=>tt_subpackage_info.
+      RETURNING VALUE(subpackages) TYPE /atrm/package_devclass_t.
 
     METHODS get_all_packages
       RETURNING VALUE(packages) TYPE /atrm/package_devclass_t.
@@ -95,6 +97,8 @@ CLASS /atrm/cl_package DEFINITION
                 tolerate                   TYPE string OPTIONAL
       RAISING   /atrm/cx_exception.
 
+    "! Saves a package: in transport_request when one is given, otherwise without recording it
+    "! (where the release can skip that, see save_records_changes)
     CLASS-METHODS save
       IMPORTING package           TYPE REF TO if_package
       CHANGING  transport_request TYPE trkorr OPTIONAL
@@ -109,6 +113,32 @@ CLASS /atrm/cl_package DEFINITION
                 method_name TYPE string
       EXPORTING descr       TYPE abap_methdescr
                 found       TYPE flag.
+
+    "! X when IF_PACKAGE~SAVE can't skip recording the package in a request on this release
+    "! (no I_SUPPRESS_CORR_INSERT, e.g. SAP_BASIS 702)
+    CLASS-METHODS save_records_changes
+      RETURNING VALUE(result) TYPE flag.
+
+    "! Consolidation target of a transport layer from this system, blank when it has no route
+    CLASS-METHODS get_layer_target
+      IMPORTING layer         TYPE devlayer
+      RETURNING VALUE(target) TYPE tr_target.
+
+    "! Saves a new transportable package recorded in a temporary workbench request (no task) to the
+    "! target of its transport layer, then removes the request entries and deletes the request: TRM
+    "! ships packages in its own transports. Cleanup is attempted even when saving fails; the save
+    "! failure is raised first, otherwise a cleanup failure
+    "! @parameter request | The temporary request
+    CLASS-METHODS save_in_temporary_request
+      IMPORTING package TYPE REF TO if_package
+      EXPORTING request TYPE trkorr
+      RAISING   /atrm/cx_exception.
+"! Consolidation target of a stored package as CTS determines it (TR_GET_TRANSPORT_TARGET): the
+    "! target of its transport layer, or for the super package layer $SPL the target of its superpackage
+    "! (recursively), blank when there is none or the package doesn't exist
+    CLASS-METHODS get_devclass_target
+      IMPORTING devclass      TYPE devclass
+      RETURNING VALUE(target) TYPE tr_target.
 ENDCLASS.
 
 
@@ -146,7 +176,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       /atrm/cx_exception=>raise( ).
     ENDIF.
 
-    save( package = lo_package ).
+    "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 702),
+    "and without a dialog it finds no request to record it in (TK 599): record it in a temporary one
+    IF ls_data-devclass(1) <> '$' AND lo_package->wbo_korr_flag = 'X' AND save_records_changes( ) = 'X'.
+      save_in_temporary_request( package = lo_package ).
+    ELSE.
+      save( package = lo_package ).
+    ENDIF.
 
     set_changeable( package = lo_package changeable = ' ' suppress_dialog = 'X' ).
 
@@ -203,8 +239,6 @@ CLASS /atrm/cl_package IMPLEMENTATION.
              objecttype TYPE char4,
            END OF ty_ddls_gen_view.
     DATA: lt_devclass      TYPE STANDARD TABLE OF devclass,
-          lt_subpackages   TYPE cl_pak_package_queries=>tt_subpackage_info,
-          ls_subpackage    LIKE LINE OF lt_subpackages,
           lv_devclass      TYPE devclass,
           lt_tadir         LIKE tadir,
           ls_tadir         LIKE LINE OF tadir,
@@ -286,11 +320,20 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 * save package
     TRY.
-        CALL METHOD save
-          EXPORTING
-            package           = lo_package
-          CHANGING
-            transport_request = transport_request.
+        "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 700),
+        "and over RFC it asks for a request in a popup (DYNPRO_SEND_IN_BACKGROUND): record it in a temporary one
+        IF transport_request IS INITIAL
+          AND package_data-devclass(1) <> '$'
+          AND lo_package->wbo_korr_flag = 'X'
+          AND save_records_changes( ) = 'X'.
+          save_in_temporary_request( package = lo_package ).
+        ELSE.
+          CALL METHOD save
+            EXPORTING
+              package           = lo_package
+            CHANGING
+              transport_request = transport_request.
+        ENDIF.
       CATCH /atrm/cx_exception INTO lx_save.
 *   try to undo the changes, exceptions are tolerated
 *   (Note: if successful, this also unlocks the package)
@@ -343,7 +386,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       IF sy-subrc <> 0.
         /atrm/cx_exception=>raise( ).
       ENDIF.
-      save( package = lo_package ).
+      "IF_PACKAGE~SAVE can't skip recording a transportable package on this release (e.g. SAP_BASIS 700),
+      "and over RFC it asks for a request in a popup (DYNPRO_SEND_IN_BACKGROUND): record it in a temporary one
+      IF gv_devclass(1) <> '$' AND lo_package->wbo_korr_flag = 'X' AND save_records_changes( ) = 'X'.
+        save_in_temporary_request( package = lo_package ).
+      ELSE.
+        save( package = lo_package ).
+      ENDIF.
       set_changeable( package                    = lo_package
                       changeable                 = ' '
                       suppress_dialog            = 'D'
@@ -368,48 +417,38 @@ CLASS /atrm/cl_package IMPLEMENTATION.
 
 
   METHOD get_subpackages.
-    TRY.
-        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
-          EXPORTING
-            im_package                    = gv_devclass
-            im_also_local_packages        = 'X'
-          IMPORTING
-            et_subpackages                = subpackages
-          EXCEPTIONS
-            no_package_specified          = 1
-            package_has_no_tdevc_record   = 2
-            package_has_no_tadir_record   = 3
-            package_does_not_exist        = 4
-            invalid_superpackage          = 5
-            no_output_parameter_requested = 6
-            OTHERS                        = 7.
-      CATCH cx_dynamic_check.
-        CALL METHOD ('CL_PAK_PACKAGE_QUERIES')=>('GET_ALL_SUBPACKAGES')
-         EXPORTING
-           im_package                    = gv_devclass
-         IMPORTING
-            et_subpackages                = subpackages
-          EXCEPTIONS
-           no_package_specified          = 1
-           package_has_no_tdevc_record   = 2
-           package_has_no_tadir_record   = 3
-            package_does_not_exist        = 4
-            invalid_superpackage          = 5
-           no_output_parameter_requested = 6
-           OTHERS                        = 7
-.
-    ENDTRY.
+    " Walks TDEVC-PARENTCL level by level instead of calling
+    " CL_PAK_PACKAGE_QUERIES=>GET_ALL_SUBPACKAGES: its result type
+    " TT_SUBPACKAGE_INFO does not exist on SAP_BASIS 700, TDEVC does everywhere.
+    " Local ($) subpackages are included, as with IM_ALSO_LOCAL_PACKAGES = 'X'.
+    DATA: lt_level    TYPE /atrm/package_devclass_t,
+          lt_children TYPE /atrm/package_devclass_t,
+          lv_child    TYPE devclass.
+
+    APPEND gv_devclass TO lt_level.
+    WHILE lt_level IS NOT INITIAL.
+      CLEAR lt_children.
+      SELECT devclass FROM tdevc INTO TABLE lt_children
+        FOR ALL ENTRIES IN lt_level
+        WHERE parentcl = lt_level-table_line.
+      CLEAR lt_level.
+      LOOP AT lt_children INTO lv_child.
+        " guard against inconsistent TDEVC hierarchies (cycles)
+        CHECK lv_child <> gv_devclass.
+        READ TABLE subpackages TRANSPORTING NO FIELDS WITH KEY table_line = lv_child.
+        CHECK sy-subrc <> 0.
+        APPEND lv_child TO subpackages.
+        APPEND lv_child TO lt_level.
+      ENDLOOP.
+    ENDWHILE.
   ENDMETHOD.
 
 
   METHOD get_all_packages.
-    DATA: subpackages TYPE cl_pak_package_queries=>tt_subpackage_info,
-          subpackage  LIKE LINE OF subpackages.
+    DATA subpackages TYPE /atrm/package_devclass_t.
     subpackages = get_subpackages( ).
     APPEND gv_devclass TO packages.
-    LOOP AT subpackages INTO subpackage.
-      APPEND subpackage-package TO packages.
-    ENDLOOP.
+    APPEND LINES OF subpackages TO packages.
   ENDMETHOD.
 
 
@@ -692,7 +731,10 @@ CLASS /atrm/cl_package IMPLEMENTATION.
       lt_parameters = with_ref( parameters = lt_parameters name = 'E_TRANSPORT_REQUEST' kind = cl_abap_objectdescr=>importing ref = lr_ref ).
     ENDIF.
     lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_DIALOG' value = 'X' ).
-    lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_CORR_INSERT' value = 'X' ).
+    "a given request records the package in it; without one, TRM ships packages in its own transports
+    IF transport_request IS NOT SUPPLIED OR transport_request IS INITIAL.
+      lt_parameters = with_value( parameters = lt_parameters name = 'I_SUPPRESS_CORR_INSERT' value = 'X' ).
+    ENDIF.
     IF call_api( instance    = package
                  method_name = 'IF_PACKAGE~SAVE'
                  parameters  = lt_parameters ) <> 0.
@@ -731,5 +773,161 @@ CLASS /atrm/cl_package IMPLEMENTATION.
         ENDIF.
       CATCH cx_sy_move_cast_error.
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD save_records_changes.
+    DATA: ls_methdescr TYPE abap_methdescr,
+          lv_found     TYPE flag.
+
+    CLEAR result.
+    CALL METHOD describe_method
+      EXPORTING
+        method_name = 'IF_PACKAGE~SAVE'
+      IMPORTING
+        descr       = ls_methdescr
+        found       = lv_found.
+    "signature unknown: save as before
+    CHECK lv_found = 'X'.
+    READ TABLE ls_methdescr-parameters TRANSPORTING NO FIELDS WITH KEY name = 'I_SUPPRESS_CORR_INSERT'.
+    IF sy-subrc <> 0.
+      result = 'X'.
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_layer_target.
+    DATA lv_version TYPE tceversion.
+
+    CLEAR target.
+    CHECK layer IS NOT INITIAL.
+    SELECT SINGLE version FROM tcevers INTO lv_version WHERE active EQ 'A'.
+    CHECK sy-subrc = 0.
+    SELECT SINGLE consys FROM tcerele INTO target
+      WHERE version EQ lv_version AND intsys EQ sy-sysid AND translayer EQ layer.
+  ENDMETHOD.
+
+  METHOD save_in_temporary_request.
+    DATA: lo_transport TYPE REF TO /atrm/cl_transport,
+          lv_text      TYPE as4text,
+          lv_layer     TYPE tdevc-pdevclass,
+          lv_target    TYPE tr_target,
+          lv_srcsystem TYPE tadir-srcsystem,
+          lv_task_type TYPE trfunction,
+          lv_request   TYPE trkorr,
+          lv_reason    TYPE string,
+          ls_object    TYPE e071,
+          ls_header    TYPE trwbo_request_header,
+          lx_save      TYPE REF TO /atrm/cx_exception,
+          lx_cleanup   TYPE REF TO /atrm/cx_exception,
+          lt_log       TYPE /atrm/cx_exception=>tyt_log,
+          lv_log       LIKE LINE OF lt_log.
+
+    CLEAR request.
+    "RS_CORR_INSERT checks an existing package as stored: its stored transport layer
+    "decides between a transportable and a local request (a changed layer applies only
+    "once saved). A new package is checked with the layer it is created with
+    SELECT SINGLE pdevclass FROM tdevc INTO lv_layer WHERE devclass = package->package_name.
+    IF sy-subrc <> 0.
+      "the super package layer $SPL takes the target of the superpackage
+      IF package->transport_layer = '$SPL'.
+        lv_target = get_devclass_target( package->super_package_name ).
+      ELSE.
+        lv_target = get_layer_target( package->transport_layer ).
+      ENDIF.
+    ELSE.
+      lv_target = get_devclass_target( package->package_name ).
+      IF lv_target IS INITIAL.
+        "a blank target would get the system's default target: LOCAL creates a local request
+        lv_target = 'LOCAL'.
+      ENDIF.
+    ENDIF.
+    "a package imported from another system is changed in a repair task (SAP_BASIS 700
+    "refuses a correction task with TK 519 and prompts for a request)
+    SELECT SINGLE srcsystem FROM tadir INTO lv_srcsystem
+      WHERE pgmid = 'R3TR' AND object = 'DEVC' AND obj_name = package->package_name.
+    IF sy-subrc = 0 AND lv_srcsystem IS NOT INITIAL AND lv_srcsystem <> sy-sysid.
+      lv_task_type = 'R'.
+    ENDIF.
+    CONCATENATE 'TRM package' package->package_name INTO lv_text SEPARATED BY space.
+    "RS_CORR_INSERT records the package in a task of the current user
+    lo_transport = /atrm/cl_transport=>create_workbench( text      = lv_text
+                                                         target    = lv_target
+                                                         with_task = 'X'
+                                                         task_type = lv_task_type ).
+    request = lo_transport->get_trkorr( ).
+
+    "TR_REQ_CHECK_OBJECT buffers the last checked package in a static (SS_TDEVC) and reads
+    "TDEVC again only for a different package: after an earlier save of this package in the
+    "same session it checks the stale layer and refuses the request with TK 332. Checking
+    "another package first (a read-only check, its result is irrelevant) refreshes it.
+    "A $ package (or a DEVC entry named $...) is refused (TK 301) before the buffer is read
+    SELECT pgmid object obj_name FROM tadir UP TO 1 ROWS
+      INTO (ls_object-pgmid, ls_object-object, ls_object-obj_name)
+      WHERE pgmid = 'R3TR' AND object = 'DEVC'
+        AND devclass <> package->package_name AND devclass NOT LIKE '$%'
+        AND obj_name NOT LIKE '$%'.
+    ENDSELECT.
+    IF sy-subrc = 0.
+      ls_header-trkorr         = request.
+      ls_header-trfunction     = 'K'.
+      ls_header-clients_filled = 'X'.
+      CALL FUNCTION 'TR_REQ_CHECK_OBJECT'
+        EXPORTING
+          is_object         = ls_object
+          is_request_header = ls_header
+        EXCEPTIONS
+          OTHERS            = 1.
+    ENDIF.
+
+    lv_request = request.
+    TRY.
+        save( EXPORTING package = package CHANGING transport_request = lv_request ).
+      CATCH /atrm/cx_exception INTO lx_save.
+    ENDTRY.
+
+    "the request is deleted once its entries (and their object locks) are removed
+    TRY.
+        lo_transport->delete_entries( ).
+        lo_transport->delete( ).
+      CATCH /atrm/cx_exception INTO lx_cleanup.
+    ENDTRY.
+
+    IF lx_cleanup IS BOUND.
+      lv_reason = lx_cleanup->get_text( ).
+      CONCATENATE 'Temporary transport request' request 'of package' package->package_name
+        'could not be deleted:' lv_reason INTO lv_log SEPARATED BY space.
+      APPEND lv_log TO lt_log.
+    ENDIF.
+    IF lx_save IS BOUND.
+      IF lt_log IS INITIAL.
+        RAISE EXCEPTION lx_save.
+      ENDIF.
+      /atrm/cx_exception=>raise( io_root = lx_save it_log = lt_log ).
+    ENDIF.
+    IF lx_cleanup IS BOUND.
+      /atrm/cx_exception=>raise( io_root = lx_cleanup it_log = lt_log ).
+    ENDIF.
+  ENDMETHOD.
+
+  METHOD get_devclass_target.
+    DATA: lv_devclass TYPE devclass,
+          lv_layer    TYPE devlayer,
+          lv_parentcl TYPE devclass.
+
+    CLEAR target.
+    lv_devclass = devclass.
+    "$SPL: the package is transported with its superpackage (TR_GET_TRANSPORT_TARGET follows
+    "PARENTCL the same way); the bound only guards against a TDEVC hierarchy cycle
+    DO 100 TIMES.
+      SELECT SINGLE pdevclass parentcl FROM tdevc INTO (lv_layer, lv_parentcl)
+        WHERE devclass = lv_devclass.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+      IF lv_layer <> '$SPL' OR lv_parentcl IS INITIAL.
+        EXIT.
+      ENDIF.
+      lv_devclass = lv_parentcl.
+    ENDDO.
+    target = get_layer_target( lv_layer ).
   ENDMETHOD.
 ENDCLASS.

@@ -3,6 +3,7 @@ CLASS /atrm/cl_object_ddls DEFINITION
   INHERITING FROM /atrm/cl_object
   CREATE PUBLIC.
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     METHODS /atrm/if_object~get_dependencies REDEFINITION.
   PROTECTED SECTION.
   PRIVATE SECTION.

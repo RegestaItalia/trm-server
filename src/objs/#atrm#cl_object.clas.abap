@@ -70,6 +70,10 @@ CLASS /atrm/cl_object DEFINITION
                 where_clause TYPE string
                 class_field  TYPE fieldname
       CHANGING  dependencies TYPE /atrm/object_dependency_t.
+CLASS-METHODS utf8_to_string
+      IMPORTING utf8          TYPE xstring
+      RETURNING VALUE(string) TYPE string
+      RAISING   cx_sy_conversion_codepage.
   PRIVATE SECTION.
 ENDCLASS.
 
@@ -108,7 +112,9 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           ls_dispatcher_dependencies TYPE /atrm/object_dependencies,
           lt_trm_packages            TYPE /atrm/packages_t,
           lv_devclass                TYPE devclass,
-          ls_trm_package             LIKE LINE OF lt_trm_packages.
+          ls_trm_package             LIKE LINE OF lt_trm_packages,
+          lo_singleton               TYPE REF TO /atrm/cl_singleton,
+          lv_message                 TYPE string.
 
     lv_tabname = 'TADIR'.
     CONCATENATE 'R3TR' object obj_name INTO lv_tabkey.
@@ -119,7 +125,8 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       RETURN.
     ENDLOOP.
 
-    lt_trm_packages = /atrm/cl_singleton=>get( )->get_installed_packages( ).
+    lo_singleton = /atrm/cl_singleton=>get( ).
+    lt_trm_packages = lo_singleton->get_installed_packages( ).
     SELECT SINGLE devclass FROM tadir INTO lv_devclass WHERE pgmid = 'R3TR' AND object = object AND obj_name = obj_name.
     IF sy-subrc EQ 0.
       dependency-tabname = lv_tabname.
@@ -134,9 +141,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
         EXIT.
       ENDLOOP.
     ELSE.
+      CONCATENATE 'R3TR' object obj_name 'is not in TADIR' INTO lv_message SEPARATED BY space.
       /atrm/cx_exception=>raise(
         iv_reason  = /atrm/cx_exception=>c_reason-generic
-        iv_message = 'R3TR ' && object && ' ' && obj_name && ' is not in TADIR'
+        iv_message = lv_message
       ).
     ENDIF.
   ENDMETHOD.
@@ -148,7 +156,9 @@ CLASS /atrm/cl_object IMPLEMENTATION.
           ls_dispatcher_dependencies TYPE /atrm/object_dependencies,
           lt_trm_packages            TYPE /atrm/packages_t,
           lv_devclass                TYPE devclass,
-          ls_trm_package             LIKE LINE OF lt_trm_packages.
+          ls_trm_package             LIKE LINE OF lt_trm_packages,
+          lo_singleton               TYPE REF TO /atrm/cl_singleton,
+          lv_message                 TYPE string.
 
     lv_tabname = 'TFDIR'.
     lv_tabkey = funcname.
@@ -159,7 +169,8 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       RETURN.
     ENDLOOP.
 
-    lt_trm_packages = /atrm/cl_singleton=>get( )->get_installed_packages( ).
+    lo_singleton = /atrm/cl_singleton=>get( ).
+    lt_trm_packages = lo_singleton->get_installed_packages( ).
     SELECT SINGLE tadir~devclass
       FROM tadir
       INNER JOIN v_fdir ON tadir~obj_name = v_fdir~area
@@ -177,9 +188,10 @@ CLASS /atrm/cl_object IMPLEMENTATION.
         EXIT.
       ENDLOOP.
     ELSE.
+      CONCATENATE 'Cannot find function group of' lv_tabkey INTO lv_message SEPARATED BY space.
       /atrm/cx_exception=>raise(
         iv_reason  = /atrm/cx_exception=>c_reason-generic
-        iv_message = 'Cannot find function group of ' && funcname
+        iv_message = lv_message
       ).
     ENDIF.
   ENDMETHOD.
@@ -717,6 +729,14 @@ CLASS /atrm/cl_object IMPLEMENTATION.
       CATCH cx_root.
         " document-model APIs may not exist in the target system
     ENDTRY.
+  ENDMETHOD.
+
+  METHOD utf8_to_string.
+    " CL_ABAP_CODEPAGE is not on 7.00: CL_ABAP_CONV_IN_CE is
+    DATA lo_conv TYPE REF TO cl_abap_conv_in_ce.
+    CHECK utf8 IS NOT INITIAL.
+    lo_conv = cl_abap_conv_in_ce=>create( input = utf8 encoding = 'UTF-8' ).
+    lo_conv->read( IMPORTING data = string ).
   ENDMETHOD.
 ENDCLASS.
 

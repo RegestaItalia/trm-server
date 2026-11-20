@@ -4,6 +4,7 @@ CLASS /atrm/cl_action_log_reader DEFINITION
   CREATE PUBLIC.
 
   PUBLIC SECTION.
+    TYPE-POOLS abap.
     TYPES tyt_actions TYPE STANDARD TABLE OF /atrm/log_act WITH DEFAULT KEY.
     TYPES tyr_session TYPE RANGE OF /atrm/log_session_id.
     TYPES tyr_action TYPE RANGE OF /atrm/log_action_name.

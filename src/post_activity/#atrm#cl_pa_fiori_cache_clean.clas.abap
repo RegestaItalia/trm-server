@@ -5,7 +5,7 @@ CLASS /atrm/cl_pa_fiori_cache_clean DEFINITION
 
   PUBLIC SECTION.
 
-    CONSTANTS trm_pa TYPE flag VALUE 'X' ##NO_TEXT.
+    CONSTANTS trm_pa TYPE flag VALUE 'X'.                   "#EC NOTEXT
 
     TYPES: ty_ui5_repository_ui   TYPE c LENGTH 30.
 

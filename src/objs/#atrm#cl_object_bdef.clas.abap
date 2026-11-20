@@ -27,6 +27,7 @@ CLASS /atrm/cl_object_bdef IMPLEMENTATION.
           lv_prev2      TYPE string,
           lv_next       TYPE string,
           lv_index      TYPE i,
+          lv_position   TYPE i,
           ls_dependency TYPE /atrm/object_dependency.
 
     super->/atrm/if_object~get_dependencies(
@@ -41,13 +42,17 @@ CLASS /atrm/cl_object_bdef IMPLEMENTATION.
     LOOP AT lt_tokens INTO lv_token.
       lv_index = sy-tabix.
       CLEAR: lv_prev1, lv_prev2, lv_next, ls_dependency.
+      " no arithmetic in operand positions on 7.00: compute the index first
       IF lv_index > 1.
-        READ TABLE lt_tokens INTO lv_prev1 INDEX lv_index - 1.
+        lv_position = lv_index - 1.
+        READ TABLE lt_tokens INTO lv_prev1 INDEX lv_position.
       ENDIF.
       IF lv_index > 2.
-        READ TABLE lt_tokens INTO lv_prev2 INDEX lv_index - 2.
+        lv_position = lv_index - 2.
+        READ TABLE lt_tokens INTO lv_prev2 INDEX lv_position.
       ENDIF.
-      READ TABLE lt_tokens INTO lv_next INDEX lv_index + 1.
+      lv_position = lv_index + 1.
+      READ TABLE lt_tokens INTO lv_next INDEX lv_position.
       CHECK lv_next IS NOT INITIAL.
       TRY.
           IF lv_token = 'CLASS' AND lv_prev1 = 'IN' AND lv_prev2 = 'IMPLEMENTATION'.

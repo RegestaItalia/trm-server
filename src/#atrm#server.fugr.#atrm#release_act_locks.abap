@@ -1,8 +1,8 @@
-FUNCTION /atrm/release_act_locks.
+FUNCTION /ATRM/RELEASE_ACT_LOCKS.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
-*"     VALUE(OWNER_TOKEN) TYPE  SYSUUID_C32
+*"     VALUE(OWNER_TOKEN) TYPE  /ATRM/ACT_LOCK_OWNER_TOKEN
 *"     VALUE(KEYS) TYPE  /ATRM/ACT_LOCK_T
 *"  EXCEPTIONS
 *"      TRM_RFC_UNAUTHORIZED

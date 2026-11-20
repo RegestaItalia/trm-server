@@ -69,6 +69,9 @@ PARAMETERS:
 
 SELECTION-SCREEN SKIP.
 
+SELECTION-SCREEN COMMENT /1(77) json_err MODIF ID njs.
+SELECTION-SCREEN COMMENT /1(1) json_spc MODIF ID njs.
+
 SELECTION-SCREEN: BEGIN OF TABBED BLOCK psel FOR 15 LINES,
 TAB (20) offline USER-COMMAND tab2 DEFAULT SCREEN 200,
 TAB (20) online USER-COMMAND tab1 DEFAULT SCREEN 100 MODIF ID jsn,
@@ -132,9 +135,10 @@ CLASS lcl_strust IMPLEMENTATION.
           pse_password    TYPE ssfpabpw,
           temporary_file  TYPE localfile,
           distribute      TYPE ssfflag,
-          credential_name TYPE icm_credname,
+          credential_name TYPE REF TO data,
           is_locked       TYPE flag,
           authority_error TYPE REF TO cx_root.
+    FIELD-SYMBOLS <credential_name> TYPE any.
 
     IF certificate IS INITIAL.
       error = 'Cannot install an empty certificate'.
@@ -246,16 +250,31 @@ CLASS lcl_strust IMPLEMENTATION.
         EXIT.
       ENDIF.
 
-      credential_name = pse_name.
-      CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
-        EXPORTING
-          global              = 1
-          cred_name           = credential_name
-        EXCEPTIONS
-          icm_op_failed       = 1
-          icm_get_serv_failed = 2
-          icm_auth_failed     = 3
-          OTHERS              = 4.
+      " ICM_CREDNAME (and the CRED_NAME parameter) don't exist on older
+      " releases: there, refresh all SSL credentials (GLOBAL = 1) without a name
+      TRY.
+          CREATE DATA credential_name TYPE ('ICM_CREDNAME').
+          ASSIGN credential_name->* TO <credential_name>.
+          <credential_name> = pse_name.
+          CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
+            EXPORTING
+              global              = 1
+              cred_name           = <credential_name>
+            EXCEPTIONS
+              icm_op_failed       = 1
+              icm_get_serv_failed = 2
+              icm_auth_failed     = 3
+              OTHERS              = 4.
+        CATCH cx_sy_create_data_error cx_sy_dyn_call_error.
+          CALL FUNCTION 'ICM_SSL_PSE_CHANGED'
+            EXPORTING
+              global              = 1
+            EXCEPTIONS
+              icm_op_failed       = 1
+              icm_get_serv_failed = 2
+              icm_auth_failed     = 3
+              OTHERS              = 4.
+      ENDTRY.
       IF sy-subrc <> 0.
         error = get_system_error( 'Certificate was saved, but ICM could not be refreshed' ).
       ENDIF.
@@ -294,6 +313,422 @@ CLASS lcl_strust IMPLEMENTATION.
     IF error IS INITIAL.
       error = fallback.
     ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+* SHA-512 in plain ABAP, for releases without CL_ABAP_MESSAGE_DIGEST (e.g. 7.0).
+* 64-bit words are kept as x LENGTH 8 for bit operations; rotations and
+* additions work on four 16-bit limbs held in type i (no int8 before 7.50).
+CLASS lcl_sha512 DEFINITION FINAL.
+  PUBLIC SECTION.
+    TYPES ty_word TYPE x LENGTH 8.
+    CLASS-METHODS hash_b64
+      IMPORTING
+        data        TYPE xstring
+      RETURNING
+        VALUE(hash) TYPE string.
+  PRIVATE SECTION.
+    TYPES: BEGIN OF ty_limbs,
+             l0 TYPE i,
+             l1 TYPE i,
+             l2 TYPE i,
+             l3 TYPE i,
+           END OF ty_limbs.
+    CLASS-DATA constants TYPE xstring.
+    CLASS-METHODS split
+      IMPORTING
+        word         TYPE ty_word
+      RETURNING
+        VALUE(limbs) TYPE ty_limbs.
+    CLASS-METHODS join
+      IMPORTING
+        limbs       TYPE ty_limbs
+      RETURNING
+        VALUE(word) TYPE ty_word.
+    CLASS-METHODS accumulate
+      IMPORTING
+        word TYPE ty_word
+      CHANGING
+        sum  TYPE ty_limbs.
+    CLASS-METHODS rotate
+      IMPORTING
+        limbs       TYPE ty_limbs
+        bits        TYPE i
+        shift_only  TYPE abap_bool DEFAULT abap_false
+      RETURNING
+        VALUE(word) TYPE ty_word.
+    CLASS-METHODS sigma
+      IMPORTING
+        word         TYPE ty_word
+        r1           TYPE i
+        r2           TYPE i
+        r3           TYPE i
+        r3_is_shift  TYPE abap_bool DEFAULT abap_false
+      RETURNING
+        VALUE(result) TYPE ty_word.
+    CLASS-METHODS base64
+      IMPORTING
+        data           TYPE xstring
+      RETURNING
+        VALUE(encoded) TYPE string.
+    CLASS-METHODS load_constants.
+ENDCLASS.
+
+CLASS lcl_sha512 IMPLEMENTATION.
+  METHOD hash_b64.
+    DATA: message    TYPE xstring,
+          padding    TYPE xstring,
+          bit_length TYPE x LENGTH 4,
+          byte_80    TYPE x LENGTH 1 VALUE '80',
+          byte_00    TYPE x LENGTH 1 VALUE '00',
+          length     TYPE i,
+          zeros      TYPE i,
+          blocks     TYPE i,
+          offset     TYPE i,
+          t          TYPE i,
+          w_off      TYPE i,
+          schedule   TYPE x LENGTH 640,
+          h          TYPE x LENGTH 64,
+          digest     TYPE xstring,
+          a          TYPE ty_word,
+          b          TYPE ty_word,
+          c          TYPE ty_word,
+          d          TYPE ty_word,
+          e          TYPE ty_word,
+          f          TYPE ty_word,
+          g          TYPE ty_word,
+          hh         TYPE ty_word,
+          w1         TYPE ty_word,
+          w2         TYPE ty_word,
+          s0         TYPE ty_word,
+          s1         TYPE ty_word,
+          ch         TYPE ty_word,
+          maj        TYPE ty_word,
+          not_e      TYPE ty_word,
+          k          TYPE ty_word,
+          wt         TYPE ty_word,
+          t1         TYPE ty_word,
+          sum        TYPE ty_limbs,
+          i          TYPE i,
+          block      TYPE i,
+          percentage TYPE i,
+          shown      TYPE i VALUE -1,
+          percent_c  TYPE c LENGTH 3,
+          progress   TYPE string.
+
+    IF constants IS INITIAL.
+      load_constants( ).
+    ENDIF.
+
+    " padding: 0x80, zeros up to 112 mod 128, 128-bit big-endian bit length
+    length = xstrlen( data ).
+    zeros = ( 111 - length MOD 128 ) MOD 128.
+    CONCATENATE padding byte_80 INTO padding IN BYTE MODE.
+    DO zeros TIMES.
+      CONCATENATE padding byte_00 INTO padding IN BYTE MODE.
+    ENDDO.
+    DO 12 TIMES.
+      CONCATENATE padding byte_00 INTO padding IN BYTE MODE.
+    ENDDO.
+    bit_length = length * 8.
+    CONCATENATE data padding bit_length INTO message IN BYTE MODE.
+
+    h = constants+640(64).
+    blocks = xstrlen( message ) / 128.
+    offset = 0.
+    DO blocks TIMES.
+      " this is slow (no 64-bit integers before 7.50): show progress, at most once per percent
+      block = sy-index.
+      percentage = ( block * 100 ) DIV blocks.
+      IF percentage <> shown.
+        shown = percentage.
+        percent_c = percentage.
+        CONDENSE percent_c.
+        CONCATENATE 'Calculating release checksum (SHA512 in ABAP):' percent_c INTO progress SEPARATED BY space.
+        CONCATENATE progress '%' INTO progress.
+        CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
+          EXPORTING
+            percentage = percentage
+            text       = progress.
+      ENDIF.
+      schedule+0(128) = message+offset(128).
+      t = 16.
+      WHILE t < 80.
+        w_off = ( t - 2 ) * 8.
+        w1 = schedule+w_off(8).
+        w_off = ( t - 15 ) * 8.
+        w2 = schedule+w_off(8).
+        s1 = sigma( word = w1 r1 = 19 r2 = 61 r3 = 6 r3_is_shift = abap_true ).
+        s0 = sigma( word = w2 r1 = 1 r2 = 8 r3 = 7 r3_is_shift = abap_true ).
+        CLEAR sum.
+        accumulate( EXPORTING word = s1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = s0 CHANGING sum = sum ).
+        w_off = ( t - 7 ) * 8.
+        w1 = schedule+w_off(8).
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        w_off = ( t - 16 ) * 8.
+        w1 = schedule+w_off(8).
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        w_off = t * 8.
+        schedule+w_off(8) = join( sum ).
+        t = t + 1.
+      ENDWHILE.
+
+      a = h+0(8).
+      b = h+8(8).
+      c = h+16(8).
+      d = h+24(8).
+      e = h+32(8).
+      f = h+40(8).
+      g = h+48(8).
+      hh = h+56(8).
+
+      t = 0.
+      WHILE t < 80.
+        w_off = t * 8.
+        k = constants+w_off(8).
+        wt = schedule+w_off(8).
+        s1 = sigma( word = e r1 = 14 r2 = 18 r3 = 41 ).
+        not_e = BIT-NOT e.
+        ch = ( e BIT-AND f ) BIT-XOR ( not_e BIT-AND g ).
+        CLEAR sum.
+        accumulate( EXPORTING word = hh CHANGING sum = sum ).
+        accumulate( EXPORTING word = s1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = ch CHANGING sum = sum ).
+        accumulate( EXPORTING word = k CHANGING sum = sum ).
+        accumulate( EXPORTING word = wt CHANGING sum = sum ).
+        t1 = join( sum ).
+        s0 = sigma( word = a r1 = 28 r2 = 34 r3 = 39 ).
+        maj = ( a BIT-AND b ) BIT-XOR ( a BIT-AND c ) BIT-XOR ( b BIT-AND c ).
+        hh = g.
+        g = f.
+        f = e.
+        CLEAR sum.
+        accumulate( EXPORTING word = d CHANGING sum = sum ).
+        accumulate( EXPORTING word = t1 CHANGING sum = sum ).
+        e = join( sum ).
+        d = c.
+        c = b.
+        b = a.
+        CLEAR sum.
+        accumulate( EXPORTING word = t1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = s0 CHANGING sum = sum ).
+        accumulate( EXPORTING word = maj CHANGING sum = sum ).
+        a = join( sum ).
+        t = t + 1.
+      ENDWHILE.
+
+      i = 0.
+      DO 8 TIMES.
+        w_off = i * 8.
+        CASE i.
+          WHEN 0. w1 = a.
+          WHEN 1. w1 = b.
+          WHEN 2. w1 = c.
+          WHEN 3. w1 = d.
+          WHEN 4. w1 = e.
+          WHEN 5. w1 = f.
+          WHEN 6. w1 = g.
+          WHEN 7. w1 = hh.
+        ENDCASE.
+        w2 = h+w_off(8).
+        CLEAR sum.
+        accumulate( EXPORTING word = w1 CHANGING sum = sum ).
+        accumulate( EXPORTING word = w2 CHANGING sum = sum ).
+        h+w_off(8) = join( sum ).
+        i = i + 1.
+      ENDDO.
+
+      offset = offset + 128.
+    ENDDO.
+
+    digest = h.
+    hash = base64( digest ).
+  ENDMETHOD.
+
+  METHOD split.
+    DATA half TYPE x LENGTH 2.
+    half = word+0(2).
+    limbs-l0 = half.
+    half = word+2(2).
+    limbs-l1 = half.
+    half = word+4(2).
+    limbs-l2 = half.
+    half = word+6(2).
+    limbs-l3 = half.
+  ENDMETHOD.
+
+  METHOD join.
+    DATA: normalized TYPE ty_limbs,
+          carry      TYPE i,
+          half       TYPE x LENGTH 2.
+    normalized = limbs.
+    carry = normalized-l3 DIV 65536.
+    normalized-l3 = normalized-l3 MOD 65536.
+    normalized-l2 = normalized-l2 + carry.
+    carry = normalized-l2 DIV 65536.
+    normalized-l2 = normalized-l2 MOD 65536.
+    normalized-l1 = normalized-l1 + carry.
+    carry = normalized-l1 DIV 65536.
+    normalized-l1 = normalized-l1 MOD 65536.
+    normalized-l0 = ( normalized-l0 + carry ) MOD 65536.
+    half = normalized-l0.
+    word+0(2) = half.
+    half = normalized-l1.
+    word+2(2) = half.
+    half = normalized-l2.
+    word+4(2) = half.
+    half = normalized-l3.
+    word+6(2) = half.
+  ENDMETHOD.
+
+  METHOD accumulate.
+    DATA limbs TYPE ty_limbs.
+    limbs = split( word ).
+    sum-l0 = sum-l0 + limbs-l0.
+    sum-l1 = sum-l1 + limbs-l1.
+    sum-l2 = sum-l2 + limbs-l2.
+    sum-l3 = sum-l3 + limbs-l3.
+  ENDMETHOD.
+
+  METHOD rotate.
+    " rotate (or shift) right a 64-bit word given as limbs, l0 most significant
+    DATA: moved    TYPE ty_limbs,
+          result   TYPE ty_limbs,
+          wrap     TYPE i,
+          divisor  TYPE i,
+          factor   TYPE i,
+          bit_part TYPE i,
+          quarter  TYPE i.
+
+    quarter = bits DIV 16.
+    CASE quarter.
+      WHEN 0.
+        moved = limbs.
+      WHEN 1.
+        moved-l0 = limbs-l3.
+        moved-l1 = limbs-l0.
+        moved-l2 = limbs-l1.
+        moved-l3 = limbs-l2.
+      WHEN 2.
+        moved-l0 = limbs-l2.
+        moved-l1 = limbs-l3.
+        moved-l2 = limbs-l0.
+        moved-l3 = limbs-l1.
+      WHEN 3.
+        moved-l0 = limbs-l1.
+        moved-l1 = limbs-l2.
+        moved-l2 = limbs-l3.
+        moved-l3 = limbs-l0.
+    ENDCASE.
+
+    " shift_only is used with bits < 16 only (SHA-512 shifts by 6 and 7)
+    IF shift_only = abap_true.
+      wrap = 0.
+    ELSE.
+      wrap = moved-l3.
+    ENDIF.
+
+    bit_part = bits MOD 16.
+    IF bit_part = 0.
+      result = moved.
+      IF shift_only = abap_true.
+        CLEAR result-l0.
+      ENDIF.
+    ELSE.
+      divisor = 1.
+      DO bit_part TIMES.
+        divisor = divisor * 2.
+      ENDDO.
+      factor = 65536 DIV divisor.
+      result-l0 = moved-l0 DIV divisor + ( wrap MOD divisor ) * factor.
+      result-l1 = moved-l1 DIV divisor + ( moved-l0 MOD divisor ) * factor.
+      result-l2 = moved-l2 DIV divisor + ( moved-l1 MOD divisor ) * factor.
+      result-l3 = moved-l3 DIV divisor + ( moved-l2 MOD divisor ) * factor.
+    ENDIF.
+    word = join( result ).
+  ENDMETHOD.
+
+  METHOD sigma.
+    DATA: limbs TYPE ty_limbs,
+          x1    TYPE ty_word,
+          x2    TYPE ty_word,
+          x3    TYPE ty_word.
+    limbs = split( word ).
+    x1 = rotate( limbs = limbs bits = r1 ).
+    x2 = rotate( limbs = limbs bits = r2 ).
+    x3 = rotate( limbs = limbs bits = r3 shift_only = r3_is_shift ).
+    result = x1 BIT-XOR x2 BIT-XOR x3.
+  ENDMETHOD.
+
+  METHOD base64.
+    DATA alphabet TYPE c LENGTH 64
+      VALUE 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.
+    DATA: length TYPE i,
+          offset TYPE i,
+          rest   TYPE i,
+          group  TYPE x LENGTH 3,
+          value  TYPE i,
+          index  TYPE i,
+          chars  TYPE c LENGTH 4.
+
+    length = xstrlen( data ).
+    offset = 0.
+    WHILE offset < length.
+      rest = length - offset.
+      CLEAR group.
+      IF rest >= 3.
+        group = data+offset(3).
+      ELSE.
+        group+0(rest) = data+offset(rest).
+      ENDIF.
+      value = group.
+      index = value DIV 262144.
+      chars+0(1) = alphabet+index(1).
+      index = ( value DIV 4096 ) MOD 64.
+      chars+1(1) = alphabet+index(1).
+      index = ( value DIV 64 ) MOD 64.
+      chars+2(1) = alphabet+index(1).
+      index = value MOD 64.
+      chars+3(1) = alphabet+index(1).
+      IF rest = 1.
+        chars+2(2) = '=='.
+      ELSEIF rest = 2.
+        chars+3(1) = '='.
+      ENDIF.
+      CONCATENATE encoded chars INTO encoded.
+      offset = offset + 3.
+    ENDWHILE.
+  ENDMETHOD.
+
+  METHOD load_constants.
+    DATA hex TYPE string.
+    " 80 round constants (640 bytes), then the 8 initial hash values (64 bytes)
+    CONCATENATE
+      '428A2F98D728AE227137449123EF65CDB5C0FBCFEC4D3B2FE9B5DBA58189DBBC'
+      '3956C25BF348B53859F111F1B605D019923F82A4AF194F9BAB1C5ED5DA6D8118'
+      'D807AA98A303024212835B0145706FBE243185BE4EE4B28C550C7DC3D5FFB4E2'
+      '72BE5D74F27B896F80DEB1FE3B1696B19BDC06A725C71235C19BF174CF692694'
+      'E49B69C19EF14AD2EFBE4786384F25E30FC19DC68B8CD5B5240CA1CC77AC9C65'
+      '2DE92C6F592B02754A7484AA6EA6E4835CB0A9DCBD41FBD476F988DA831153B5'
+      '983E5152EE66DFABA831C66D2DB43210B00327C898FB213FBF597FC7BEEF0EE4'
+      'C6E00BF33DA88FC2D5A79147930AA72506CA6351E003826F142929670A0E6E70'
+      '27B70A8546D22FFC2E1B21385C26C9264D2C6DFC5AC42AED53380D139D95B3DF'
+      '650A73548BAF63DE766A0ABB3C77B2A881C2C92E47EDAEE692722C851482353B'
+      'A2BFE8A14CF10364A81A664BBC423001C24B8B70D0F89791C76C51A30654BE30'
+      'D192E819D6EF5218D69906245565A910F40E35855771202A106AA07032BBD1B8'
+      '19A4C116B8D2D0C81E376C085141AB532748774CDF8EEB9934B0BCB5E19B48A8'
+      '391C0CB3C5C95A634ED8AA4AE3418ACB5B9CCA4F7763E373682E6FF3D6B2B8A3'
+      '748F82EE5DEFB2FC78A5636F43172F6084C87814A1F0AB728CC702081A6439EC'
+      '90BEFFFA23631E28A4506CEBDE82BDE9BEF9A3F7B2C67915C67178F2E372532B'
+      'CA273ECEEA26619CD186B8C721C0C207EADA7DD6CDE0EB1EF57D4F7FEE6ED178'
+      '06F067AA72176FBA0A637DC5A2C898A6113F9804BEF90DAE1B710B35131C471B'
+      '28DB77F523047D8432CAAB7B40C724933C9EBE0A15C9BEBC431D67C49C100D4C'
+      '4CC5D4BECB3E42B6597F299CFC657E2A5FCB6FAB3AD6FAEC6C44198C4A475817'
+      '6A09E667F3BCC908BB67AE8584CAA73B3C6EF372FE94F82BA54FF53A5F1D36F1'
+      '510E527FADE682D19B05688C2B3E6C1F1F83D9ABFB41BD6B5BE0CD19137E2179'
+      INTO hex.
+    constants = hex.
   ENDMETHOD.
 ENDCLASS.
 
@@ -368,6 +803,12 @@ CLASS lcl_report DEFINITION.
     METHODS write_log
       IMPORTING
         iv_response TYPE string.
+    METHODS log_missing_zip_entry
+      IMPORTING
+        zip      TYPE REF TO cl_abap_zip
+        expected TYPE string
+        context  TYPE string
+        prefix   TYPE string OPTIONAL.
     METHODS run_offline
       EXPORTING
         ok_server TYPE flag
@@ -405,7 +846,8 @@ CLASS lcl_report DEFINITION.
     CLASS-METHODS write_binary_file
       IMPORTING file_path      TYPE string
                 file           TYPE xstring
-      RETURNING VALUE(written) TYPE flag.
+      EXPORTING written        TYPE flag
+                error          TYPE string.
     CLASS-METHODS get_file_sys
       EXPORTING file_sys TYPE filesys.
     CLASS-METHODS delete_from_tms_queue
@@ -423,6 +865,14 @@ CLASS lcl_report DEFINITION.
                 system   TYPE tmssysnam
       EXPORTING subrc    TYPE i
                 tpstdout TYPE t_tpstdout.
+    CLASS-METHODS add_fm_value
+      IMPORTING name   TYPE abap_parmname
+                value  TYPE any
+      CHANGING  params TYPE abap_func_parmbind_tab.
+    CLASS-METHODS fm_has_parameter
+      IMPORTING funcname     TYPE rs38l_fnam
+                parameter    TYPE rs38l_par_
+      RETURNING VALUE(found) TYPE flag.
     CLASS-METHODS rebuild_hierarchy
       IMPORTING
         it_packages         TYPE ty_package_tab
@@ -555,8 +1005,6 @@ CLASS lcl_report IMPLEMENTATION.
     DATA: encoded_certificates TYPE STANDARD TABLE OF string WITH DEFAULT KEY,
           encoded_certificate  TYPE string,
           certificate          TYPE xstring,
-          certificate_object   TYPE REF TO cl_abap_x509_certificate,
-          certificate_error    TYPE REF TO cx_abap_x509_certificate,
           install_error        TYPE string.
 
 * BEGIN AUTO-GENERATED REGISTRY CERTIFICATES
@@ -658,15 +1106,21 @@ CLASS lcl_report IMPLEMENTATION.
 * END AUTO-GENERATED REGISTRY CERTIFICATES
 
     LOOP AT encoded_certificates INTO encoded_certificate.
-      TRY.
-          CREATE OBJECT certificate_object
-            EXPORTING
-              if_certificate = encoded_certificate.
-          certificate = certificate_object->get_certificate( ).
-        CATCH cx_abap_x509_certificate INTO certificate_error.
-          MESSAGE certificate_error TYPE 'I' DISPLAY LIKE 'E'.
-          RETURN.
-      ENDTRY.
+      " CL_ABAP_X509_CERTIFICATE doesn't exist on older releases (e.g. 7.0):
+      " the certificates are base64 DER, so decoding them is all that's needed
+      CLEAR certificate.
+      CALL FUNCTION 'SSFC_BASE64_DECODE'
+        EXPORTING
+          b64data = encoded_certificate
+        IMPORTING
+          bindata = certificate
+        EXCEPTIONS
+          OTHERS  = 1.
+      IF sy-subrc <> 0 OR certificate IS INITIAL.
+        install_error = 'Registry certificate could not be decoded'.
+        MESSAGE install_error TYPE 'I' DISPLAY LIKE 'E'.
+        RETURN.
+      ENDIF.
 
       install_error = lcl_strust=>add_certificate(
         application = p_id
@@ -840,8 +1294,17 @@ CLASS lcl_report IMPLEMENTATION.
           RECEIVING
             data               = file.
       CATCH cx_sy_dyn_call_error.
-        file = client->response->get_data(
-          vscan_scan_always = vscan_check ).
+        " older releases: GET_DATA has no VIRUS_SCAN_PROFILE parameter
+        TRY.
+            CALL METHOD client->response->('GET_DATA')
+              EXPORTING
+                vscan_scan_always = vscan_check
+              RECEIVING
+                data              = file.
+          CATCH cx_sy_dyn_call_error.
+            " even older releases: no virus scan parameters at all
+            file = client->response->get_data( ).
+        ENDTRY.
     ENDTRY.
     client->close( ).
     IF file IS INITIAL.
@@ -1114,6 +1577,39 @@ CLASS lcl_report IMPLEMENTATION.
         txt2  = ''.
   ENDMETHOD.
 
+  METHOD log_missing_zip_entry.
+    DATA: file     TYPE cl_abap_zip=>t_file,
+          log_text TYPE string,
+          size     TYPE string,
+          found    TYPE flag,
+          pattern  TYPE string.
+    CONCATENATE prefix '*' INTO pattern.
+    CONCATENATE 'Expected entry' expected 'in' context 'but it was not found.'
+      INTO log_text SEPARATED BY space.
+    write_log( log_text ).
+    IF prefix IS INITIAL.
+      write_log( 'Entries found:' ).
+    ELSE.
+      CONCATENATE 'Entries found in' prefix INTO log_text SEPARATED BY space.
+      CONCATENATE log_text ':' INTO log_text.
+      write_log( log_text ).
+    ENDIF.
+    LOOP AT zip->files INTO file.
+      IF prefix IS NOT INITIAL AND file-name NP pattern.
+        CONTINUE.
+      ENDIF.
+      found = 'X'.
+      size = file-size.
+      CONDENSE size.
+      CONCATENATE '  -' file-name '(' INTO log_text SEPARATED BY space.
+      CONCATENATE log_text size ' bytes)' INTO log_text.
+      write_log( log_text ).
+    ENDLOOP.
+    IF found IS INITIAL.
+      write_log( '  (none)' ).
+    ENDIF.
+  ENDMETHOD.
+
   METHOD write_log.
     DATA:
       lt_lines TYPE TABLE OF string,
@@ -1163,6 +1659,8 @@ CLASS lcl_report IMPLEMENTATION.
   METHOD run_online.
     DATA:
       code        TYPE i,
+      code_text   TYPE string,
+      log_text    TYPE string,
       request_ok  TYPE flag,
       download_ok TYPE flag,
       client      TYPE REF TO if_http_client,
@@ -1194,7 +1692,9 @@ CLASS lcl_report IMPLEMENTATION.
         code   = code
         reason = reason ).
     IF code <> 200.
-      write_log( 'TRM Registry is unreachable! Code ' && code ).
+      code_text = code.
+      CONCATENATE 'TRM Registry is unreachable! Code' code_text INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'TRM Registry is unreachable!' ).
       client->close( ).
       RETURN.
@@ -1260,25 +1760,39 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS          = 1.
   ENDMETHOD.
   METHOD write_binary_file.
-    OPEN DATASET file_path FOR OUTPUT IN BINARY MODE.
-    IF sy-subrc <> 0.
-      RETURN.
-    ENDIF.
-    TRANSFER file TO file_path.
-    IF sy-subrc = 0.
-      written = 'X'.
-    ENDIF.
-    CLOSE DATASET file_path.
+    DATA: os_message TYPE c LENGTH 255,
+          exception  TYPE REF TO cx_root.
+    CLEAR: written, error.
+    TRY.
+        OPEN DATASET file_path FOR OUTPUT IN BINARY MODE MESSAGE os_message.
+        IF sy-subrc <> 0.
+          " os_message holds the operating system error (e.g. path not found, access denied)
+          error = os_message.
+          IF error IS INITIAL.
+            error = 'OPEN DATASET failed (no operating system message)'.
+          ENDIF.
+          RETURN.
+        ENDIF.
+        TRANSFER file TO file_path.
+        written = 'X'.
+        CLOSE DATASET file_path.
+      CATCH cx_root INTO exception.
+        " e.g. CX_SY_FILE_AUTHORITY (missing S_DATASET), CX_SY_FILE_OPEN, CX_SY_FILE_IO
+        error = exception->get_text( ).
+        CLEAR written.
+        CLOSE DATASET file_path.
+    ENDTRY.
   ENDMETHOD.
   METHOD get_file_sys.
     SELECT SINGLE filesys INTO file_sys FROM opsystem WHERE opsys = sy-opsys.
   ENDMETHOD.
   METHOD delete_from_tms_queue.
-    DATA: ls_tmsbuffer    TYPE tmsbuffer,
-          lt_tp_maintains TYPE stms_tp_maintains,
-          ls_tp_maintains LIKE LINE OF lt_tp_maintains,
-          ls_tpstdout     TYPE tpstdout,
-          ls_exception    TYPE stmscalert.
+    " STMS_TP_MAINTAINS / ET_TP_MAINTAINS don't exist on older releases (e.g. 7.0):
+    " for a single request TT_STDOUT holds the same tp output
+    DATA: ls_tmsbuffer TYPE tmsbuffer,
+          lt_tpstdout  TYPE t_tpstdout,
+          ls_tpstdout  TYPE tpstdout,
+          ls_exception TYPE stmscalert.
 
     SELECT SINGLE * FROM tmsbuffer INTO ls_tmsbuffer WHERE sysnam EQ system AND trkorr EQ trkorr.
     CHECK sy-subrc EQ 0.
@@ -1293,20 +1807,18 @@ CLASS lcl_report IMPLEMENTATION.
         iv_monitor                 = ' '
         iv_verbose                 = ' '
       IMPORTING
-        et_tp_maintains            = lt_tp_maintains
         es_exception               = ls_exception
+      TABLES
+        tt_stdout                  = lt_tpstdout
       EXCEPTIONS
         read_config_failed         = 1
         table_of_requests_is_empty = 2
         OTHERS                     = 3.
 
     IF sy-subrc <> 0 OR ( ls_exception-error <> 'OK' AND ls_exception-error <> space ).
-      IF lt_tp_maintains[] IS NOT INITIAL.
-        READ TABLE lt_tp_maintains INTO ls_tp_maintains INDEX 1.
-        LOOP AT ls_tp_maintains-tp_stdout INTO ls_tpstdout.
-          WRITE: /, ls_tpstdout-line.
-        ENDLOOP.
-      ENDIF.
+      LOOP AT lt_tpstdout INTO ls_tpstdout.
+        WRITE: /, ls_tpstdout-line.
+      ENDLOOP.
       subrc = 1.
     ELSE.
       subrc = 0.
@@ -1340,6 +1852,28 @@ CLASS lcl_report IMPLEMENTATION.
       subrc = 0.
     ENDIF.
   ENDMETHOD.
+  METHOD add_fm_value.
+    " Bind a by-value input of a dynamic function call (copied, so literals are safe)
+    CONSTANTS lc_kind_exporting TYPE i VALUE 10. " = abap_func_exporting
+    DATA ls_param TYPE abap_func_parmbind.
+    FIELD-SYMBOLS <value> TYPE any.
+    ls_param-name = name.
+    ls_param-kind = lc_kind_exporting.
+    CREATE DATA ls_param-value LIKE value.
+    ASSIGN ls_param-value->* TO <value>.
+    <value> = value.
+    INSERT ls_param INTO TABLE params.
+  ENDMETHOD.
+  METHOD fm_has_parameter.
+    DATA lv_parameter TYPE fupararef-parameter.
+    SELECT SINGLE parameter FROM fupararef INTO lv_parameter
+      WHERE funcname = funcname
+        AND r3state  = 'A'
+        AND parameter = parameter.
+    IF sy-subrc = 0.
+      found = 'X'.
+    ENDIF.
+  ENDMETHOD.
   METHOD import.
     DATA: msgid   TYPE sy-msgid,
           msgno   TYPE sy-msgno,
@@ -1347,33 +1881,55 @@ CLASS lcl_report IMPLEMENTATION.
           msgv1   TYPE sy-msgv1,
           msgv2   TYPE sy-msgv2,
           msgv3   TYPE sy-msgv3,
-          msgv4   TYPE sy-msgv4,
-          imports TYPE stms_tp_imports,
-          import  LIKE LINE OF imports.
+          msgv4     TYPE sy-msgv4,
+          exception TYPE stmscalert,
+          lt_params TYPE abap_func_parmbind_tab,
+          ls_param  TYPE abap_func_parmbind,
+          lt_excps  TYPE abap_func_excpbind_tab,
+          ls_excp   TYPE abap_func_excpbind.
+    CONSTANTS: lc_kind_importing TYPE i VALUE 20, " = abap_func_importing
+               lc_kind_tables    TYPE i VALUE 30. " = abap_func_tables
+    " ES_EXCEPTION and TT_STDOUT are used instead of ET_TP_IMPORTS: for a single
+    " request they hold the same alert and tp output, and are present on every release
+    CLEAR tpstdout.
+    " Parameters are bound dynamically because the signature differs by release:
+    " IV_IGNORE_CVERS does not exist on 7.00, and a static call passing it dumps
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SYSTEM' value = system CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_REQUEST' value = trkorr CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CLIENT' value = sy-mandt CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_CTC_ACTIVE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OVERTAKE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IMPORT_AGAIN' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_ORIGINALITY' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_REPAIRS' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TRANSTYPE' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_TABLETYPE' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_PREDEC' value = 'X' CHANGING params = lt_params.
+    IF fm_has_parameter( funcname = 'TMS_MGR_IMPORT_TR_REQUEST' parameter = 'IV_IGNORE_CVERS' ) = 'X'.
+      CALL METHOD add_fm_value EXPORTING name = 'IV_IGNORE_CVERS' value = 'X' CHANGING params = lt_params.
+    ENDIF.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_TEST_IMPORT' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_SUBSET' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_OFFLINE' value = ' ' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_MONITOR' value = 'X' CHANGING params = lt_params.
+    CALL METHOD add_fm_value EXPORTING name = 'IV_VERBOSE' value = 'X' CHANGING params = lt_params.
+    ls_param-name = 'ES_EXCEPTION'.
+    ls_param-kind = lc_kind_importing.
+    GET REFERENCE OF exception INTO ls_param-value.
+    INSERT ls_param INTO TABLE lt_params.
+    ls_param-name = 'TT_STDOUT'.
+    ls_param-kind = lc_kind_tables.
+    GET REFERENCE OF tpstdout INTO ls_param-value.
+    INSERT ls_param INTO TABLE lt_params.
+    ls_excp-name = 'ERROR_MESSAGE'.
+    ls_excp-value = 1.
+    INSERT ls_excp INTO TABLE lt_excps.
+    ls_excp-name = 'OTHERS'.
+    ls_excp-value = 2.
+    INSERT ls_excp INTO TABLE lt_excps.
     CALL FUNCTION 'TMS_MGR_IMPORT_TR_REQUEST'
-      EXPORTING
-        iv_system             = system
-        iv_request            = trkorr
-        iv_client             = sy-mandt
-        iv_ctc_active         = ' '
-        iv_overtake           = ' '
-        iv_import_again       = 'X'
-        iv_ignore_originality = 'X'
-        iv_ignore_repairs     = ' '
-        iv_ignore_transtype   = 'X'
-        iv_ignore_tabletype   = 'X'
-        iv_ignore_predec      = 'X'
-        iv_ignore_cvers       = 'X'
-        iv_test_import        = ' '
-        iv_subset             = ' '
-        iv_offline            = ' '
-        iv_monitor            = 'X'
-        iv_verbose            = 'X'
-      IMPORTING
-        et_tp_imports         = imports
-      EXCEPTIONS
-        error_message         = 1
-        OTHERS                = 2.
+      PARAMETER-TABLE lt_params
+      EXCEPTION-TABLE lt_excps.
     subrc = sy-subrc.
     msgty = sy-msgty.
     msgid = sy-msgid.
@@ -1383,24 +1939,18 @@ CLASS lcl_report IMPLEMENTATION.
     msgv3 = sy-msgv3.
     msgv4 = sy-msgv4.
 
-    READ TABLE imports INDEX 1 INTO import.
-    IF sy-subrc <> 0.
-      subrc = 1.
-      RETURN.
-    ENDIF.
-    tpstdout = import-tp_stdout.
-    IF import-alert-severity = 'E'
-        OR import-alert-msgty = 'E'
-        OR import-alert-msgty = 'A'.
-      IF import-alert-msgid IS NOT INITIAL
-        AND import-alert-msgno IS NOT INITIAL.
-        sy-msgid = import-alert-msgid.
-        sy-msgty = import-alert-msgty.
-        sy-msgno = import-alert-msgno.
-        sy-msgv1 = import-alert-msgv1.
-        sy-msgv2 = import-alert-msgv2.
-        sy-msgv3 = import-alert-msgv3.
-        sy-msgv4 = import-alert-msgv4.
+    IF exception-severity = 'E'
+        OR exception-msgty = 'E'
+        OR exception-msgty = 'A'.
+      IF exception-msgid IS NOT INITIAL
+        AND exception-msgno IS NOT INITIAL.
+        sy-msgid = exception-msgid.
+        sy-msgty = exception-msgty.
+        sy-msgno = exception-msgno.
+        sy-msgv1 = exception-msgv1.
+        sy-msgv2 = exception-msgv2.
+        sy-msgv3 = exception-msgv3.
+        sy-msgv4 = exception-msgv4.
         subrc = 1.
         RETURN.
       ENDIF.
@@ -1654,6 +2204,9 @@ CLASS lcl_report IMPLEMENTATION.
       header_file_name     TYPE string,
       data_file_path       TYPE string,
       header_file_path     TYPE string,
+      log_text             TYPE string,
+      file_error           TYPE string,
+      file_written         TYPE flag,
       data_file            TYPE xstring,
       header_file          TYPE xstring,
       zip                  TYPE REF TO cl_abap_zip,
@@ -1678,7 +2231,9 @@ CLASS lcl_report IMPLEMENTATION.
       tpstdout             TYPE t_tpstdout,
       tpstdout_line        LIKE LINE OF tpstdout,
       log                  TYPE string,
-      dummy_message        TYPE string.
+      dummy_message        TYPE string,
+      hash_error           TYPE string,
+      hash_exception       TYPE REF TO cx_root.
 
     CLEAR: installed, integrity, manifest.
     transport_id = trkorr.
@@ -1698,23 +2253,35 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
     get_dir_trans( IMPORTING dir_trans = dirtrans ).
     CONCATENATE 'dist/' trkorr INTO release_entry.
-    data_file_name = 'R' && trkorr+4(6) && '.' && trkorr(3).
-    header_file_name =  'K' && trkorr+4(6) && '.' && trkorr(3).
-    data_file_path = dirtrans && file_path_separator && 'data' && file_path_separator && data_file_name.
-    header_file_path =  dirtrans && file_path_separator && 'cofiles' && file_path_separator && header_file_name.
+    CONCATENATE 'R' trkorr+4(6) '.' trkorr(3) INTO data_file_name.
+    CONCATENATE 'K' trkorr+4(6) '.' trkorr(3) INTO header_file_name.
+    CONCATENATE dirtrans file_path_separator 'data' file_path_separator data_file_name INTO data_file_path.
+    CONCATENATE dirtrans file_path_separator 'cofiles' file_path_separator header_file_name INTO header_file_path.
     WRITE: /, 'Release data: ', data_file_name, ' Release header: ', header_file_name.
+    " CL_ABAP_MESSAGE_DIGEST (kernel SHA512) doesn't exist on older releases (e.g. 7.0),
+    " and CALCULATE_HASH_FOR_RAW can't do SHA512 (HASHALG is CHAR4): only when the
+    " class is missing, fall back to the plain ABAP implementation in LCL_SHA512
     TRY.
-        cl_abap_message_digest=>calculate_hash_for_raw(
+        CALL METHOD ('CL_ABAP_MESSAGE_DIGEST')=>('CALCULATE_HASH_FOR_RAW')
           EXPORTING
             if_algorithm     = 'SHA512'
             if_data          = release
           IMPORTING
-            ef_hashb64string = integrity
-        ).
-      CATCH cx_abap_message_digest.
+            ef_hashb64string = integrity.
+      CATCH cx_sy_dyn_call_error.
+        write_log( 'Kernel SHA512 not available, calculating release checksum in ABAP...' ).
+        integrity = lcl_sha512=>hash_b64( release ).
+      CATCH cx_root INTO hash_exception.
+        hash_error = hash_exception->get_text( ).
+        CONCATENATE 'CL_ABAP_MESSAGE_DIGEST:' hash_error INTO hash_error SEPARATED BY space.
+        write_log( hash_error ).
         display_error( 'Error in release checksum' ).
         RETURN.
     ENDTRY.
+    IF integrity IS INITIAL.
+      display_error( 'Error in release checksum' ).
+      RETURN.
+    ENDIF.
     IF checksum IS NOT INITIAL.
       WRITE: /, 'Verifying release integrity, to match', / checksum.
       IF integrity <> checksum.
@@ -1746,6 +2313,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF manifest IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = 'manifest.json' context = 'release' prefix = 'dist/' ).
       display_error( 'Error in release content: manifest not found' ).
       RETURN.
     ENDIF.
@@ -1756,7 +2324,7 @@ CLASS lcl_report IMPLEMENTATION.
           CHANGING
             data  = release_manifest.
       CATCH cx_sy_dyn_call_error.
-        WRITE: /, 'Package manifest was not validated.'.
+        WRITE: /, 'Package manifest was not validated: UI add-on/SAP_UI is missing?, install continues.'.
     ENDTRY.
     IF release_manifest IS NOT INITIAL.
       IF release_manifest-name <> name.
@@ -1781,6 +2349,8 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF transport_files IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = release_entry context = 'release' prefix = 'dist/' ).
+      write_log( 'Make sure the file is an installer release of trm-server/trm-rest (e.g. downloaded from trmregistry.com).' ).
       display_error( 'Error in release content: transport files not found' ).
       RETURN.
     ENDIF.
@@ -1806,6 +2376,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF header_file IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = header_file_name context = release_entry ).
       display_error( 'Error in release content: header file not found' ).
       RETURN.
     ENDIF.
@@ -1820,6 +2391,7 @@ CLASS lcl_report IMPLEMENTATION.
         OTHERS                  = 3
     ).
     IF data_file IS INITIAL OR sy-subrc <> 0.
+      log_missing_zip_entry( zip = zip expected = data_file_name context = release_entry ).
       display_error( 'Error in release content: data file not found' ).
       RETURN.
     ENDIF.
@@ -1839,17 +2411,36 @@ CLASS lcl_report IMPLEMENTATION.
     ENDIF.
 
     write_log( 'All files extracted from release, ready to import into application server.' ).
-    write_log( 'Release data: ' && data_file_path && ' Release header: ' && header_file_path ).
+    CONCATENATE 'Release data:' data_file_path 'Release header:' header_file_path INTO log_text SEPARATED BY space.
+    write_log( log_text ).
 
     CALL FUNCTION 'SAPGUI_PROGRESS_INDICATOR'
       EXPORTING
         text = 'Copying release files into application server'.
 
-    IF write_binary_file( file_path = header_file_path file = header_file ) <> 'X'.
+    CALL METHOD write_binary_file
+      EXPORTING
+        file_path = header_file_path
+        file      = header_file
+      IMPORTING
+        written   = file_written
+        error     = file_error.
+    IF file_written <> 'X'.
+      CONCATENATE 'Cannot write' header_file_path ':' file_error INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'Error writing transport header file.' ).
       RETURN.
     ENDIF.
-    IF write_binary_file( file_path = data_file_path file = data_file ) <> 'X'.
+    CALL METHOD write_binary_file
+      EXPORTING
+        file_path = data_file_path
+        file      = data_file
+      IMPORTING
+        written   = file_written
+        error     = file_error.
+    IF file_written <> 'X'.
+      CONCATENATE 'Cannot write' data_file_path ':' file_error INTO log_text SEPARATED BY space.
+      write_log( log_text ).
       display_error( 'Error writing transport data file.' ).
       RETURN.
     ENDIF.
@@ -1968,10 +2559,7 @@ CLASS lcl_report IMPLEMENTATION.
             unexpected_error             = 15
             intern_err                   = 16
             no_access                    = 17
-            invalid_translation_depth    = 18
-            wrong_mainpack_value         = 19
-            superpackage_invalid         = 20
-            OTHERS                       = 21
+            OTHERS                       = 18
         ).
         IF sy-subrc <> 0.
           display_error( 'Error in package create' ).
@@ -2029,8 +2617,9 @@ INITIALIZATION.
     online               = '@Y4@ From registry'.
   ELSE.
     sc_txt3              = 'You can provide a release via file upload.'.
+    json_err             = '@0S@ Online install is not possible: UI add-on/SAP_UI is missing.'.
   ENDIF.
-  sc_txt6                = '@X1@ TRM Installer v5.0.0 - RegestaItalia'.
+  sc_txt6                = '@X1@ TRM Installer v6.0.0 - RegestaItalia'.
   sc_txt7                = 'Visit trmregistry.com'.
   sc_titl2               = 'Registry connection settings'.
   sc_titl3               = 'Proxy settings (Optional)'.
@@ -2074,11 +2663,8 @@ INITIALIZATION.
   ENDIF.
 
 AT SELECTION-SCREEN.
-  p_proxy = replace(
-    val   = p_proxy
-    regex = 'http(s?)://'
-    with  = ''
-    occ   = 1 ).
+  " replace( ) built-in function is 7.02+, use the classic statement for 7.0
+  REPLACE FIRST OCCURRENCE OF REGEX 'http(s?)://' IN p_proxy WITH ''.
   IF sy-ucomm <> 'CERT'.
     CLEAR suppress_certificate_command.
   ENDIF.
@@ -2141,6 +2727,10 @@ AT SELECTION-SCREEN OUTPUT.
   %_p_lrest_%_app_%-text  = 'trm-rest package'.
   LOOP AT SCREEN.
     IF screen-group1 EQ 'JSN' AND json_supported <> 'X'.
+      screen-active = 0.
+      MODIFY SCREEN.
+    ENDIF.
+    IF screen-group1 EQ 'NJS' AND json_supported EQ 'X'.
       screen-active = 0.
       MODIFY SCREEN.
     ENDIF.

@@ -30,15 +30,6 @@ CLASS /atrm/cx_exception DEFINITION
         package_not_temporary    TYPE string VALUE 'PACKAGE_NOT_TEMPORARY',
       END OF c_reason .
 
-    "! Constructor
-    "! Initializes the exception with optional text ID and root cause
-    "! @parameter textid | Optional message class ID
-    "! @parameter previous | Optional reference to previous (inner) exception
-    METHODS constructor
-      IMPORTING
-        !textid   LIKE textid OPTIONAL
-        !previous LIKE previous OPTIONAL.
-
     "! Returns the stored reason code for the exception
     "! @parameter rv_reason | One of the defined constants in `c_reason`, or 'GENERIC' by default
     METHODS reason
@@ -67,7 +58,7 @@ CLASS /atrm/cx_exception DEFINITION
                 it_log     TYPE tyt_log OPTIONAL
       RAISING   /atrm/cx_exception.
 
-    DATA: message TYPE symsg READ-ONLY.
+    DATA: message TYPE /atrm/symsg READ-ONLY.
   PROTECTED SECTION.
     DATA: gv_reason TYPE string,
           gt_log    TYPE tyt_log,
@@ -87,20 +78,6 @@ ENDCLASS.
 
 
 CLASS /atrm/cx_exception IMPLEMENTATION.
-
-  METHOD constructor ##ADT_SUPPRESS_GENERATION.
-    CALL METHOD super->constructor
-      EXPORTING
-        textid   = textid
-        previous = previous.
-    MOVE-CORRESPONDING sy TO me->message.
-    if_t100_message~t100key-msgid = me->message-msgid.
-    if_t100_message~t100key-msgno = me->message-msgno.
-    if_t100_message~t100key-attr1 = me->message-msgv1.
-    if_t100_message~t100key-attr2 = me->message-msgv2.
-    if_t100_message~t100key-attr3 = me->message-msgv3.
-    if_t100_message~t100key-attr4 = me->message-msgv4.
-  ENDMETHOD.
 
   METHOD reason.
     IF gv_reason IS INITIAL.
@@ -125,10 +102,15 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD raise.
+    " raise is the only place that creates the exception (CREATE PROTECTED):
+    " the sy message is copied here, so the constructor stays the generated
+    " one and needs no ##ADT_SUPPRESS_GENERATION pragma (not known on 7.00)
     DATA: lo_exc      TYPE REF TO /atrm/cx_exception,
           lo_root     TYPE REF TO cx_root,
           lo_trm_root TYPE REF TO /atrm/cx_exception,
           lt_caused   TYPE tyt_log,
+          ls_message  TYPE /atrm/symsg,
+          lv_text     TYPE string,
           lv_dummy    TYPE string.
     IF io_root IS BOUND.
       lo_root = io_root.
@@ -149,12 +131,21 @@ CLASS /atrm/cx_exception IMPLEMENTATION.
                lo_trm_root->message-msgv4
           INTO lv_dummy.
       ELSE.
-        cl_message_helper=>set_msg_vars_for_clike( lo_root->get_text( ) ).
+        lv_text = lo_root->get_text( ).
+        cl_message_helper=>set_msg_vars_for_clike( lv_text ).
       ENDIF.
     ELSEIF iv_message IS SUPPLIED.
       cl_message_helper=>set_msg_vars_for_clike( iv_message ).
     ENDIF.
+    MOVE-CORRESPONDING sy TO ls_message.
     CREATE OBJECT lo_exc EXPORTING previous = lo_root.
+    lo_exc->message = ls_message.
+    lo_exc->if_t100_message~t100key-msgid = ls_message-msgid.
+    lo_exc->if_t100_message~t100key-msgno = ls_message-msgno.
+    lo_exc->if_t100_message~t100key-attr1 = ls_message-msgv1.
+    lo_exc->if_t100_message~t100key-attr2 = ls_message-msgv2.
+    lo_exc->if_t100_message~t100key-attr3 = ls_message-msgv3.
+    lo_exc->if_t100_message~t100key-attr4 = ls_message-msgv4.
     lo_exc->gv_reason = iv_reason.
     lo_exc->gt_log = it_log.
     "keep the diagnostics of a wrapped trm exception: its log and the stack
