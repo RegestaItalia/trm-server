@@ -1,3 +1,6 @@
+CLASS ltc_package DEFINITION DEFERRED.
+CLASS /atrm/cl_package DEFINITION LOCAL FRIENDS ltc_package.
+
 CLASS ltc_package DEFINITION FOR TESTING
   "#AU Risk_Level Harmless
   "#AU Duration Short
@@ -9,6 +12,7 @@ CLASS ltc_package DEFINITION FOR TESTING
     METHODS subpackages_contain_child FOR TESTING.
     METHODS all_packages_start_with_root FOR TESTING.
     METHODS same_as_package_api FOR TESTING.
+    METHODS target_same_as_cts FOR TESTING.
 ENDCLASS.
 
 CLASS ltc_package IMPLEMENTATION.
@@ -97,6 +101,44 @@ CLASS ltc_package IMPLEMENTATION.
     lv_lines_api = lines( lt_api ).
     cl_aunit_assert=>assert_equals( act = lv_lines_own exp = lv_lines_api msg = 'Subpackage count differs from package API' ).
     cl_aunit_assert=>assert_equals( act = lt_subpackages exp = lt_api msg = 'Subpackages differ from package API' ).
+  ENDMETHOD.
+
+  METHOD target_same_as_cts.
+    " The temporary request must have the target CTS checks the package against:
+    " get_devclass_target must agree with TR_GET_TRANSPORT_TARGET, $SPL packages included
+    DATA: lt_devclass TYPE STANDARD TABLE OF devclass,
+          lt_sample   TYPE STANDARD TABLE OF devclass,
+          lv_devclass TYPE devclass,
+          lv_own      TYPE tr_target,
+          lv_cts      TYPE tr_target,
+          lv_msg      TYPE string.
+    SELECT devclass FROM tdevc INTO TABLE lt_devclass WHERE pdevclass = '$SPL'.
+    SELECT devclass FROM tdevc UP TO 50 ROWS INTO TABLE lt_sample
+      WHERE pdevclass <> '$SPL' AND devclass NOT LIKE '$%'.
+    APPEND LINES OF lt_sample TO lt_devclass.
+    LOOP AT lt_devclass INTO lv_devclass.
+      CLEAR lv_cts.
+      TRY.
+          CALL FUNCTION 'TR_GET_TRANSPORT_TARGET'
+            EXPORTING
+              iv_development_class       = lv_devclass
+            IMPORTING
+              ev_target                  = lv_cts
+            EXCEPTIONS
+              wrong_call                 = 1
+              invalid_input              = 2
+              cts_initialization_failure = 3
+              OTHERS                     = 4.
+        CATCH cx_sy_dyn_call_error.
+          RETURN. " another signature on this release: nothing to compare with
+      ENDTRY.
+      IF sy-subrc <> 0.
+        CLEAR lv_cts.
+      ENDIF.
+      lv_own = /atrm/cl_package=>get_devclass_target( lv_devclass ).
+      CONCATENATE 'Target of package' lv_devclass 'differs from CTS' INTO lv_msg SEPARATED BY space.
+      cl_aunit_assert=>assert_equals( act = lv_own exp = lv_cts msg = lv_msg ).
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.

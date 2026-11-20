@@ -133,6 +133,12 @@ CLASS /atrm/cl_package DEFINITION
       IMPORTING package TYPE REF TO if_package
       EXPORTING request TYPE trkorr
       RAISING   /atrm/cx_exception.
+"! Consolidation target of a stored package as CTS determines it (TR_GET_TRANSPORT_TARGET): the
+    "! target of its transport layer, or for the super package layer $SPL the target of its superpackage
+    "! (recursively), blank when there is none or the package doesn't exist
+    CLASS-METHODS get_devclass_target
+      IMPORTING devclass      TYPE devclass
+      RETURNING VALUE(target) TYPE tr_target.
 ENDCLASS.
 
 
@@ -821,9 +827,14 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     "once saved). A new package is checked with the layer it is created with
     SELECT SINGLE pdevclass FROM tdevc INTO lv_layer WHERE devclass = package->package_name.
     IF sy-subrc <> 0.
-      lv_target = get_layer_target( package->transport_layer ).
+      "the super package layer $SPL takes the target of the superpackage
+      IF package->transport_layer = '$SPL'.
+        lv_target = get_devclass_target( package->super_package_name ).
+      ELSE.
+        lv_target = get_layer_target( package->transport_layer ).
+      ENDIF.
     ELSE.
-      lv_target = get_layer_target( lv_layer ).
+      lv_target = get_devclass_target( package->package_name ).
       IF lv_target IS INITIAL.
         "a blank target would get the system's default target: LOCAL creates a local request
         lv_target = 'LOCAL'.
@@ -847,11 +858,13 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     "TR_REQ_CHECK_OBJECT buffers the last checked package in a static (SS_TDEVC) and reads
     "TDEVC again only for a different package: after an earlier save of this package in the
     "same session it checks the stale layer and refuses the request with TK 332. Checking
-    "another package first (a read-only check, its result is irrelevant) refreshes it
+    "another package first (a read-only check, its result is irrelevant) refreshes it.
+    "A $ package (or a DEVC entry named $...) is refused (TK 301) before the buffer is read
     SELECT pgmid object obj_name FROM tadir UP TO 1 ROWS
       INTO (ls_object-pgmid, ls_object-object, ls_object-obj_name)
       WHERE pgmid = 'R3TR' AND object = 'DEVC'
-        AND devclass <> package->package_name AND devclass NOT LIKE '$%'.
+        AND devclass <> package->package_name AND devclass NOT LIKE '$%'
+        AND obj_name NOT LIKE '$%'.
     ENDSELECT.
     IF sy-subrc = 0.
       ls_header-trkorr         = request.
@@ -893,5 +906,28 @@ CLASS /atrm/cl_package IMPLEMENTATION.
     IF lx_cleanup IS BOUND.
       /atrm/cx_exception=>raise( io_root = lx_cleanup it_log = lt_log ).
     ENDIF.
+  ENDMETHOD.
+
+  METHOD get_devclass_target.
+    DATA: lv_devclass TYPE devclass,
+          lv_layer    TYPE devlayer,
+          lv_parentcl TYPE devclass.
+
+    CLEAR target.
+    lv_devclass = devclass.
+    "$SPL: the package is transported with its superpackage (TR_GET_TRANSPORT_TARGET follows
+    "PARENTCL the same way); the bound only guards against a TDEVC hierarchy cycle
+    DO 100 TIMES.
+      SELECT SINGLE pdevclass parentcl FROM tdevc INTO (lv_layer, lv_parentcl)
+        WHERE devclass = lv_devclass.
+      IF sy-subrc <> 0.
+        RETURN.
+      ENDIF.
+      IF lv_layer <> '$SPL' OR lv_parentcl IS INITIAL.
+        EXIT.
+      ENDIF.
+      lv_devclass = lv_parentcl.
+    ENDDO.
+    target = get_layer_target( lv_layer ).
   ENDMETHOD.
 ENDCLASS.
