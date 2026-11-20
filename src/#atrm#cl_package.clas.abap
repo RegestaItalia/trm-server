@@ -808,6 +808,8 @@ CLASS /atrm/cl_package IMPLEMENTATION.
           lv_task_type TYPE trfunction,
           lv_request   TYPE trkorr,
           lv_reason    TYPE string,
+          ls_object    TYPE e071,
+          ls_header    TYPE trwbo_request_header,
           lx_save      TYPE REF TO /atrm/cx_exception,
           lx_cleanup   TYPE REF TO /atrm/cx_exception,
           lt_log       TYPE /atrm/cx_exception=>tyt_log,
@@ -841,6 +843,27 @@ CLASS /atrm/cl_package IMPLEMENTATION.
                                                          with_task = 'X'
                                                          task_type = lv_task_type ).
     request = lo_transport->get_trkorr( ).
+
+    "TR_REQ_CHECK_OBJECT buffers the last checked package in a static (SS_TDEVC) and reads
+    "TDEVC again only for a different package: after an earlier save of this package in the
+    "same session it checks the stale layer and refuses the request with TK 332. Checking
+    "another package first (a read-only check, its result is irrelevant) refreshes it
+    SELECT pgmid object obj_name FROM tadir UP TO 1 ROWS
+      INTO (ls_object-pgmid, ls_object-object, ls_object-obj_name)
+      WHERE pgmid = 'R3TR' AND object = 'DEVC'
+        AND devclass <> package->package_name AND devclass NOT LIKE '$%'.
+    ENDSELECT.
+    IF sy-subrc = 0.
+      ls_header-trkorr         = request.
+      ls_header-trfunction     = 'K'.
+      ls_header-clients_filled = 'X'.
+      CALL FUNCTION 'TR_REQ_CHECK_OBJECT'
+        EXPORTING
+          is_object         = ls_object
+          is_request_header = ls_header
+        EXCEPTIONS
+          OTHERS            = 1.
+    ENDIF.
 
     lv_request = request.
     TRY.
